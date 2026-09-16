@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="ScoreTrack">
+  <!-- Variante monochrome (currentColor, sans fond) : icône inline, masque, impression. -->
+  <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <g stroke-width="40">
+      <path d="M172 110.51A168 168 0 0 1 340 110.51"/>
+      <path d="M401.49 172A168 168 0 0 1 401.49 340"/>
+      <path d="M340 401.49A168 168 0 0 1 172 401.49"/>
+      <path d="M110.51 340A168 168 0 0 1 110.51 172"/>
+    </g>
+    <g stroke-width="30">
+      <path d="M200 192v128"/>
+      <path d="M256 192v128"/>
+      <path d="M312 192v128"/>
+      <path d="M166 322 346 190"/>
+    </g>
+  </g>
+</svg>
