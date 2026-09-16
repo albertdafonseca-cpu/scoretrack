@@ -1,0 +1,12 @@
+node_modules
+test-results
+playwright-report
+.lighthouseci
+coverage
+package-lock.json
+assets
+icons
+css/fonts.css
+# Fichiers de l'élément assets : formatés par leur propriétaire
+scripts/build-icons.mjs
+scripts/fetch-fonts.mjs

@@ -1,0 +1,85 @@
+/* Base — reset, page, utilitaires, splash. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+html {
+  overflow-x: hidden;
+  width: 100%;
+  height: 100%;
+}
+body {
+  height: 100%;
+  width: 100%;
+  min-height: 100vh;
+  background: var(--bg-grad);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  overflow-x: hidden;
+}
+
+.page {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  padding: 44px 20px 80px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--bg-grad);
+  width: 100%;
+  box-sizing: border-box;
+}
+.page.active {
+  display: flex;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ── SPLASH ── */
+#splash {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #020d12;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  transition: opacity 0.5s ease;
+}
+#splash.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+.splash-icon {
+  font-size: 52px;
+  animation: splashBounce 1s ease-in-out infinite;
+}
+.splash-title {
+  font-family: 'Orbitron', monospace;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: #00ffe0;
+  text-shadow: 0 0 16px #00ffe0;
+}
+.splash-sub {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: #4a9880;
+  text-transform: uppercase;
+}

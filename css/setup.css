@@ -1,0 +1,624 @@
+/* Écrans de configuration : setup, réglages (thème), noms. */
+/* SETUP */
+.logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 32px;
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+}
+.logo-gear {
+  position: absolute;
+  right: 0;
+  top: 0;
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  opacity: 0.6;
+  padding: 4px;
+  transition: opacity 0.2s;
+}
+.logo-gear:hover {
+  opacity: 1;
+}
+.logo-mark {
+  width: 60px;
+  height: 60px;
+  border-radius: var(--radius);
+  margin-bottom: 12px;
+  border: 2px solid var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  box-shadow:
+    0 0 20px var(--accent),
+    inset 0 0 20px rgba(0, 0, 0, 0.1);
+}
+.logo-name {
+  font-family: var(--btn-font);
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  text-shadow: 0 0 12px var(--accent);
+  text-transform: uppercase;
+}
+.logo-sub {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: var(--muted2);
+  margin-top: 4px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+.setup-section {
+  width: 100%;
+  max-width: 420px;
+  margin-bottom: 22px;
+}
+.setup-label {
+  font-family: var(--btn-font);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  color: var(--accent2);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  display: block;
+  text-shadow: 0 0 8px var(--accent2);
+}
+
+.players-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 8px;
+  width: 100%;
+}
+.points-presets {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 8px;
+  width: 100%;
+}
+
+/* Chip non sélectionnée : fond teinté thème, texte discret */
+.player-chip {
+  aspect-ratio: 1;
+  border-radius: var(--radius);
+  background: var(--chip-bg);
+  border: 1.5px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--btn-font);
+  font-size: clamp(10px, 3.5vw, 18px);
+  font-weight: 700;
+  color: var(--chip-text);
+  cursor: pointer;
+  transition: all 0.15s;
+  min-width: 0;
+  overflow: hidden;
+}
+/* Chip sélectionnée : fond plein Tol, texte contrasté (noir ou blanc) */
+.player-chip.on {
+  background: var(--chip-on);
+  border-color: var(--chip-on);
+  color: var(--chip-on-text);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--chip-on) 50%, transparent);
+}
+
+.points-chip {
+  aspect-ratio: 1;
+  border-radius: var(--radius);
+  background: var(--chip-bg);
+  border: 1.5px solid transparent;
+  font-family: var(--btn-font);
+  font-size: clamp(9px, 2.8vw, 15px);
+  font-weight: 700;
+  color: var(--chip-text);
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  overflow: hidden;
+}
+.points-chip.on {
+  background: var(--chip-on);
+  border-color: var(--chip-on);
+  color: var(--chip-on-text);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--chip-on) 50%, transparent);
+}
+.points-chip.disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.points-input {
+  width: 100%;
+  padding: 11px 14px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 16px;
+  outline: none;
+  transition: all 0.2s;
+  -webkit-user-select: auto;
+  user-select: auto;
+}
+.points-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 12px var(--accent);
+}
+.points-input::placeholder {
+  color: var(--muted2);
+  opacity: 0.5;
+}
+
+.go-btn {
+  width: 100%;
+  max-width: 420px;
+  padding: 17px;
+  background: var(--accent);
+  color: var(--bg);
+  border: 2px solid var(--accent);
+  border-radius: var(--radius);
+  font-family: var(--btn-font);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transition: all 0.18s;
+  margin-top: 8px;
+}
+.go-btn:disabled {
+  background: var(--surface);
+  color: var(--muted2);
+  border-color: var(--border);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+.go-btn:not(:disabled):active {
+  transform: scale(0.98);
+  opacity: 0.85;
+}
+
+/* PARAMÈTRES */
+.settings-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 32px;
+  width: 100%;
+  max-width: 420px;
+}
+.back-btn {
+  background: none;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--muted2);
+  font-size: 16px;
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.settings-title {
+  font-family: var(--btn-font);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--accent);
+  text-shadow: 0 0 10px var(--accent);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.themes-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  width: 100%;
+  max-width: 420px;
+  margin-bottom: 8px;
+}
+.theme-card {
+  border-radius: 10px;
+  padding: 14px 12px 10px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.18s;
+  position: relative;
+}
+.theme-card.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 16px var(--accent);
+}
+.theme-card-name {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.theme-swatches {
+  display: flex;
+  gap: 5px;
+}
+.theme-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+}
+.theme-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 14px;
+  display: none;
+}
+.theme-card.selected .theme-check {
+  display: block;
+}
+.save-btn {
+  width: 100%;
+  max-width: 420px;
+  padding: 16px;
+  background: transparent;
+  color: var(--accent);
+  border: 2px solid var(--accent);
+  border-radius: var(--radius);
+  font-family: var(--btn-font);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-shadow: 0 0 8px var(--accent);
+  margin-top: 16px;
+  transition: all 0.18s;
+}
+.save-btn:active {
+  transform: scale(0.98);
+}
+.save-confirm {
+  text-align: center;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  color: var(--green);
+  margin-top: 10px;
+  height: 16px;
+  text-shadow: 0 0 8px var(--green);
+}
+
+/* NAMES */
+.names-title {
+  font-family: var(--btn-font);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--accent);
+  text-shadow: 0 0 12px var(--accent);
+  margin-bottom: 4px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.names-sub {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  color: var(--muted2);
+  margin-bottom: 12px;
+}
+#names-list {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.name-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+}
+.name-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: calc(var(--radius) - 2px);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--btn-font);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--bg);
+  border: 1.5px solid currentColor;
+}
+.name-input {
+  flex: 1;
+  padding: 8px 0;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 16px;
+  outline: none;
+  -webkit-user-select: auto;
+  user-select: auto;
+  min-width: 0;
+}
+.name-input::placeholder {
+  color: var(--muted2);
+  opacity: 0.6;
+}
+.names-go-btn {
+  width: 100%;
+  max-width: 420px;
+  padding: 16px;
+  background: transparent;
+  color: var(--accent2);
+  border: 2px solid var(--accent2);
+  border-radius: var(--radius);
+  font-family: var(--btn-font);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 8px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-shadow: 0 0 8px var(--accent2);
+  transition: all 0.18s;
+}
+.names-go-btn:active {
+  transform: scale(0.98);
+}
+.names-back {
+  background: none;
+  border: none;
+  color: var(--muted2);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 8px;
+}
+
+/* PRÉRÉGLAGES DE JEUX */
+.presets-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.preset-card {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: left;
+}
+.preset-card:active {
+  transform: scale(0.97);
+}
+.preset-card.on {
+  border-color: var(--accent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.preset-card-name {
+  font-family: var(--btn-font);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.preset-card-detail {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: var(--muted2);
+}
+/* PROFILS JOUEURS */
+.profiles-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+  min-height: 0;
+}
+.profile-chip {
+  background: var(--chip-bg);
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  padding: 5px 10px 5px 12px;
+  font-family: var(--btn-font);
+  font-size: 11px;
+  color: var(--chip-text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s;
+}
+.profile-chip:active {
+  opacity: 0.7;
+}
+.profile-chip-del {
+  font-size: 13px;
+  opacity: 0.45;
+  line-height: 1;
+  padding-left: 2px;
+}
+/* NAMES PAGE extras */
+.names-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  width: 100%;
+  max-width: 420px;
+}
+.names-action-btn {
+  flex: 1;
+  padding: 10px 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--muted2);
+  font-family: var(--btn-font);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.names-action-btn:active {
+  transform: scale(0.96);
+}
+/* TOGGLE */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.toggle-label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+  color: var(--text);
+}
+.toggle-sub {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px;
+  color: var(--muted2);
+  margin-top: 2px;
+}
+.toggle-switch {
+  width: 44px;
+  height: 26px;
+  border-radius: 13px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  position: relative;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.toggle-switch.on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.toggle-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+.toggle-switch.on::after {
+  transform: translateX(18px);
+}
+/* BANNER PARTIE SAUVEGARDÉE */
+.restore-banner {
+  width: 100%;
+  max-width: 420px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.restore-banner-text {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  color: var(--accent);
+  line-height: 1.4;
+}
+.restore-banner-btns {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.restore-btn {
+  padding: 7px 12px;
+  border: none;
+  border-radius: var(--radius);
+  font-family: var(--btn-font);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.restore-btn.yes {
+  background: var(--chip-on);
+  color: var(--chip-on-text);
+}
+.restore-btn.no {
+  background: var(--surface2);
+  color: var(--muted2);
+}
+
+/* ── Setup btn row ── */
+.setup-btn-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  max-width: 420px;
+  margin-top: 8px;
+}
+.names-back-flex {
+  flex: 1;
+  padding: 10px;
+}
+/* ── Bouton confidentialité settings ── */
+.btn-privacy-link {
+  margin-top: 8px;
+  opacity: 0.6;
+  font-size: 10px;
+}
+
+/* ── Bouton vider les cases ── */
+.btn-vider-cases-st {
+  width: 100%;
+  max-width: 420px;
+  margin-top: 4px;
+  padding: 5px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--muted2);
+  font-family: var(--btn-font);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}

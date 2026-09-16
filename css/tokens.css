@@ -1,0 +1,41 @@
+/* Jetons de thème par défaut (Cyberpunk) — variables consommées par toutes les feuilles. */
+/*
+  --chip-bg      : fond chip non sélectionné (teinté thème)
+  --chip-text    : texte chip non sélectionné
+  --chip-on      : fond chip sélectionné (Tol, plein)
+  --chip-on-text : texte chip sélectionné (blanc ou noir selon luminosité)
+  --bg-grad      : dégradé de fond de page (du thème)
+*/
+:root {
+  --bg: #020d12;
+  --bg2: #041018;
+  --surface: #071a24;
+  --surface2: #0a2030;
+  --border: rgba(0, 255, 200, 0.15);
+  --accent: #00ffe0;
+  --accent2: #00bfff;
+  --green: #00ff88;
+  --red: #ff2d6b;
+  --text: #e0fff8;
+  --muted: #2a7060;
+  --muted2: #4a9880;
+  --btn-font: 'Orbitron', monospace;
+  --score-font: 'Share Tech Mono', monospace;
+  --radius: 6px;
+  --chip-bg: #0d2535;
+  --chip-text: #4a9880;
+  --chip-on: #66ccee;
+  --chip-on-text: #000000;
+  --bg-grad:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='46'%3E%3Cpath d='M20 3l17 10v20L20 43 3 33V13z' fill='none' stroke='%2300ffe0' stroke-width='0.6' opacity='0.12'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse at 50% 0%, #0a2030 0%, #020d12 70%);
+  --modal-bg: rgba(0, 5, 12, 0.92);
+  --modal-glow: 0 -8px 40px rgba(0, 255, 200, 0.12);
+}
+
+/* cyber : circuit hexagonal (texture de carte par défaut) */
+:root {
+  --card-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='46'%3E%3Cpath d='M20 3l17 10v20L20 43 3 33V13z' fill='none' stroke='%2300ffe0' stroke-width='0.8'/%3E%3C/svg%3E");
+  --card-texture-size: 40px 46px;
+  --card-texture-opacity: 0.12;
+}
