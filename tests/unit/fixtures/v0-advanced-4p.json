@@ -1,0 +1,33 @@
+{
+  "players": [
+    { "playerName": "Alice", "score": 39, "eliminated": false },
+    { "playerName": "Bob <b>&'\"", "score": 0, "eliminated": true },
+    { "playerName": "Chloé", "score": 25, "eliminated": false },
+    { "playerName": "", "score": 38, "eliminated": false }
+  ],
+  "seatOrder": [3, 0, 1, 2],
+  "history": [
+    {
+      "playerIdx": 3,
+      "who": "",
+      "entries": [{ "delta": -1 }, { "delta": -1 }],
+      "open": true,
+      "rank": 4
+    },
+    {
+      "playerIdx": 1,
+      "who": "Bob <b>&'\"",
+      "entries": [{ "delta": -40 }],
+      "open": false,
+      "rank": 3
+    },
+    { "playerIdx": 2, "who": "Chloé", "entries": [{ "delta": -15 }], "open": false, "rank": 2 },
+    { "playerIdx": 0, "who": "Alice", "entries": [{ "delta": -1 }], "open": false, "rank": 1 }
+  ],
+  "actionCounter": 4,
+  "numPlayers": 4,
+  "startPoints": 40,
+  "maxPoints": 40,
+  "allowNeg": false,
+  "ts": 1789598912802
+}

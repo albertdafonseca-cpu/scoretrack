@@ -1,0 +1,137 @@
+# Intégration continue ScoreTrack.
+# Aucun secret n'est requis : tout s'exécute avec le GITHUB_TOKEN implicite en lecture seule.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: 22
+
+jobs:
+  lint:
+    name: Lint (eslint, prettier, précache SW, emoji)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: ESLint
+        run: npx eslint .
+      - name: Prettier
+        run: npx prettier --check .
+      - name: Précache du service worker à jour
+        run: npm run check:sw
+      - name: Aucun emoji système dans l'interface (si le script existe)
+        run: |
+          if [ -f scripts/lint-no-emoji.mjs ]; then
+            node scripts/lint-no-emoji.mjs
+          else
+            echo "scripts/lint-no-emoji.mjs absent : étape ignorée"
+          fi
+
+  unit:
+    name: Tests unitaires (vitest + couverture)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Vitest avec couverture
+        run: >
+          npx vitest run --coverage
+          --coverage.reporter=text-summary --coverage.reporter=lcov --coverage.reporter=html
+      - name: Couverture (artefact)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: couverture-unitaire
+          path: coverage/
+          retention-days: 14
+
+  e2e:
+    name: Tests de bout en bout (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Navigateur Chromium (CI uniquement)
+        run: npx playwright install --with-deps chromium
+      - name: Playwright
+        run: npx playwright test --reporter=list,html
+      - name: Traces et captures des échecs (artefact)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-echecs
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  lighthouse:
+    name: Lighthouse (budget lighthouserc.json)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Navigateur Chromium (le même que les tests e2e)
+        run: npx playwright install --with-deps chromium
+      - name: Chemin de Chromium pour Lighthouse
+        run: >
+          echo "CHROME_PATH=$(node -e "console.log(require('@playwright/test').chromium.executablePath())")"
+          >> "$GITHUB_ENV"
+      - name: Collecte (serveur statique local) puis assertions
+        run: npm run lhci
+      - name: Rapports Lighthouse (artefact)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse
+          path: .lighthouseci/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  audit:
+    name: Audit des dépendances
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      # Le projet n'a AUCUNE dépendance à l'exécution (D2) : `--omit=dev` audite donc un arbre vide et
+      # documente ce fait à chaque exécution. Les dépendances de développement sont auditées séparément
+      # au niveau critique.
+      - name: Dépendances de production (aucune attendue)
+        run: npm audit --omit=dev --audit-level=high
+      - name: Dépendances de développement (critique)
+        run: npm audit --audit-level=critical

@@ -1,12 +1,121 @@
-/* Jetons de thème par défaut (Cyberpunk) — variables consommées par toutes les feuilles. */
-/*
-  --chip-bg      : fond chip non sélectionné (teinté thème)
-  --chip-text    : texte chip non sélectionné
-  --chip-on      : fond chip sélectionné (Tol, plein)
-  --chip-on-text : texte chip sélectionné (blanc ou noir selon luminosité)
-  --bg-grad      : dégradé de fond de page (du thème)
+/* Jetons de design — source unique des tailles, espacements, rayons, durées, ombres, icônes
+   et couleurs sémantiques. Le bloc :root porte aussi le thème par défaut (Cyberpunk) ;
+   chaque [data-theme] de themes.css redéfinit les jetons de couleur listés sous « THÈME ».
+
+   Jetons de couleur consommés par les feuilles :
+   --bg / --bg2 / --surface / --surface2  fonds (page, barre, cartes UI, boutons)
+   --border                                bordures fines (alpha)
+   --accent / --accent2                    accent principal (titres, CTA) et secondaire (libellés)
+   --text / --muted2                       texte principal et texte secondaire (≥ 4,5:1 garanti)
+   --muted                                 gris décoratif (séparateurs, non utilisé pour du texte)
+   --gain / --loss / --warn                sémantique daltonien-safe (bleu / orange / ambre)
+   --focus                                 anneau de focus (≥ 3:1 sur bg, surface, surface2)
+   --chip-bg / --chip-text / --chip-on / --chip-on-text   puces de sélection
+   --score-color / --score-low / --score-crit             couleur du score (normal / bas / critique)
+   --card-1 … --card-10                    fonds des cartes joueurs (dérivés, voir themes.css)
+   --font-display / --font-ui / --font-score  familles (≤ 2 par thème) ; --btn-font / --score-font = alias
 */
 :root {
+  color-scheme: dark;
+
+  /* ── Typographie : échelle ×1,2 arrondie au pixel, plancher 11 px (D7) ── */
+  --fs-1: 11px;
+  --fs-2: 13px;
+  --fs-3: 15px;
+  --fs-4: 18px;
+  --fs-5: 22px;
+  --fs-6: 26px;
+  --fs-7: 32px;
+  --fs-8: 40px;
+  --lh-tight: 1.1;
+  --lh-base: 1.45;
+  --lh-loose: 1.65;
+  --tracking-wide: 0.08em;
+  --tracking-caps: 0.16em;
+
+  /* ── Espacements : grille 4 px ── */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+
+  /* ── Rayons (--radius reste la « signature » du thème) ── */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 16px;
+  --radius-full: 999px;
+
+  /* ── Cibles tactiles et icônes ── */
+  --tap-min: 44px;
+  --icon-size: 1em;
+  --icon-stroke: 2;
+
+  /* ── Mouvement ── */
+  --dur-1: 120ms;
+  --dur-2: 220ms;
+  --dur-3: 360ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  /* Repli du ressort pour les navigateurs sans linear() ; surchargé sous @supports ci-dessous. */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* ── Ombres ── */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.35);
+  --shadow-3: 0 12px 32px rgba(0, 0, 0, 0.45);
+
+  /* ── Palette Paul Tol « bright » (12 couleurs joueurs, = COLORS de js/core/constants.js) ── */
+  --tol-1: #4477aa;
+  --tol-2: #ee6677;
+  --tol-3: #ccbb44;
+  --tol-4: #aa3377;
+  --tol-5: #228833;
+  --tol-6: #66ccee;
+  --tol-7: #bbbbbb;
+  --tol-8: #ee7733;
+  --tol-9: #0077bb;
+  --tol-10: #ee3377;
+  --tol-11: #44aa99;
+  --tol-12: #ddcc77;
+
+  /* ── Sémantique daltonien-safe (fond sombre) ──
+     gain = Tol bright cyan #66CCEE éclairci (écart de luminance ≥ 20 % avec la perte sous les
+     trois dichromaties, cf. scripts/audit-cvd.mjs), perte = Tol #EE7733 éclairci de 12 % (≥ 4,5:1
+     sur toutes les surfaces sombres), ambre = score bas. Les thèmes clairs redéfinissent la paire. */
+  --gain: #8fe0ff;
+  --loss: #ff8844;
+  --warn: #ffb454;
+  --focus: var(--accent);
+  --focus-ring: 0 0 0 3px var(--focus);
+  /* Anciens noms conservés pour compatibilité : alias de la paire daltonien-safe (D1). */
+  --green: var(--gain);
+  --red: var(--loss);
+
+  /* ── Cartes joueurs : Tol mélangé au fond du thème en OKLab (voir themes.css) ── */
+  --card-mix: 30%;
+  --card-base: var(--bg);
+  --card-1: color-mix(in oklab, var(--tol-1) var(--card-mix), var(--card-base));
+  --card-2: color-mix(in oklab, var(--tol-2) var(--card-mix), var(--card-base));
+  --card-3: color-mix(in oklab, var(--tol-3) var(--card-mix), var(--card-base));
+  --card-4: color-mix(in oklab, var(--tol-4) var(--card-mix), var(--card-base));
+  --card-5: color-mix(in oklab, var(--tol-5) var(--card-mix), var(--card-base));
+  --card-6: color-mix(in oklab, var(--tol-6) var(--card-mix), var(--card-base));
+  --card-7: color-mix(in oklab, var(--tol-7) var(--card-mix), var(--card-base));
+  --card-8: color-mix(in oklab, var(--tol-8) var(--card-mix), var(--card-base));
+  --card-9: color-mix(in oklab, var(--tol-9) var(--card-mix), var(--card-base));
+  --card-10: color-mix(in oklab, var(--tol-10) var(--card-mix), var(--card-base));
+  --card-text: #ffffff;
+  --card-sign: rgba(255, 255, 255, 0.72);
+  --score-color: var(--accent);
+  --score-low: var(--warn);
+  --score-crit: var(--text);
+
+  /* ── THÈME par défaut : Cyberpunk ── */
   --bg: #020d12;
   --bg2: #041018;
   --surface: #071a24;
@@ -14,16 +123,18 @@
   --border: rgba(0, 255, 200, 0.15);
   --accent: #00ffe0;
   --accent2: #00bfff;
-  --green: #00ff88;
-  --red: #ff2d6b;
   --text: #e0fff8;
-  --muted: #2a7060;
-  --muted2: #4a9880;
-  --btn-font: 'Orbitron', monospace;
-  --score-font: 'Share Tech Mono', monospace;
+  --muted-mix: 66%;
+  --muted: color-mix(in oklab, var(--text) 40%, var(--bg));
+  --muted2: color-mix(in oklab, var(--text) var(--muted-mix), var(--bg));
+  --font-display: 'Orbitron', monospace;
+  --font-score: 'Share Tech Mono', monospace;
+  --font-ui: 'Share Tech Mono', monospace;
+  --btn-font: var(--font-display);
+  --score-font: var(--font-score);
   --radius: 6px;
   --chip-bg: #0d2535;
-  --chip-text: #4a9880;
+  --chip-text: var(--muted2);
   --chip-on: #66ccee;
   --chip-on-text: #000000;
   --bg-grad:
@@ -31,11 +142,58 @@
     radial-gradient(ellipse at 50% 0%, #0a2030 0%, #020d12 70%);
   --modal-bg: rgba(0, 5, 12, 0.92);
   --modal-glow: 0 -8px 40px rgba(0, 255, 200, 0.12);
-}
-
-/* cyber : circuit hexagonal (texture de carte par défaut) */
-:root {
+  /* cyber : circuit hexagonal (texture de carte par défaut) */
   --card-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='46'%3E%3Cpath d='M20 3l17 10v20L20 43 3 33V13z' fill='none' stroke='%2300ffe0' stroke-width='0.8'/%3E%3C/svg%3E");
   --card-texture-size: 40px 46px;
   --card-texture-opacity: 0.12;
+}
+
+/* Ressort réel (dépassement ~4 %, 360 ms) quand linear() est pris en charge. */
+@supports (animation-timing-function: linear(0, 1)) {
+  :root {
+    --ease-spring: linear(
+      0,
+      0.006,
+      0.025 2.8%,
+      0.101 6.1%,
+      0.539 18.9%,
+      0.721 25.3%,
+      0.849 31.5%,
+      0.937 38.1%,
+      0.968 41.8%,
+      0.991 45.7%,
+      1.006 50.1%,
+      1.015 55%,
+      1.017 63.9%,
+      1.001
+    );
+  }
+}
+
+/* ── Icônes SVG inline (js/ui/icons.js) : taille en em, alignées sur la ligne de base ── */
+.icon {
+  display: inline-block;
+  width: var(--icon-size);
+  height: var(--icon-size);
+  flex-shrink: 0;
+  vertical-align: -0.125em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: var(--icon-stroke);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.icon[data-icon='target'] {
+  vertical-align: -0.15em;
+}
+
+/* Mouvement réduit : durées quasi nulles, aucune boucle (D7). */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-1: 1ms;
+    --dur-2: 1ms;
+    --dur-3: 1ms;
+    --ease-spring: linear;
+  }
 }

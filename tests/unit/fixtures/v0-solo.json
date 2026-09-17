@@ -1,0 +1,19 @@
+{
+  "players": [{ "playerName": "Solo", "score": 2, "eliminated": false }],
+  "seatOrder": [0],
+  "history": [
+    {
+      "playerIdx": 0,
+      "who": "Solo",
+      "entries": [{ "delta": 1 }, { "delta": 1 }],
+      "open": true,
+      "rank": 1
+    }
+  ],
+  "actionCounter": 1,
+  "numPlayers": 1,
+  "startPoints": 0,
+  "maxPoints": null,
+  "allowNeg": false,
+  "ts": 1789598916337
+}

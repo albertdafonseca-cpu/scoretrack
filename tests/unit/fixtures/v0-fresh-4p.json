@@ -1,0 +1,16 @@
+{
+  "players": [
+    { "playerName": "Alice", "score": 40, "eliminated": false },
+    { "playerName": "Bob <b>&'\"", "score": 40, "eliminated": false },
+    { "playerName": "Chloé", "score": 40, "eliminated": false },
+    { "playerName": "", "score": 40, "eliminated": false }
+  ],
+  "seatOrder": [0, 1, 2, 3],
+  "history": [],
+  "actionCounter": 0,
+  "numPlayers": 4,
+  "startPoints": 40,
+  "maxPoints": 40,
+  "allowNeg": false,
+  "ts": 1789598910065
+}

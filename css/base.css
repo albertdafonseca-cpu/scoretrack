@@ -1,4 +1,4 @@
-/* Base — reset, page, utilitaires, splash. */
+/* Base — reset, page, utilitaires (accessibilité), splash. */
 *,
 *::before,
 *::after {
@@ -15,10 +15,9 @@
 html {
   overflow-x: hidden;
   width: 100%;
-  height: 100%;
+  min-height: 100%;
 }
 body {
-  height: 100%;
   width: 100%;
   min-height: 100vh;
   background: var(--bg-grad);
@@ -27,17 +26,22 @@ body {
   overflow-x: hidden;
 }
 
+/* Les champs de saisie restent sélectionnables (copier/coller autorisé). */
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 .page {
   display: none;
   flex-direction: column;
   align-items: center;
   min-height: 100vh;
-  padding: 44px 20px 80px;
-  overflow-y: auto;
-  overflow-x: hidden;
+  padding: calc(32px + env(safe-area-inset-top, 0px)) calc(20px + env(safe-area-inset-right, 0px))
+    calc(48px + env(safe-area-inset-bottom, 0px)) calc(20px + env(safe-area-inset-left, 0px));
   background: var(--bg-grad);
   width: 100%;
-  box-sizing: border-box;
 }
 .page.active {
   display: flex;
@@ -46,19 +50,60 @@ body {
 .hidden {
   display: none !important;
 }
+[hidden] {
+  display: none !important;
+}
 
-/* ── SPLASH ── */
+/* Texte réservé aux technologies d'assistance. */
+.sr-only {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Focus visible uniforme (clavier) : anneau ≥ 2 px, décalé pour rester lisible sur tout fond. */
+:focus {
+  outline: none;
+}
+:focus-visible {
+  outline: 3px solid var(--focus, var(--accent));
+  outline-offset: 2px;
+  box-shadow: 0 0 0 5px var(--bg);
+}
+
+/* Icônes vectorielles : suivent la taille et la couleur du texte. */
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25em;
+  height: 1.25em;
+  vertical-align: -0.25em;
+  flex-shrink: 0;
+}
+.icon > svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* ── SPLASH (≤ 200 ms, absent sous prefers-reduced-motion) ── */
 #splash {
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background: #020d12;
+  background: var(--bg);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 16px;
-  transition: opacity 0.5s ease;
+  transition: opacity var(--dur-2, 200ms) ease;
 }
 #splash.hidden {
   opacity: 0;
@@ -66,20 +111,29 @@ body {
 }
 .splash-icon {
   font-size: 52px;
+  color: var(--accent);
   animation: splashBounce 1s ease-in-out infinite;
 }
 .splash-title {
-  font-family: 'Orbitron', monospace;
-  font-size: 22px;
+  font-family: var(--btn-font);
+  font-size: var(--fs-6, 22px);
   font-weight: 700;
   letter-spacing: 0.15em;
-  color: #00ffe0;
-  text-shadow: 0 0 16px #00ffe0;
+  color: var(--accent);
+  text-shadow: 0 0 16px var(--accent);
 }
 .splash-sub {
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 11px;
+  font-family: var(--score-font);
+  font-size: var(--fs-1, 11px);
   letter-spacing: 0.2em;
-  color: #4a9880;
+  color: var(--muted2);
   text-transform: uppercase;
+}
+@media (prefers-reduced-motion: reduce) {
+  #splash {
+    display: none;
+  }
+  .splash-icon {
+    animation: none;
+  }
 }

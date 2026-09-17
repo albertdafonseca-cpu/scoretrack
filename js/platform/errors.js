@@ -6,6 +6,7 @@ const MAX_ENTRIES = 20;
 const MAX_TEXT = 500;
 
 const trunc = (s) => (typeof s === 'string' ? s.slice(0, MAX_TEXT) : '');
+const listeners = new Set();
 
 /** Lit le journal (tableau, éventuellement vide). */
 export function readErrorJournal() {
@@ -17,6 +18,9 @@ export function readErrorJournal() {
   }
 }
 
+/** Alias explicite de `readErrorJournal`. */
+export const getErrorJournal = readErrorJournal;
+
 /** Efface le journal. */
 export function clearErrorJournal() {
   try {
@@ -24,6 +28,15 @@ export function clearErrorJournal() {
   } catch {
     /* stockage indisponible : rien à effacer */
   }
+}
+
+/**
+ * Abonne un observateur aux erreurs non gérées capturées (`cb(entry)`), pour une bannière discrète.
+ * Renvoie la fonction de désabonnement. Les erreurs internes de stockage (`storage.*`) ne sont pas notifiées.
+ */
+export function onError(cb) {
+  listeners.add(cb);
+  return () => listeners.delete(cb);
 }
 
 /** Ajoute une entrée { ts, type, message, source, line, col, stack } ; garde les MAX_ENTRIES dernières. */
@@ -43,6 +56,15 @@ export function logError(err, context = 'error') {
     localStorage.setItem(ERRORS_KEY, JSON.stringify(list.slice(-MAX_ENTRIES)));
   } catch {
     /* quota dépassé ou stockage indisponible : on abandonne silencieusement */
+  }
+  if (context === 'error' || context === 'unhandledrejection') {
+    listeners.forEach((cb) => {
+      try {
+        cb(entry);
+      } catch {
+        /* un observateur défaillant ne doit pas masquer l'erreur d'origine */
+      }
+    });
   }
   return entry;
 }
@@ -68,4 +90,44 @@ export function installErrorJournal(target = window) {
     const r = e.reason;
     logError(r instanceof Error ? r : { message: String(r) }, 'unhandledrejection');
   });
+}
+
+const fmtBytes = (n) =>
+  typeof n === 'number' && Number.isFinite(n) ? `${(n / 1024).toFixed(1)} Kio` : 'inconnu';
+
+/**
+ * Texte de diagnostic à copier/partager (aucun envoi automatique) : version de l'application et du SW,
+ * navigateur, stockage (quota, usage, persistance) et journal d'erreurs.
+ */
+export async function exportDiagnostics() {
+  const [{ getStorageEstimate }, { getServiceWorkerVersion }] = await Promise.all([
+    import('./storage.js'),
+    import('./sw-client.js'),
+  ]);
+  const [estimate, swVersion] = await Promise.all([
+    getStorageEstimate(),
+    getServiceWorkerVersion(),
+  ]);
+  const nav = typeof navigator !== 'undefined' ? navigator : {};
+  const lines = [
+    'ScoreTrack — diagnostic',
+    `Date : ${new Date().toISOString()}`,
+    `Service worker : ${swVersion || 'non actif'}`,
+    `Navigateur : ${nav.userAgent || 'inconnu'}`,
+    `Langue : ${nav.language || 'inconnue'} · En ligne : ${nav.onLine === undefined ? 'inconnu' : nav.onLine}`,
+    `Écran : ${typeof screen !== 'undefined' ? `${screen.width}×${screen.height} @${window.devicePixelRatio || 1}` : 'inconnu'}`,
+    `Stockage : usage ${fmtBytes(estimate.usage)} / quota ${fmtBytes(estimate.quota)} · persistant : ${
+      estimate.persisted === null ? 'inconnu' : estimate.persisted
+    } · localStorage ${fmtBytes(estimate.localStorageBytes)}`,
+    '',
+    'Journal des erreurs :',
+  ];
+  const journal = readErrorJournal();
+  if (!journal.length) lines.push('(vide)');
+  journal.forEach((e) => {
+    const where = e.source ? ` @ ${e.source}:${e.line}:${e.col}` : '';
+    lines.push(`- ${new Date(e.ts).toISOString()} [${e.type}] ${e.message}${where}`);
+    if (e.stack) lines.push(`  ${e.stack.split('\n').slice(0, 3).join(' | ')}`);
+  });
+  return lines.join('\n');
 }

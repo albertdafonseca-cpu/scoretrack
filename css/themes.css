@@ -1,56 +1,68 @@
-/* Thèmes — chaque bloc [data-theme] redéfinit les jetons, puis les couleurs de cartes (palette Paul Tol, daltonien-safe). */
+/* Thèmes — chaque bloc [data-theme] redéfinit les jetons de couleur/police du :root (tokens.css).
+
+   Règles garanties par scripts/audit-contrast.mjs (0 échec exigé) :
+   - les 10 fonds de cartes sont DÉRIVÉS : color-mix(in oklab, Tol-N var(--card-mix), var(--card-base)),
+     30 % sur fond sombre, 20 % sur fond clair (aucune valeur manuelle) ;
+   - --muted2 est dérivé du texte et du fond (66 % sombre / 78 % clair) ;
+   - --gain / --loss / --warn : paire bleu/orange Tol, déclinée sombre/clair ;
+   - --score-color est l'accent, sauf quand l'accent est trop sombre pour 4,5:1 sur les cartes
+     (dark, neon-pink, sunset, ocean, mono-light) : variante éclaircie ou texte.
+   Thème par défaut (cyber) : voir tokens.css. Thème « auto » : suit prefers-color-scheme. */
+
 [data-theme='dark'] {
   --bg: #0a0a0f;
   --bg2: #111118;
   --surface: #1a1a24;
   --surface2: #22222f;
   --border: rgba(255, 255, 255, 0.1);
-  --accent: #6c63ff;
-  --accent2: #a78bfa;
-  --green: #22d3a0;
-  --red: #f4436c;
+  --accent: #8a83ff;
+  --accent2: #b5a6ff;
   --text: #f0f0ff;
-  --muted: #444466;
-  --muted2: #8888bb;
-  --btn-font: 'Inter', sans-serif;
-  --score-font: 'Inter', sans-serif;
+  --font-display: 'Inter', sans-serif;
+  --font-score: 'Inter', sans-serif;
+  --font-ui: 'Inter', sans-serif;
   --radius: 14px;
   --chip-bg: #1e1e2e;
-  --chip-text: #8888bb;
   --chip-on: #88ccee;
   --chip-on-text: #000000;
+  --score-color: #b5a6ff;
   --bg-grad:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M0 32L32 0M0 16L16 0M16 32L32 16' stroke='%23a78bfa' stroke-width='0.5' opacity='0.12'/%3E%3C/svg%3E"),
     radial-gradient(ellipse at 50% 0%, #1a1a2e 0%, #0a0a0f 70%);
   --modal-bg: rgba(5, 5, 20, 0.93);
   --modal-glow: 0 -8px 40px rgba(108, 99, 255, 0.15);
+  --card-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M0 32L32 0M0 16L16 0M16 32L32 16' stroke='%23a78bfa' stroke-width='0.6'/%3E%3C/svg%3E");
+  --card-texture-size: 32px 32px;
+  --card-texture-opacity: 0.15;
 }
+
 [data-theme='neon-pink'] {
   --bg: #0d0010;
   --bg2: #150018;
   --surface: #200025;
   --surface2: #2a0035;
   --border: rgba(255, 0, 200, 0.18);
-  --accent: #ff00cc;
-  --accent2: #cc00ff;
-  --green: #00ffaa;
-  --red: #ff4444;
+  --accent: #ff33d6;
+  --accent2: #d966ff;
   --text: #ffe0ff;
-  --muted: #5a1060;
-  --muted2: #aa40cc;
-  --btn-font: 'Orbitron', monospace;
-  --score-font: 'Share Tech Mono', monospace;
+  --font-display: 'Orbitron', monospace;
+  --font-score: 'Share Tech Mono', monospace;
+  --font-ui: 'Share Tech Mono', monospace;
   --radius: 6px;
   --chip-bg: #28003a;
-  --chip-text: #aa40cc;
   --chip-on: #ee6677;
-  --chip-on-text: #ffffff;
+  --chip-on-text: #000000;
+  --score-color: #ff7ae0;
   --bg-grad:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18'%3E%3Ccircle cx='9' cy='9' r='1' fill='%23ff00cc' opacity='0.18'/%3E%3C/svg%3E"),
     radial-gradient(ellipse at 50% 0%, #280038 0%, #0d0010 70%);
   --modal-bg: rgba(10, 0, 18, 0.94);
   --modal-glow: 0 -8px 40px rgba(255, 0, 200, 0.2);
+  --card-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18'%3E%3Ccircle cx='9' cy='9' r='1.2' fill='%23ff00cc'/%3E%3C/svg%3E");
+  --card-texture-size: 18px 18px;
+  --card-texture-opacity: 0.22;
 }
+
 [data-theme='arcade'] {
   --bg: #0a0800;
   --bg2: #120f00;
@@ -58,17 +70,13 @@
   --surface2: #2a2200;
   --border: rgba(255, 220, 0, 0.2);
   --accent: #ffdc00;
-  --accent2: #ff8800;
-  --green: #00ff44;
-  --red: #ff2200;
+  --accent2: #ffa033;
   --text: #fff8e0;
-  --muted: #5a4800;
-  --muted2: #aa8800;
-  --btn-font: 'Press Start 2P', monospace;
-  --score-font: 'Press Start 2P', monospace;
+  --font-display: 'Press Start 2P', monospace;
+  --font-score: 'Press Start 2P', monospace;
+  --font-ui: 'Inter', sans-serif;
   --radius: 2px;
   --chip-bg: #1e1800;
-  --chip-text: #aa8800;
   --chip-on: #ccbb44;
   --chip-on-text: #000000;
   --bg-grad:
@@ -76,7 +84,11 @@
     linear-gradient(180deg, #1a1400 0%, #0a0800 60%);
   --modal-bg: rgba(8, 6, 0, 0.94);
   --modal-glow: 0 -8px 40px rgba(255, 220, 0, 0.14);
+  --card-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect y='0' width='4' height='2' fill='%23ffdc00' opacity='0.18'/%3E%3C/svg%3E");
+  --card-texture-size: 4px 4px;
+  --card-texture-opacity: 0.5;
 }
+
 [data-theme='nature'] {
   --bg: #051208;
   --bg2: #071a0c;
@@ -85,16 +97,12 @@
   --border: rgba(80, 200, 80, 0.2);
   --accent: #50c850;
   --accent2: #88dd44;
-  --green: #00ff88;
-  --red: #ff4444;
   --text: #e8ffe8;
-  --muted: #1a4420;
-  --muted2: #3a8840;
-  --btn-font: 'Inter', sans-serif;
-  --score-font: 'Share Tech Mono', monospace;
+  --font-display: 'Inter', sans-serif;
+  --font-score: 'Share Tech Mono', monospace;
+  --font-ui: 'Inter', sans-serif;
   --radius: 16px;
   --chip-bg: #0d2010;
-  --chip-text: #3a8840;
   --chip-on: #ccbb44;
   --chip-on-text: #000000;
   --bg-grad:
@@ -102,59 +110,65 @@
     radial-gradient(ellipse at 50% 0%, #0d2a10 0%, #051208 70%);
   --modal-bg: rgba(2, 10, 4, 0.93);
   --modal-glow: 0 -8px 40px rgba(80, 200, 80, 0.12);
+  --card-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Cpath d='M0 40 Q20 20 40 40 Q60 60 80 40' fill='none' stroke='%2388dd44' stroke-width='1'/%3E%3Cpath d='M0 55 Q20 35 40 55 Q60 75 80 55' fill='none' stroke='%2350c850' stroke-width='0.7'/%3E%3Cpath d='M0 25 Q20 5 40 25 Q60 45 80 25' fill='none' stroke='%2388dd44' stroke-width='0.5'/%3E%3C/svg%3E");
+  --card-texture-size: 80px 80px;
+  --card-texture-opacity: 0.28;
 }
+
 [data-theme='sunset'] {
   --bg: #120508;
   --bg2: #1a080c;
   --surface: #280d14;
   --surface2: #341220;
   --border: rgba(255, 100, 60, 0.2);
-  --accent: #ff6040;
+  --accent: #ff7050;
   --accent2: #ffaa00;
-  --green: #44ffcc;
-  --red: #ff2244;
   --text: #fff0e8;
-  --muted: #5a1820;
-  --muted2: #cc4422;
-  --btn-font: 'Inter', sans-serif;
-  --score-font: 'Share Tech Mono', monospace;
+  --font-display: 'Inter', sans-serif;
+  --font-score: 'Share Tech Mono', monospace;
+  --font-ui: 'Inter', sans-serif;
   --radius: 12px;
   --chip-bg: #280d14;
-  --chip-text: #cc4422;
   --chip-on: #ee7733;
   --chip-on-text: #000000;
+  --score-color: #ff9070;
   --bg-grad:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cpath d='M0 40L40 0' stroke='%23ff6040' stroke-width='0.6' opacity='0.12'/%3E%3Cpath d='M-10 30L30 -10' stroke='%23ffaa00' stroke-width='0.4' opacity='0.08'/%3E%3C/svg%3E"),
     linear-gradient(160deg, #200810 0%, #120508 50%, #0a0808 100%);
   --modal-bg: rgba(14, 3, 5, 0.94);
   --modal-glow: 0 -8px 40px rgba(255, 80, 40, 0.14);
+  --card-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cpath d='M0 40L40 0' stroke='%23ff6040' stroke-width='0.8'/%3E%3Cpath d='M-10 30L30 -10' stroke='%23ffaa00' stroke-width='0.5'/%3E%3Cpath d='M10 40L40 10' stroke='%23ff6040' stroke-width='0.4'/%3E%3C/svg%3E");
+  --card-texture-size: 40px 40px;
+  --card-texture-opacity: 0.2;
 }
+
 [data-theme='ocean'] {
   --bg: #020810;
   --bg2: #040e18;
   --surface: #081828;
   --surface2: #0c2238;
   --border: rgba(0, 150, 255, 0.2);
-  --accent: #0096ff;
-  --accent2: #00ccff;
-  --green: #00ffcc;
-  --red: #ff4466;
+  --accent: #33a6ff;
+  --accent2: #33d6ff;
   --text: #e0f0ff;
-  --muted: #0a2840;
-  --muted2: #1a6090;
-  --btn-font: 'Inter', sans-serif;
-  --score-font: 'Share Tech Mono', monospace;
+  --font-display: 'Inter', sans-serif;
+  --font-score: 'Share Tech Mono', monospace;
+  --font-ui: 'Inter', sans-serif;
   --radius: 20px;
   --chip-bg: #081828;
-  --chip-text: #1a6090;
   --chip-on: #ee7733;
   --chip-on-text: #000000;
+  --score-color: #5cbcff;
   --bg-grad:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='30'%3E%3Cpath d='M0 15 Q15 4 30 15 Q45 26 60 15' fill='none' stroke='%2300ccff' stroke-width='0.8' opacity='0.14'/%3E%3Cpath d='M0 25 Q15 14 30 25 Q45 36 60 25' fill='none' stroke='%230096ff' stroke-width='0.5' opacity='0.1'/%3E%3C/svg%3E"),
     radial-gradient(ellipse at 50% 30%, #0c2040 0%, #020810 70%);
   --modal-bg: rgba(0, 4, 12, 0.94);
   --modal-glow: 0 -8px 40px rgba(0, 150, 255, 0.15);
+  --card-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='30'%3E%3Cpath d='M0 15 Q15 4 30 15 Q45 26 60 15' fill='none' stroke='%2300ccff' stroke-width='1.2'/%3E%3Cpath d='M0 25 Q15 14 30 25 Q45 36 60 25' fill='none' stroke='%230096ff' stroke-width='0.7'/%3E%3C/svg%3E");
+  --card-texture-size: 60px 30px;
+  --card-texture-opacity: 0.2;
 }
+
 [data-theme='mono'] {
   --bg: #080808;
   --bg2: #101010;
@@ -162,23 +176,24 @@
   --surface2: #202020;
   --border: rgba(255, 255, 255, 0.15);
   --accent: #ffffff;
-  --accent2: #aaaaaa;
-  --green: #ccffcc;
-  --red: #ffcccc;
+  --accent2: #bbbbbb;
   --text: #ffffff;
-  --muted: #333333;
-  --muted2: #888888;
-  --btn-font: 'Inter', sans-serif;
-  --score-font: 'Share Tech Mono', monospace;
+  --font-display: 'Inter', sans-serif;
+  --font-score: 'Share Tech Mono', monospace;
+  --font-ui: 'Inter', sans-serif;
   --radius: 0px;
   --chip-bg: #202020;
-  --chip-text: #888888;
   --chip-on: #ffffff;
   --chip-on-text: #000000;
+  /* mono : cartes en niveaux de gris (Tol désaturé), aucune texture */
+  --card-mix: 22%;
   --bg-grad: linear-gradient(180deg, #101010 0%, #080808 100%);
   --modal-bg: rgba(0, 0, 0, 0.95);
   --modal-glow: 0 -8px 40px rgba(255, 255, 255, 0.06);
+  --card-texture: none;
+  --card-texture-opacity: 0;
 }
+
 [data-theme='gold'] {
   --bg: #0a0800;
   --bg2: #120e00;
@@ -187,16 +202,12 @@
   --border: rgba(220, 180, 0, 0.2);
   --accent: #ddb800;
   --accent2: #ffee44;
-  --green: #88ff44;
-  --red: #ff4422;
   --text: #fff8e0;
-  --muted: #3a3000;
-  --muted2: #887000;
-  --btn-font: 'Orbitron', monospace;
-  --score-font: 'Share Tech Mono', monospace;
+  --font-display: 'Orbitron', monospace;
+  --font-score: 'Share Tech Mono', monospace;
+  --font-ui: 'Share Tech Mono', monospace;
   --radius: 4px;
   --chip-bg: #1e1800;
-  --chip-text: #887000;
   --chip-on: #ccbb44;
   --chip-on-text: #000000;
   --bg-grad:
@@ -204,57 +215,11 @@
     radial-gradient(ellipse at 50% 0%, #1e1600 0%, #0a0800 70%);
   --modal-bg: rgba(8, 6, 0, 0.94);
   --modal-glow: 0 -8px 40px rgba(220, 180, 0, 0.16);
+  --card-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cline x1='12' y1='0' x2='12' y2='24' stroke='%23ffee44' stroke-width='0.6'/%3E%3Cline x1='0' y1='12' x2='24' y2='12' stroke='%23ddb800' stroke-width='0.5'/%3E%3C/svg%3E");
+  --card-texture-size: 24px 24px;
+  --card-texture-opacity: 0.14;
 }
-[data-theme='light'] {
-  --bg: #f0f4ff;
-  --bg2: #e4eaff;
-  --surface: #d8e2ff;
-  --surface2: #c8d4ff;
-  --border: rgba(60, 80, 200, 0.15);
-  --accent: #3355cc;
-  --accent2: #5577ee;
-  --green: #006644;
-  --red: #cc2200;
-  --text: #111133;
-  --muted: #8899cc;
-  --muted2: #5566aa;
-  --btn-font: 'Inter', sans-serif;
-  --score-font: 'Inter', sans-serif;
-  --radius: 12px;
-  --chip-bg: #c8d4f0;
-  --chip-text: #5566aa;
-  --chip-on: #4477aa;
-  --chip-on-text: #ffffff;
-  --bg-grad:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Ccircle cx='10' cy='10' r='0.8' fill='%234455dd' opacity='0.18'/%3E%3C/svg%3E"),
-    linear-gradient(160deg, #e8eeff 0%, #f0f4ff 60%, #eaf0ff 100%);
-  --modal-bg: rgba(20, 30, 80, 0.7);
-  --modal-glow: 0 -8px 40px rgba(60, 80, 200, 0.12);
-}
-[data-theme='mono-light'] {
-  --bg: #f4f4f4;
-  --bg2: #e8e8e8;
-  --surface: #dddddd;
-  --surface2: #cccccc;
-  --border: rgba(0, 0, 0, 0.12);
-  --accent: #000000;
-  --accent2: #333333;
-  --green: #006600;
-  --red: #cc0000;
-  --text: #111111;
-  --muted: #aaaaaa;
-  --muted2: #666666;
-  --btn-font: 'Inter', sans-serif;
-  --score-font: 'Inter', sans-serif;
-  --radius: 0px;
-  --chip-bg: #cccccc;
-  --chip-text: #666666;
-  --chip-on: #4477aa;
-  --chip-on-text: #ffffff;
-  --bg-grad: linear-gradient(180deg, #ffffff 0%, #ececec 100%);
-  --modal-bg: rgba(0, 0, 0, 0.55);
-  --modal-glow: 0 -8px 24px rgba(0, 0, 0, 0.12);
-}
+
 [data-theme='sobre'] {
   --bg: #1c1c1e;
   --bg2: #2c2c2e;
@@ -262,17 +227,14 @@
   --surface2: #48484a;
   --border: rgba(255, 255, 255, 0.12);
   --accent: #e8e8e8;
-  --accent2: #a0a0a0;
-  --green: #30d158;
-  --red: #ff453a;
+  --accent2: #b0b0b5;
   --text: #f2f2f7;
-  --muted: #48484a;
-  --muted2: #8e8e93;
-  --btn-font: 'Inter', sans-serif;
-  --score-font: 'Inter', sans-serif;
+  --muted-mix: 76%;
+  --font-display: 'Inter', sans-serif;
+  --font-score: 'Inter', sans-serif;
+  --font-ui: 'Inter', sans-serif;
   --radius: 10px;
   --chip-bg: #3a3a3c;
-  --chip-text: #8e8e93;
   --chip-on: #88ccee;
   --chip-on-text: #000000;
   --bg-grad:
@@ -280,9 +242,12 @@
     radial-gradient(ellipse at 50% 0%, #28282a 0%, #1c1c1e 70%);
   --modal-bg: rgba(10, 10, 12, 0.93);
   --modal-glow: 0 -8px 32px rgba(232, 232, 232, 0.06);
+  --card-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cpath d='M24 0v24M0 24h24' stroke='%23ffffff' stroke-width='0.4'/%3E%3C/svg%3E");
+  --card-texture-size: 24px 24px;
+  --card-texture-opacity: 0.07;
 }
 
-/* ══ Thème Loi du Milieu Nuit — or/brun foncé, inspiré du jeu physique ══ */
+/* ══ Loi du Milieu · Nuit — or/brun foncé, inspiré du jeu physique ══ */
 [data-theme='ldm'] {
   --bg: #2e2418;
   --bg2: #261e13;
@@ -291,18 +256,16 @@
   --border: rgba(240, 192, 64, 0.28);
   --accent: #f0c040;
   --accent2: #ffe070;
-  --green: #1a80c0;
-  --red: #e06010;
   --text: #fff8e8;
-  --muted: #8a6830;
-  --muted2: #c8a050;
-  --btn-font: 'Cinzel', Georgia, serif;
-  --score-font: 'Bebas Neue', sans-serif;
+  --muted-mix: 72%;
+  --font-display: 'Cinzel', Georgia, serif;
+  --font-score: 'Cinzel', Georgia, serif;
+  --font-ui: 'Inter', sans-serif;
   --radius: 8px;
   --chip-bg: #3d3020;
-  --chip-text: #c8a050;
   --chip-on: #ccbb44;
   --chip-on-text: #000000;
+  --card-mix: 28%;
   --bg-grad:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M16 2l14 14-14 14L2 16z' fill='none' stroke='%23f0c040' stroke-width='0.6' opacity='0.1'/%3E%3C/svg%3E"),
     radial-gradient(ellipse at 50% 0%, #3d3020 0%, #2e2418 70%);
@@ -313,80 +276,75 @@
   --card-texture-opacity: 0.14;
 }
 
-/* Cartes Loi du Milieu Nuit — teintes Tol assombries sur fond brun */
-[data-theme='ldm'] .pcard.color-1 {
-  background: #1e3050;
-} /* bleu      #4477AA */
-[data-theme='ldm'] .pcard.color-2 {
-  background: #5c1020;
-} /* rose      #EE6677 */
-[data-theme='ldm'] .pcard.color-3 {
-  background: #403a00;
-} /* jaune     #CCBB44 */
-[data-theme='ldm'] .pcard.color-4 {
-  background: #3c0c28;
-} /* violet    #AA3377 */
-[data-theme='ldm'] .pcard.color-5 {
-  background: #0a2e12;
-} /* vert      #228833 */
-[data-theme='ldm'] .pcard.color-6 {
-  background: #083840;
-} /* cyan      #66CCEE */
-[data-theme='ldm'] .pcard.color-7 {
-  background: #2a2418;
-} /* gris      #BBBBBB */
-[data-theme='ldm'] .pcard.color-8 {
-  background: #4a2000;
-} /* orange    #EE7733 */
-[data-theme='ldm'] .pcard.color-9 {
-  background: #062040;
-} /* bleu foncé#0077BB */
-[data-theme='ldm'] .pcard.color-10 {
-  background: #500c20;
-} /* magenta   #EE3377 */
-/* Score Loi du Milieu Nuit — or, sans halos */
-[data-theme='ldm'] .score {
-  color: var(--accent);
-  text-shadow: none;
-}
-[data-theme='ldm'] .score.low {
-  color: #ee7733;
-  text-shadow: none;
-}
-[data-theme='ldm'] .score.crit {
-  color: #ff8040;
-  text-shadow: none;
-}
-[data-theme='ldm'] .pplayer {
-  text-shadow: none;
-}
-[data-theme='ldm'] .logo-name {
-  text-shadow: none;
-}
-[data-theme='ldm'] .logo-sub {
-  text-shadow: none;
-}
-[data-theme='ldm'] .setup-label {
-  text-shadow: none;
-}
-[data-theme='ldm'] .game-header-title {
-  text-shadow: none;
-}
-[data-theme='ldm'] .logo-mark {
-  box-shadow: none;
-}
-[data-theme='ldm'] .delta-flash {
-  text-shadow: none;
-}
-[data-theme='ldm'] .tap-sign-minus,
-[data-theme='ldm'] .tap-sign-plus {
-  text-shadow: none;
-}
-[data-theme='ldm'] .card-inner::before {
-  opacity: 0.3;
+/* ══ Thèmes clairs : sémantique assombrie, cartes pastel (20 %), texte de carte sombre ══ */
+[data-theme='light'],
+[data-theme='mono-light'],
+[data-theme='ldm-day'] {
+  color-scheme: light;
+  --gain: #003d63;
+  --loss: #9a3c00;
+  --warn: #7a4400;
+  --card-mix: 20%;
+  --muted-mix: 78%;
+  --card-text: #111111;
+  --card-sign: rgba(17, 17, 17, 0.6);
+  --shadow-1: 0 1px 2px rgba(20, 20, 40, 0.12);
+  --shadow-2: 0 4px 12px rgba(20, 20, 40, 0.14);
+  --shadow-3: 0 12px 32px rgba(20, 20, 40, 0.18);
 }
 
-/* ══ Thème Loi du Milieu Jour — parchemin clair, même univers ══ */
+[data-theme='light'] {
+  --bg: #f0f4ff;
+  --bg2: #e4eaff;
+  --surface: #d8e2ff;
+  --surface2: #c8d4ff;
+  --border: rgba(60, 80, 200, 0.2);
+  --accent: #2f4fc4;
+  --accent2: #2b47b8;
+  --text: #111133;
+  --font-display: 'Inter', sans-serif;
+  --font-score: 'Inter', sans-serif;
+  --font-ui: 'Inter', sans-serif;
+  --radius: 12px;
+  --chip-bg: #c8d4f0;
+  --chip-on: #4477aa;
+  --chip-on-text: #ffffff;
+  --bg-grad:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Ccircle cx='10' cy='10' r='0.8' fill='%234455dd' opacity='0.18'/%3E%3C/svg%3E"),
+    linear-gradient(160deg, #e8eeff 0%, #f0f4ff 60%, #eaf0ff 100%);
+  --modal-bg: rgba(20, 30, 80, 0.7);
+  --modal-glow: 0 -8px 40px rgba(60, 80, 200, 0.12);
+  --card-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Ccircle cx='10' cy='10' r='1' fill='%234455dd'/%3E%3C/svg%3E");
+  --card-texture-size: 20px 20px;
+  --card-texture-opacity: 0.18;
+}
+
+[data-theme='mono-light'] {
+  --bg: #f4f4f4;
+  --bg2: #e8e8e8;
+  --surface: #dddddd;
+  --surface2: #cccccc;
+  --border: rgba(0, 0, 0, 0.14);
+  --accent: #000000;
+  --accent2: #333333;
+  --text: #111111;
+  --font-display: 'Inter', sans-serif;
+  --font-score: 'Inter', sans-serif;
+  --font-ui: 'Inter', sans-serif;
+  --radius: 0px;
+  --chip-bg: #d6d6d6;
+  --chip-on: #4477aa;
+  --chip-on-text: #ffffff;
+  --card-mix: 16%;
+  --score-color: var(--text);
+  --bg-grad: linear-gradient(180deg, #ffffff 0%, #ececec 100%);
+  --modal-bg: rgba(0, 0, 0, 0.55);
+  --modal-glow: 0 -8px 24px rgba(0, 0, 0, 0.12);
+  --card-texture: none;
+  --card-texture-opacity: 0;
+}
+
+/* ══ Loi du Milieu · Jour — parchemin clair, même univers ══ */
 [data-theme='ldm-day'] {
   --bg: #f5f0e8;
   --bg2: #ede6d8;
@@ -394,19 +352,19 @@
   --surface2: #cfc6ae;
   --border: rgba(120, 85, 0, 0.35);
   --accent: #7a5500;
-  --accent2: #9e7000;
-  --green: #004f8a;
-  --red: #b03800;
+  --accent2: #6e4c00;
   --text: #2e2418;
-  --muted: #a08060;
-  --muted2: #5a4220;
-  --btn-font: 'Cinzel', Georgia, serif;
-  --score-font: 'Bebas Neue', sans-serif;
+  --font-display: 'Cinzel', Georgia, serif;
+  --font-score: 'Cinzel', Georgia, serif;
+  --font-ui: 'Inter', sans-serif;
   --radius: 8px;
   --chip-bg: #ddd5c0;
-  --chip-text: #5a4220;
   --chip-on: #4477aa;
   --chip-on-text: #ffffff;
+  --card-base: #f0e9dc;
+  --score-color: #664700;
+  --card-text: #2e2418;
+  --card-sign: rgba(46, 36, 24, 0.6);
   --bg-grad:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M16 2l14 14-14 14L2 16z' fill='none' stroke='%237a5500' stroke-width='0.6' opacity='0.12'/%3E%3C/svg%3E"),
     linear-gradient(160deg, #ede6d8 0%, #f5f0e8 60%, #ede8df 100%);
@@ -417,82 +375,248 @@
   --card-texture-opacity: 0.1;
 }
 
-/* Cartes Loi du Milieu Jour — pastels Tol clairs, daltonien-safe */
-[data-theme='ldm-day'] .pcard.color-1 {
-  background: #a8c8e8;
-} /* bleu      #4477AA clair */
-[data-theme='ldm-day'] .pcard.color-2 {
-  background: #f0c0c8;
-} /* rose      #EE6677 clair */
-[data-theme='ldm-day'] .pcard.color-3 {
-  background: #e8e0a0;
-} /* jaune     #CCBB44 clair */
-[data-theme='ldm-day'] .pcard.color-4 {
-  background: #d8b0d0;
-} /* violet    #AA3377 clair */
-[data-theme='ldm-day'] .pcard.color-5 {
-  background: #b0d8b8;
-} /* vert      #228833 clair */
-[data-theme='ldm-day'] .pcard.color-6 {
-  background: #a8d8e8;
-} /* cyan      #66CCEE clair */
-[data-theme='ldm-day'] .pcard.color-7 {
-  background: #d8d0c0;
-} /* gris brun (neutre) */
-[data-theme='ldm-day'] .pcard.color-8 {
-  background: #f0d0a8;
-} /* orange    #EE7733 clair */
-[data-theme='ldm-day'] .pcard.color-9 {
-  background: #a0c0e0;
-} /* bleu foncé#0077BB clair */
-[data-theme='ldm-day'] .pcard.color-10 {
-  background: #f0b8cc;
-} /* magenta   #EE3377 clair */
-/* Textes Loi du Milieu Jour — sombres pour contraste sur fond clair */
-[data-theme='ldm-day'] .pplayer {
-  color: #2e2418;
+/* ══ Auto — suit prefers-color-scheme : couleurs « clair » le jour, « cyber » la nuit (Inter).
+   light-dark() est ignoré par les anciens navigateurs : le bloc entier est alors invalide et
+   le thème par défaut (cyber) s'applique. Le thème par défaut reste 'cyber' (choix documenté). ══ */
+[data-theme='auto'] {
+  color-scheme: light dark;
+  --bg: light-dark(#f0f4ff, #020d12);
+  --bg2: light-dark(#e4eaff, #041018);
+  --surface: light-dark(#d8e2ff, #071a24);
+  --surface2: light-dark(#c8d4ff, #0a2030);
+  --border: light-dark(rgba(60, 80, 200, 0.2), rgba(0, 255, 200, 0.15));
+  --accent: light-dark(#2f4fc4, #00ffe0);
+  --accent2: light-dark(#2b47b8, #00bfff);
+  --text: light-dark(#111133, #e0fff8);
+  --muted: light-dark(
+    color-mix(in oklab, #111133 40%, #f0f4ff),
+    color-mix(in oklab, #e0fff8 40%, #020d12)
+  );
+  --muted2: light-dark(
+    color-mix(in oklab, #111133 78%, #f0f4ff),
+    color-mix(in oklab, #e0fff8 66%, #020d12)
+  );
+  --gain: light-dark(#003d63, #8fe0ff);
+  --loss: light-dark(#9a3c00, #ff8844);
+  --warn: light-dark(#7a4400, #ffb454);
+  --font-display: 'Inter', sans-serif;
+  --font-score: 'Inter', sans-serif;
+  --font-ui: 'Inter', sans-serif;
+  --radius: 10px;
+  --chip-bg: light-dark(#c8d4f0, #0d2535);
+  --chip-on: light-dark(#4477aa, #66ccee);
+  --chip-on-text: light-dark(#ffffff, #000000);
+  --card-text: light-dark(#111111, #ffffff);
+  --card-sign: light-dark(rgba(17, 17, 17, 0.6), rgba(255, 255, 255, 0.72));
+  --card-1: light-dark(
+    color-mix(in oklab, var(--tol-1) 20%, #f0f4ff),
+    color-mix(in oklab, var(--tol-1) 30%, #020d12)
+  );
+  --card-2: light-dark(
+    color-mix(in oklab, var(--tol-2) 20%, #f0f4ff),
+    color-mix(in oklab, var(--tol-2) 30%, #020d12)
+  );
+  --card-3: light-dark(
+    color-mix(in oklab, var(--tol-3) 20%, #f0f4ff),
+    color-mix(in oklab, var(--tol-3) 30%, #020d12)
+  );
+  --card-4: light-dark(
+    color-mix(in oklab, var(--tol-4) 20%, #f0f4ff),
+    color-mix(in oklab, var(--tol-4) 30%, #020d12)
+  );
+  --card-5: light-dark(
+    color-mix(in oklab, var(--tol-5) 20%, #f0f4ff),
+    color-mix(in oklab, var(--tol-5) 30%, #020d12)
+  );
+  --card-6: light-dark(
+    color-mix(in oklab, var(--tol-6) 20%, #f0f4ff),
+    color-mix(in oklab, var(--tol-6) 30%, #020d12)
+  );
+  --card-7: light-dark(
+    color-mix(in oklab, var(--tol-7) 20%, #f0f4ff),
+    color-mix(in oklab, var(--tol-7) 30%, #020d12)
+  );
+  --card-8: light-dark(
+    color-mix(in oklab, var(--tol-8) 20%, #f0f4ff),
+    color-mix(in oklab, var(--tol-8) 30%, #020d12)
+  );
+  --card-9: light-dark(
+    color-mix(in oklab, var(--tol-9) 20%, #f0f4ff),
+    color-mix(in oklab, var(--tol-9) 30%, #020d12)
+  );
+  --card-10: light-dark(
+    color-mix(in oklab, var(--tol-10) 20%, #f0f4ff),
+    color-mix(in oklab, var(--tol-10) 30%, #020d12)
+  );
+  --bg-grad: radial-gradient(
+    ellipse at 50% 0%,
+    light-dark(#e8eeff, #0a2030) 0%,
+    light-dark(#f0f4ff, #020d12) 70%
+  );
+  --modal-bg: light-dark(rgba(20, 30, 80, 0.7), rgba(0, 5, 12, 0.92));
+  --modal-glow: 0 -8px 40px light-dark(rgba(60, 80, 200, 0.12), rgba(0, 255, 200, 0.12));
+  --card-texture: none;
+  --card-texture-opacity: 0;
+}
+
+/* ══ Application des jetons aux cartes (une seule règle par couleur, tous thèmes) ══ */
+.pcard.color-1 {
+  background: var(--card-1);
+}
+.pcard.color-2 {
+  background: var(--card-2);
+}
+.pcard.color-3 {
+  background: var(--card-3);
+}
+.pcard.color-4 {
+  background: var(--card-4);
+}
+.pcard.color-5 {
+  background: var(--card-5);
+}
+.pcard.color-6 {
+  background: var(--card-6);
+}
+.pcard.color-7 {
+  background: var(--card-7);
+}
+.pcard.color-8 {
+  background: var(--card-8);
+}
+.pcard.color-9 {
+  background: var(--card-9);
+}
+.pcard.color-10 {
+  background: var(--card-10);
+}
+
+/* Pont vers game.css (élément A) : couleurs de score/nom/signes pilotées par les jetons.
+   Le préfixe `html` donne la priorité sur les valeurs codées en dur de game.css sans !important ;
+   à retirer quand game.css consommera directement --score-color/--score-low/--score-crit. */
+html .score {
+  color: var(--score-color);
+}
+html .score.low {
+  color: var(--score-low);
+}
+html .score.crit {
+  color: var(--score-crit);
+}
+html .pplayer,
+html .elim-label {
+  color: var(--card-text);
+}
+html .tap-sign-minus,
+html .tap-sign-plus {
+  color: var(--card-sign);
+  opacity: 1;
+}
+
+/* Thèmes sans halo (accent sombre ou univers « papier ») : suppression des text-shadow lumineux,
+   illisibles quand le texte est plus sombre que le fond. */
+[data-theme='ldm']
+  :is(
+    .score,
+    .pplayer,
+    .logo-name,
+    .logo-sub,
+    .setup-label,
+    .game-header-title,
+    .delta-flash,
+    .tap-sign-minus,
+    .tap-sign-plus
+  ),
+[data-theme='ldm-day']
+  :is(.score, .pplayer, .logo-name, .setup-label, .tap-sign-minus, .tap-sign-plus),
+[data-theme='light'],
+[data-theme='mono-light'],
+[data-theme='ldm-day'] {
   text-shadow: none;
 }
-[data-theme='ldm-day'] .score {
-  color: var(--accent);
+[data-theme='light']
+  :is(
+    .score,
+    .pplayer,
+    .logo-name,
+    .setup-label,
+    .settings-title,
+    .names-title,
+    .modal-title,
+    .fullpage-title,
+    .game-header-title,
+    .save-btn,
+    .names-go-btn,
+    .modal-btn.primary,
+    .winner-name,
+    .recap-total-val,
+    .save-confirm,
+    .elim-confirm-name,
+    .simple-modal-title
+  ),
+[data-theme='mono-light']
+  :is(
+    .score,
+    .pplayer,
+    .logo-name,
+    .setup-label,
+    .settings-title,
+    .names-title,
+    .modal-title,
+    .fullpage-title,
+    .game-header-title,
+    .save-btn,
+    .names-go-btn,
+    .modal-btn.primary,
+    .winner-name,
+    .recap-total-val,
+    .save-confirm,
+    .elim-confirm-name,
+    .simple-modal-title,
+    .tap-sign-minus,
+    .tap-sign-plus
+  ),
+[data-theme='ldm-day']
+  :is(
+    .settings-title,
+    .names-title,
+    .modal-title,
+    .fullpage-title,
+    .game-header-title,
+    .save-btn,
+    .names-go-btn,
+    .modal-btn.primary,
+    .winner-name,
+    .recap-total-val,
+    .save-confirm,
+    .elim-confirm-name,
+    .simple-modal-title
+  ) {
   text-shadow: none;
 }
-[data-theme='ldm-day'] .score.low {
-  color: #b03800;
-  text-shadow: none;
+[data-theme='ldm'] .logo-mark {
+  box-shadow: none;
 }
-[data-theme='ldm-day'] .score.crit {
-  color: #221166;
-  text-shadow: none;
-  animation: scoreBlink 0.9s ease-in-out infinite;
-}
-[data-theme='ldm-day'] .tap-sign-minus,
-[data-theme='ldm-day'] .tap-sign-plus {
-  color: #2e2418;
-  opacity: 0.45;
-  text-shadow: none;
+[data-theme='ldm'] .card-inner::before {
+  opacity: 0.3;
 }
 [data-theme='ldm-day'] .card-inner::before {
   opacity: 0.2;
 }
+[data-theme='light'] .card-inner::before,
+[data-theme='mono-light'] .card-inner::before {
+  opacity: 0.15;
+}
 [data-theme='ldm-day'] .delta-flash {
   color: var(--accent);
 }
-[data-theme='ldm-day'] .game-header-title {
-  color: #2e2418;
+[data-theme='ldm-day'] .game-header-title,
+[data-theme='ldm-day'] .bar-btn {
+  color: var(--text);
 }
 [data-theme='ldm-day'] #bar {
   background: var(--bg2);
   border-color: var(--border);
-}
-[data-theme='ldm-day'] .bar-btn {
-  color: #2e2418;
-}
-[data-theme='ldm-day'] .setup-label {
-  text-shadow: none;
-}
-[data-theme='ldm-day'] .logo-name {
-  text-shadow: none;
 }
 [data-theme='ldm-day'] .logo-sub {
   color: var(--muted2);
@@ -503,532 +627,7 @@
   color: var(--text);
 }
 [data-theme='ldm-day'] .winner-name,
-[data-theme='ldm-day'] .winner-sub {
-  color: var(--text);
-}
-[data-theme='ldm-day'] .score.crit {
-  animation: scoreBlink 0.9s ease-in-out infinite;
-}
-
-/*
-  Couleurs de cartes — base sombre (cyber/défaut).
-  Chaque thème surcharge avec ses propres teintes Tol assombries.
-  Règle : teinte de base Tol + dominante du thème mélangés à ~30-40% sur fond quasi-noir.
-*/
-/* défaut / cyber — teintes Tol à ~40% luminosité sur fond bleu-vert */
-.pcard.color-1 {
-  background: #1a3a55;
-} /* bleu       Tol #4477AA */
-.pcard.color-2 {
-  background: #5a2030;
-} /* rose       Tol #EE6677 */
-.pcard.color-3 {
-  background: #484410;
-} /* jaune-vert Tol #CCBB44 */
-.pcard.color-4 {
-  background: #441535;
-} /* violet     Tol #AA3377 */
-.pcard.color-5 {
-  background: #103820;
-} /* vert       Tol #228833 */
-.pcard.color-6 {
-  background: #104850;
-} /* cyan       Tol #66CCEE */
-.pcard.color-7 {
-  background: #303030;
-} /* gris       Tol #BBBBBB */
-.pcard.color-8 {
-  background: #4a2a10;
-} /* orange     Tol #EE7733 */
-.pcard.color-9 {
-  background: #082848;
-} /* bleu foncé Tol #0077BB */
-.pcard.color-10 {
-  background: #501228;
-} /* magenta    Tol #EE3377 */
-
-/* dark — violet-indigo */
-[data-theme='dark'] .pcard.color-1 {
-  background: #1e1e40;
-}
-[data-theme='dark'] .pcard.color-2 {
-  background: #3e1c38;
-}
-[data-theme='dark'] .pcard.color-3 {
-  background: #343020;
-}
-[data-theme='dark'] .pcard.color-4 {
-  background: #361438;
-}
-[data-theme='dark'] .pcard.color-5 {
-  background: #182c22;
-}
-[data-theme='dark'] .pcard.color-6 {
-  background: #163050;
-}
-[data-theme='dark'] .pcard.color-7 {
-  background: #28283a;
-}
-[data-theme='dark'] .pcard.color-8 {
-  background: #38241a;
-}
-[data-theme='dark'] .pcard.color-9 {
-  background: #101e42;
-}
-[data-theme='dark'] .pcard.color-10 {
-  background: #3a1030;
-}
-
-/* neon-pink — violet-magenta lumineux */
-[data-theme='neon-pink'] .pcard.color-1 {
-  background: #181050;
-}
-[data-theme='neon-pink'] .pcard.color-2 {
-  background: #500830;
-}
-[data-theme='neon-pink'] .pcard.color-3 {
-  background: #302814;
-}
-[data-theme='neon-pink'] .pcard.color-4 {
-  background: #440850;
-}
-[data-theme='neon-pink'] .pcard.color-5 {
-  background: #0a2430;
-}
-[data-theme='neon-pink'] .pcard.color-6 {
-  background: #0a2850;
-}
-[data-theme='neon-pink'] .pcard.color-7 {
-  background: #300040;
-}
-[data-theme='neon-pink'] .pcard.color-8 {
-  background: #3c1818;
-}
-[data-theme='neon-pink'] .pcard.color-9 {
-  background: #0c1050;
-}
-[data-theme='neon-pink'] .pcard.color-10 {
-  background: #500040;
-}
-
-/* arcade — brun-jaune vif */
-[data-theme='arcade'] .pcard.color-1 {
-  background: #1c2440;
-}
-[data-theme='arcade'] .pcard.color-2 {
-  background: #401818;
-}
-[data-theme='arcade'] .pcard.color-3 {
-  background: #3a3400;
-}
-[data-theme='arcade'] .pcard.color-4 {
-  background: #301638;
-}
-[data-theme='arcade'] .pcard.color-5 {
-  background: #102410;
-}
-[data-theme='arcade'] .pcard.color-6 {
-  background: #102c2c;
-}
-[data-theme='arcade'] .pcard.color-7 {
-  background: #2a2200;
-}
-[data-theme='arcade'] .pcard.color-8 {
-  background: #3c2400;
-}
-[data-theme='arcade'] .pcard.color-9 {
-  background: #0c1838;
-}
-[data-theme='arcade'] .pcard.color-10 {
-  background: #38101c;
-}
-
-/* nature — vert forêt */
-[data-theme='nature'] .pcard.color-1 {
-  background: #142c38;
-}
-[data-theme='nature'] .pcard.color-2 {
-  background: #3c1818;
-}
-[data-theme='nature'] .pcard.color-3 {
-  background: #2c2c10;
-}
-[data-theme='nature'] .pcard.color-4 {
-  background: #2c1020;
-}
-[data-theme='nature'] .pcard.color-5 {
-  background: #0a2c14;
-}
-[data-theme='nature'] .pcard.color-6 {
-  background: #0a3c28;
-}
-[data-theme='nature'] .pcard.color-7 {
-  background: #182018;
-}
-[data-theme='nature'] .pcard.color-8 {
-  background: #3a2210;
-}
-[data-theme='nature'] .pcard.color-9 {
-  background: #0a2038;
-}
-[data-theme='nature'] .pcard.color-10 {
-  background: #2c1020;
-}
-
-/* sunset — rouge-bordeaux chaud */
-[data-theme='sunset'] .pcard.color-1 {
-  background: #22183a;
-}
-[data-theme='sunset'] .pcard.color-2 {
-  background: #4e1020;
-}
-[data-theme='sunset'] .pcard.color-3 {
-  background: #3a2c08;
-}
-[data-theme='sunset'] .pcard.color-4 {
-  background: #3c1030;
-}
-[data-theme='sunset'] .pcard.color-5 {
-  background: #102418;
-}
-[data-theme='sunset'] .pcard.color-6 {
-  background: #142c38;
-}
-[data-theme='sunset'] .pcard.color-7 {
-  background: #3c1818;
-}
-[data-theme='sunset'] .pcard.color-8 {
-  background: #441c08;
-}
-[data-theme='sunset'] .pcard.color-9 {
-  background: #101438;
-}
-[data-theme='sunset'] .pcard.color-10 {
-  background: #421020;
-}
-
-/* ocean — bleu marine électrique */
-[data-theme='ocean'] .pcard.color-1 {
-  background: #102448;
-}
-[data-theme='ocean'] .pcard.color-2 {
-  background: #3a1030;
-}
-[data-theme='ocean'] .pcard.color-3 {
-  background: #222c12;
-}
-[data-theme='ocean'] .pcard.color-4 {
-  background: #220c38;
-}
-[data-theme='ocean'] .pcard.color-5 {
-  background: #082038;
-}
-[data-theme='ocean'] .pcard.color-6 {
-  background: #083448;
-}
-[data-theme='ocean'] .pcard.color-7 {
-  background: #142438;
-}
-[data-theme='ocean'] .pcard.color-8 {
-  background: #2c1c08;
-}
-[data-theme='ocean'] .pcard.color-9 {
-  background: #061c42;
-}
-[data-theme='ocean'] .pcard.color-10 {
-  background: #300c2c;
-}
-
-/* mono — niveaux de gris bien distincts */
-[data-theme='mono'] .pcard.color-1 {
-  background: #303030;
-}
-[data-theme='mono'] .pcard.color-2 {
-  background: #242424;
-}
-[data-theme='mono'] .pcard.color-3 {
-  background: #383838;
-}
-[data-theme='mono'] .pcard.color-4 {
-  background: #1c1c1c;
-}
-[data-theme='mono'] .pcard.color-5 {
-  background: #2c2c2c;
-}
-[data-theme='mono'] .pcard.color-6 {
-  background: #404040;
-}
-[data-theme='mono'] .pcard.color-7 {
-  background: #181818;
-}
-[data-theme='mono'] .pcard.color-8 {
-  background: #343434;
-}
-[data-theme='mono'] .pcard.color-9 {
-  background: #282828;
-}
-[data-theme='mono'] .pcard.color-10 {
-  background: #202020;
-}
-
-/* gold — brun-ambre chaud */
-[data-theme='gold'] .pcard.color-1 {
-  background: #182230;
-}
-[data-theme='gold'] .pcard.color-2 {
-  background: #381818;
-}
-[data-theme='gold'] .pcard.color-3 {
-  background: #342c00;
-}
-[data-theme='gold'] .pcard.color-4 {
-  background: #2c1020;
-}
-[data-theme='gold'] .pcard.color-5 {
-  background: #102010;
-}
-[data-theme='gold'] .pcard.color-6 {
-  background: #102420;
-}
-[data-theme='gold'] .pcard.color-7 {
-  background: #241e00;
-}
-[data-theme='gold'] .pcard.color-8 {
-  background: #381c00;
-}
-[data-theme='gold'] .pcard.color-9 {
-  background: #0c1630;
-}
-[data-theme='gold'] .pcard.color-10 {
-  background: #30100c;
-}
-
-/* mono-light — pastels clairs bien distincts */
-[data-theme='mono-light'] .pcard.color-1 {
-  background: #c8dcf0;
-}
-[data-theme='mono-light'] .pcard.color-2 {
-  background: #f0c8cc;
-}
-[data-theme='mono-light'] .pcard.color-3 {
-  background: #eeebb0;
-}
-[data-theme='mono-light'] .pcard.color-4 {
-  background: #e8c0d8;
-}
-[data-theme='mono-light'] .pcard.color-5 {
-  background: #c0e0c8;
-}
-[data-theme='mono-light'] .pcard.color-6 {
-  background: #b8e8f5;
-}
-[data-theme='mono-light'] .pcard.color-7 {
-  background: #dcdcdc;
-}
-[data-theme='mono-light'] .pcard.color-8 {
-  background: #f0dfc0;
-}
-[data-theme='mono-light'] .pcard.color-9 {
-  background: #c0d4f0;
-}
-[data-theme='mono-light'] .pcard.color-10 {
-  background: #f0c8e0;
-}
-
-/* sobre — neutrals légèrement teintés */
-[data-theme='sobre'] .pcard.color-1 {
-  background: #243848;
-}
-[data-theme='sobre'] .pcard.color-2 {
-  background: #4a2030;
-}
-[data-theme='sobre'] .pcard.color-3 {
-  background: #423e10;
-}
-[data-theme='sobre'] .pcard.color-4 {
-  background: #40103a;
-}
-[data-theme='sobre'] .pcard.color-5 {
-  background: #103618;
-}
-[data-theme='sobre'] .pcard.color-6 {
-  background: #103848;
-}
-[data-theme='sobre'] .pcard.color-7 {
-  background: #363636;
-}
-[data-theme='sobre'] .pcard.color-8 {
-  background: #44280c;
-}
-[data-theme='sobre'] .pcard.color-9 {
-  background: #0c2840;
-}
-[data-theme='sobre'] .pcard.color-10 {
-  background: #441028;
-}
-
-/* light — pastels colorés sur fond clair */
-[data-theme='light'] .pcard.color-1 {
-  background: #c0d4f0;
-}
-[data-theme='light'] .pcard.color-2 {
-  background: #f0c4cc;
-}
-[data-theme='light'] .pcard.color-3 {
-  background: #ece8a8;
-}
-[data-theme='light'] .pcard.color-4 {
-  background: #e4bcd8;
-}
-[data-theme='light'] .pcard.color-5 {
-  background: #b8e0c4;
-}
-[data-theme='light'] .pcard.color-6 {
-  background: #b0e4f4;
-}
-[data-theme='light'] .pcard.color-7 {
-  background: #d8d8d8;
-}
-[data-theme='light'] .pcard.color-8 {
-  background: #f4ddb8;
-}
-[data-theme='light'] .pcard.color-9 {
-  background: #b8ccf0;
-}
-[data-theme='light'] .pcard.color-10 {
-  background: #f0bcd8;
-}
-
-/* Thèmes clairs — accent déjà sombre (#3355cc / #000), supprimer les halos */
-[data-theme='light'] .pplayer {
-  color: #111;
-  text-shadow: none;
-}
-[data-theme='light'] .score {
-  text-shadow: none;
-}
-[data-theme='light'] .tap-sign-minus,
-[data-theme='light'] .tap-sign-plus {
-  color: #111;
-  opacity: 0.4;
-}
-[data-theme='light'] .card-inner::before {
-  opacity: 0.15;
-}
-[data-theme='light'] .score.low {
-  color: #883300;
-  text-shadow: none;
-}
-[data-theme='light'] .score.crit {
-  color: #221166;
-  text-shadow: none;
-}
-[data-theme='mono-light'] .pplayer {
-  color: #111;
-  text-shadow: none;
-}
-[data-theme='mono-light'] .score {
-  color: #111;
-  text-shadow: none;
-}
-[data-theme='mono-light'] .tap-sign-minus,
-[data-theme='mono-light'] .tap-sign-plus {
-  color: #333;
-  opacity: 0.5;
-  text-shadow: none;
-}
-[data-theme='mono-light'] .card-inner::before {
-  opacity: 0.15;
-}
-[data-theme='mono-light'] .score.low {
-  color: #7a4400;
-  text-shadow: none;
-}
-[data-theme='mono-light'] .score.crit {
-  color: #cc0000;
-  text-shadow: none;
-}
+[data-theme='ldm-day'] .winner-sub,
 [data-theme='mono-light'] .delta-flash {
-  color: #111;
-}
-
-/* dark : diagonales croisées fines */
-[data-theme='dark'] {
-  --card-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M0 32L32 0M0 16L16 0M16 32L32 16' stroke='%23a78bfa' stroke-width='0.6'/%3E%3C/svg%3E");
-  --card-texture-size: 32px 32px;
-  --card-texture-opacity: 0.15;
-}
-
-/* neon-pink : grille de points */
-[data-theme='neon-pink'] {
-  --card-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18'%3E%3Ccircle cx='9' cy='9' r='1.2' fill='%23ff00cc'/%3E%3C/svg%3E");
-  --card-texture-size: 18px 18px;
-  --card-texture-opacity: 0.22;
-}
-
-/* arcade : scanlines + pixels */
-[data-theme='arcade'] {
-  --card-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect y='0' width='4' height='2' fill='%23ffdc00' opacity='0.18'/%3E%3C/svg%3E");
-  --card-texture-size: 4px 4px;
-  --card-texture-opacity: 0.5;
-}
-
-/* nature : veinage bois — courbes organiques */
-[data-theme='nature'] {
-  --card-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Cpath d='M0 40 Q20 20 40 40 Q60 60 80 40' fill='none' stroke='%2388dd44' stroke-width='1'/%3E%3Cpath d='M0 55 Q20 35 40 55 Q60 75 80 55' fill='none' stroke='%2350c850' stroke-width='0.7'/%3E%3Cpath d='M0 25 Q20 5 40 25 Q60 45 80 25' fill='none' stroke='%2388dd44' stroke-width='0.5'/%3E%3C/svg%3E");
-  --card-texture-size: 80px 80px;
-  --card-texture-opacity: 0.28;
-}
-
-/* sunset : rayures diagonales chaudes */
-[data-theme='sunset'] {
-  --card-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cpath d='M0 40L40 0' stroke='%23ff6040' stroke-width='0.8'/%3E%3Cpath d='M-10 30L30 -10' stroke='%23ffaa00' stroke-width='0.5'/%3E%3Cpath d='M10 40L40 10' stroke='%23ff6040' stroke-width='0.4'/%3E%3C/svg%3E");
-  --card-texture-size: 40px 40px;
-  --card-texture-opacity: 0.2;
-}
-
-/* ocean : vagues régulières */
-[data-theme='ocean'] {
-  --card-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='30'%3E%3Cpath d='M0 15 Q15 4 30 15 Q45 26 60 15' fill='none' stroke='%2300ccff' stroke-width='1.2'/%3E%3Cpath d='M0 25 Q15 14 30 25 Q45 36 60 25' fill='none' stroke='%230096ff' stroke-width='0.7'/%3E%3C/svg%3E");
-  --card-texture-size: 60px 30px;
-  --card-texture-opacity: 0.2;
-}
-
-/* mono : aucune texture */
-[data-theme='mono'] {
-  --card-texture: none;
-  --card-texture-opacity: 0;
-}
-
-/* gold : grille croisée fine */
-[data-theme='gold'] {
-  --card-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cline x1='12' y1='0' x2='12' y2='24' stroke='%23ffee44' stroke-width='0.6'/%3E%3Cline x1='0' y1='12' x2='24' y2='12' stroke='%23ddb800' stroke-width='0.5'/%3E%3C/svg%3E");
-  --card-texture-size: 24px 24px;
-  --card-texture-opacity: 0.14;
-}
-
-/* light : pointillés bleus */
-[data-theme='light'] {
-  --card-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Ccircle cx='10' cy='10' r='1' fill='%234455dd'/%3E%3C/svg%3E");
-  --card-texture-size: 20px 20px;
-  --card-texture-opacity: 0.18;
-}
-
-/* mono-light : aucune texture */
-[data-theme='mono-light'] {
-  --card-texture: none;
-  --card-texture-opacity: 0;
-}
-
-/* sobre : grille très fine */
-[data-theme='sobre'] {
-  --card-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cpath d='M24 0v24M0 24h24' stroke='%23ffffff' stroke-width='0.4'/%3E%3C/svg%3E");
-  --card-texture-size: 24px 24px;
-  --card-texture-opacity: 0.07;
-}
-
-[data-theme='mono-light'] .tap-sign-minus,
-[data-theme='mono-light'] .tap-sign-plus {
-  color: #111;
-  opacity: 0.4;
+  color: var(--text);
 }

@@ -1,0 +1,29 @@
+# Mises à jour automatiques des dépendances de développement et des actions GitHub.
+# Il n'y a aucune dépendance à l'exécution : ces mises à jour n'affectent jamais l'application servie.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '07:00'
+      timezone: Europe/Paris
+    open-pull-requests-limit: 5
+    groups:
+      outillage:
+        patterns: ['*']
+        update-types: [minor, patch]
+    commit-message:
+      prefix: 'deps'
+    labels: [dépendances]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '07:00'
+      timezone: Europe/Paris
+    commit-message:
+      prefix: 'ci'
+    labels: [dépendances, ci]

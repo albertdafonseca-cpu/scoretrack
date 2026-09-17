@@ -1,4 +1,5 @@
 // Helpers DOM sûrs : sélection, création d'éléments, texte échappé, navigation entre pages.
+import { icon as svgIcon } from './icons.js';
 
 export const byId = (id) => document.getElementById(id);
 export const qs = (sel, root = document) => root.querySelector(sel);
@@ -36,9 +37,12 @@ export function el(tag, attrs = {}, ...children) {
   return node;
 }
 
-/** Icône remplaçable : <span class="icon" data-icon="name">glyphe</span>. */
+/**
+ * Icône SVG inline (js/ui/icons.js). Le second argument (ancien glyphe de secours) n'est
+ * utilisé que si le nom est inconnu : on rend alors l'ancien <span class="icon">.
+ */
 export function icon(name, glyph) {
-  return el('span', { className: 'icon', dataset: { icon: name }, text: glyph });
+  return svgIcon(name) || el('span', { className: 'icon', dataset: { icon: name }, text: glyph });
 }
 
 export const show = (node) => node.classList.remove('hidden');

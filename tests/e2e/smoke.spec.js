@@ -23,8 +23,11 @@ async function setupGame(page, { players, start, max }) {
   await page.locator('#players-grid .player-chip', { hasText: new RegExp(`^${players}$`) }).click();
   await page.locator(`#start-presets .points-chip[data-val="${start}"]`).click();
   if (max) await page.locator(`#max-presets .points-chip[data-val="${max}"]`).click();
-  await expect(page.locator('#go-btn')).toHaveText(`Suivant → (${players}j · ${start}pts)`);
-  await page.locator('#go-btn').click();
+  const limit = max ? `max ${max}` : 'sans limite';
+  await expect(page.locator('#setup-summary')).toHaveText(
+    `${players} joueur${players > 1 ? 's' : ''} · départ ${start} · ${limit}`,
+  );
+  await page.locator('#names-btn').click();
   await expect(page.locator('.name-input')).toHaveCount(players);
 }
 
@@ -70,7 +73,9 @@ test('parcours complet à 4 joueurs, restauration, annulation et reset', async (
   for (let i = 0; i < names.length; i++) await inputs.nth(i).fill(names[i]);
   await page.getByRole('button', { name: /Mémoriser/ }).click();
   await expect(page.locator('.profile-chip')).toHaveCount(3);
-  await expect(page.locator('.profile-chip').nth(1).locator('span').first()).toHaveText(tricky);
+  await expect(page.locator('.profile-chip').nth(1).locator('.profile-chip-use')).toHaveText(
+    tricky,
+  );
   await page.getByRole('button', { name: /Lancer/ }).click();
 
   // Jeu
@@ -145,7 +150,8 @@ test('parcours complet à 4 joueurs, restauration, annulation et reset', async (
   await expect(page.locator('#setup-page')).toBeVisible();
   await expect(page.locator('#game-screen')).toBeHidden();
   expect(await page.evaluate(() => localStorage.getItem('scoretrack_save'))).toBeNull();
-  await expect(page.locator('#go-btn')).toBeDisabled();
+  // Les défauts sensés sont réappliqués : le CTA reste actif
+  await expect(page.locator('#go-btn')).toBeEnabled();
 
   expect(errors).toEqual([]);
 });

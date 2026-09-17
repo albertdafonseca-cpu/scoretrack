@@ -31,51 +31,81 @@
     <link rel="stylesheet" href="css/game.css" />
     <link rel="stylesheet" href="css/modals.css" />
     <link rel="stylesheet" href="css/motion.css" />
+    <link rel="stylesheet" href="css/system.css" />
     <script type="module" src="js/main.js"></script>
   </head>
   <body>
-    <div id="splash">
+    <div id="splash" aria-hidden="true">
       <div class="splash-icon"><span class="icon" data-icon="target">🎯</span></div>
       <div class="splash-title">ScoreTrack</div>
       <div class="splash-sub">Compteur universel</div>
     </div>
 
-    <div id="setup-page" class="page active">
-      <div class="logo">
-        <button class="logo-gear" data-action="show-settings">
-          <span class="icon" data-icon="gear">⚙️</span>
+    <section id="setup-page" class="page active" aria-labelledby="app-title">
+      <header class="logo">
+        <button type="button" class="logo-gear" data-action="show-settings" aria-label="Réglages">
+          <span class="icon" data-icon="gear" aria-hidden="true">⚙️</span>
         </button>
-        <div class="logo-mark"><span class="icon" data-icon="target">🎯</span></div>
-        <div class="logo-name">ScoreTrack</div>
-        <div class="logo-sub">Compteur universel</div>
-      </div>
-      <div class="restore-banner hidden" id="restore-banner">
+        <div class="logo-mark" aria-hidden="true">
+          <span class="icon" data-icon="target">🎯</span>
+        </div>
+        <h1 class="logo-name" id="app-title">ScoreTrack</h1>
+        <p class="logo-sub">Compteur universel</p>
+      </header>
+
+      <section class="restore-banner hidden" id="restore-banner" aria-labelledby="restore-title">
         <div class="restore-banner-text">
-          <span class="icon" data-icon="gamepad">🎮</span> Partie en cours<br />sauvegardée
+          <h2 class="restore-title" id="restore-title">
+            <span class="icon" data-icon="gamepad" aria-hidden="true">🎮</span> Partie en cours
+          </h2>
+          <p class="restore-preview" id="restore-preview"></p>
+          <time class="restore-when" id="restore-when"></time>
         </div>
         <div class="restore-banner-btns">
-          <button class="restore-btn yes" data-action="restore-game">Reprendre</button>
-          <button class="restore-btn no" data-action="discard-save">Effacer</button>
+          <button type="button" class="restore-btn yes" data-action="restore-game">
+            Reprendre
+          </button>
+          <button type="button" class="restore-btn no" data-action="discard-save">Effacer</button>
         </div>
-      </div>
-      <div class="setup-section">
-        <span class="setup-label">Préréglages</span>
-        <div class="presets-grid" id="presets-grid"></div>
-      </div>
-      <div class="setup-section">
-        <span class="setup-label">Nombre de joueurs</span>
-        <div class="players-grid" id="players-grid"></div>
-      </div>
-      <div class="setup-section">
-        <span class="setup-label">Points de départ</span>
-        <div class="points-presets" id="start-presets">
-          <div class="points-chip" data-val="0">0</div>
-          <div class="points-chip" data-val="10">10</div>
-          <div class="points-chip" data-val="20">20</div>
-          <div class="points-chip" data-val="40">40</div>
-          <div class="points-chip" data-val="50">50</div>
-          <div class="points-chip" data-val="100">100</div>
+      </section>
+
+      <section class="setup-section">
+        <h2 class="setup-label" id="lbl-presets">Préréglages</h2>
+        <div class="presets-grid" id="presets-grid" role="group" aria-labelledby="lbl-presets">
+          <button
+            type="button"
+            class="preset-card preset-card-custom"
+            id="preset-custom"
+            aria-pressed="true"
+            hidden
+          >
+            <span class="preset-card-name">Personnalisé</span>
+            <span class="preset-card-detail">Réglages ci-dessous</span>
+          </button>
         </div>
+      </section>
+
+      <section class="setup-section">
+        <h2 class="setup-label" id="lbl-players">Nombre de joueurs</h2>
+        <div
+          class="players-grid"
+          id="players-grid"
+          role="group"
+          aria-labelledby="lbl-players"
+        ></div>
+      </section>
+
+      <section class="setup-section">
+        <h2 class="setup-label" id="lbl-start">Points de départ</h2>
+        <div class="points-presets" id="start-presets" role="group" aria-labelledby="lbl-start">
+          <button type="button" class="points-chip" data-val="0" aria-pressed="false">0</button>
+          <button type="button" class="points-chip" data-val="10" aria-pressed="false">10</button>
+          <button type="button" class="points-chip" data-val="20" aria-pressed="false">20</button>
+          <button type="button" class="points-chip" data-val="40" aria-pressed="false">40</button>
+          <button type="button" class="points-chip" data-val="50" aria-pressed="false">50</button>
+          <button type="button" class="points-chip" data-val="100" aria-pressed="false">100</button>
+        </div>
+        <label class="sr-only" for="points-custom">Points de départ, autre valeur</label>
         <input
           class="points-input"
           id="points-custom"
@@ -83,76 +113,166 @@
           inputmode="numeric"
           placeholder="Autre valeur…"
           min="0"
+          max="9999999"
+          step="1"
+          aria-describedby="start-error"
         />
-      </div>
-      <div class="setup-section">
-        <span class="setup-label">Points maximum</span>
-        <div class="points-presets" id="max-presets">
-          <div class="points-chip" data-val="10">10</div>
-          <div class="points-chip" data-val="20">20</div>
-          <div class="points-chip" data-val="40">40</div>
-          <div class="points-chip" data-val="50">50</div>
-          <div class="points-chip" data-val="100">100</div>
-          <div class="points-chip" data-val="200">200</div>
+        <p class="field-error" id="start-error" role="alert" hidden></p>
+      </section>
+
+      <section class="setup-section">
+        <h2 class="setup-label" id="lbl-max">Points maximum</h2>
+        <div class="points-presets" id="max-presets" role="group" aria-labelledby="lbl-max">
+          <button type="button" class="points-chip" data-val="10" aria-pressed="false">10</button>
+          <button type="button" class="points-chip" data-val="20" aria-pressed="false">20</button>
+          <button type="button" class="points-chip" data-val="40" aria-pressed="false">40</button>
+          <button type="button" class="points-chip" data-val="50" aria-pressed="false">50</button>
+          <button type="button" class="points-chip" data-val="100" aria-pressed="false">100</button>
+          <button type="button" class="points-chip" data-val="200" aria-pressed="false">200</button>
         </div>
+        <label class="sr-only" for="max-custom"
+          >Points maximum, autre valeur (vide = sans limite)</label
+        >
         <input
           class="points-input"
           id="max-custom"
           type="number"
           inputmode="numeric"
           placeholder="Sans limite"
+          min="0"
+          max="9999999"
+          step="1"
+          aria-describedby="max-error"
         />
-      </div>
-      <div class="setup-section">
+        <p class="field-error" id="max-error" role="alert" hidden></p>
+      </section>
+
+      <section class="setup-section">
         <div class="toggle-row">
           <div>
-            <div class="toggle-label">Scores négatifs</div>
-            <div class="toggle-sub">Permettre de descendre sous 0</div>
+            <div class="toggle-label" id="neg-label">Scores négatifs</div>
+            <div class="toggle-sub" id="neg-sub">Permettre de descendre sous 0</div>
           </div>
-          <button class="toggle-switch" id="neg-toggle" data-action="toggle-negative"></button>
+          <button
+            type="button"
+            class="toggle-switch"
+            id="neg-toggle"
+            role="switch"
+            aria-checked="false"
+            aria-labelledby="neg-label"
+            aria-describedby="neg-sub"
+            data-action="toggle-negative"
+          ></button>
         </div>
-      </div>
-      <button class="go-btn" id="go-btn" disabled data-action="show-names">Suivant →</button>
+      </section>
+
+      <p class="setup-summary" id="setup-summary" aria-live="polite"></p>
+      <p class="setup-names-hint" id="setup-names-hint" hidden></p>
+      <button type="button" class="go-btn" id="go-btn" data-action="quick-start">
+        <span class="icon" data-icon="play" aria-hidden="true">▶</span> Lancer la partie
+      </button>
+      <button type="button" class="names-go-btn" id="names-btn" data-action="show-names">
+        <span class="icon" data-icon="edit" aria-hidden="true">✎</span> Nommer les joueurs
+      </button>
       <div class="setup-btn-row">
-        <button class="names-back names-back-flex" data-action="apply-defaults">↺ Défauts</button>
-        <button class="names-back names-back-flex" data-action="save-as-default">
-          <span class="icon" data-icon="save">💾</span> Sauver comme défaut
+        <button type="button" class="ghost-btn" data-action="apply-defaults">
+          <span class="icon" data-icon="refresh" aria-hidden="true">↺</span>
+          <span class="btn-text">Défauts</span>
+        </button>
+        <button type="button" class="ghost-btn" data-action="save-as-default">
+          <span class="icon" data-icon="save" aria-hidden="true">💾</span>
+          <span class="btn-text">Sauver comme défaut</span>
         </button>
       </div>
-    </div>
+    </section>
 
-    <div id="settings-page" class="page">
-      <div class="settings-header">
-        <button class="back-btn" data-action="back-from-settings">←</button>
-        <div class="settings-title">Thème</div>
-      </div>
-      <div class="setup-section">
-        <span class="setup-label">Thème visuel</span>
-        <div class="themes-grid" id="themes-grid"></div>
-      </div>
-      <div class="save-confirm" id="save-confirm"></div>
-      <button class="save-btn btn-privacy-link" data-action="show-privacy">
-        <span class="icon" data-icon="lock">🔒</span> Politique de confidentialité
-      </button>
-    </div>
+    <section id="settings-page" class="page" aria-labelledby="settings-title">
+      <header class="settings-header">
+        <button
+          type="button"
+          class="back-btn"
+          data-action="back-from-settings"
+          aria-label="Retour à l'accueil"
+        >
+          <span class="icon" data-icon="back" aria-hidden="true">←</span>
+        </button>
+        <h1 class="settings-title" id="settings-title" tabindex="-1">Réglages</h1>
+      </header>
+      <section class="setup-section">
+        <h2 class="setup-label" id="lbl-theme">Thème</h2>
+        <div class="themes-grid" id="themes-grid" role="group" aria-labelledby="lbl-theme"></div>
+      </section>
+      <section class="setup-section">
+        <h2 class="setup-label" id="lbl-data">Données</h2>
+        <p class="setup-help">
+          Réglages, partie en cours et prénoms restent sur cet appareil. Exportez-les pour les
+          conserver ou les transférer.
+        </p>
+        <div class="settings-row">
+          <button type="button" class="ghost-btn" data-action="export-data">
+            <span class="icon" data-icon="download" aria-hidden="true">↓</span>
+            <span class="btn-text">Exporter mes données</span>
+          </button>
+          <button type="button" class="ghost-btn" data-action="import-data">
+            <span class="icon" data-icon="upload" aria-hidden="true">↑</span>
+            <span class="btn-text">Importer</span>
+          </button>
+        </div>
+        <p class="setup-status" id="data-status" role="status"></p>
+      </section>
+      <section class="setup-section">
+        <h2 class="setup-label" id="lbl-privacy">Confidentialité</h2>
+        <p class="setup-help">
+          Aucune donnée ne quitte l'appareil : pas de compte, pas de serveur, pas de mesure
+          d'audience.
+        </p>
+        <button type="button" class="ghost-btn" data-action="show-privacy">
+          <span class="icon" data-icon="lock" aria-hidden="true">🔒</span>
+          <span class="btn-text">Politique de confidentialité</span>
+        </button>
+      </section>
+    </section>
 
     <!-- MODALE CONFIDENTIALITÉ -->
-    <div class="modal-overlay hidden" id="privacy-modal">
+    <div
+      class="modal-overlay hidden"
+      id="privacy-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="privacy-title"
+    >
       <div class="modal-box st-privacy-box">
-        <div class="modal-handle"></div>
-        <div class="modal-title">Confidentialité</div>
+        <div class="modal-handle" aria-hidden="true"></div>
+        <h2 class="modal-title" id="privacy-title" tabindex="-1">Confidentialité</h2>
         <div class="st-privacy-body">
-          <p class="st-privacy-intro">ScoreTrack ne collecte aucune donnée personnelle.</p>
+          <p class="st-privacy-intro">
+            ScoreTrack ne collecte aucune donnée personnelle et n'envoie aucune requête à un serveur
+            tiers.
+          </p>
           <p class="st-privacy-p">
             <strong class="privacy-strong">Stockage local uniquement</strong><br />
             ScoreTrack utilise le stockage local de votre navigateur (localStorage) pour sauvegarder
-            vos préférences (thème, paramètres par défaut), la partie en cours et les prénoms
-            mémorisés. Ces données restent exclusivement sur votre appareil.
+            vos préférences (thème, réglages par défaut), la partie en cours, les prénoms mémorisés
+            et les derniers noms utilisés par préréglage. Ces données restent exclusivement sur
+            votre appareil.
           </p>
           <p class="st-privacy-p">
-            <strong class="privacy-strong">Aucune transmission</strong><br />
-            Aucune donnée n'est envoyée à un serveur, partagée avec des tiers, ni utilisée à des
-            fins publicitaires ou analytiques.
+            <strong class="privacy-strong">Aucune requête externe</strong><br />
+            Les polices et les icônes sont embarquées dans l'application : aucune requête n'est
+            envoyée à Google Fonts ni à un réseau de diffusion. Aucune donnée n'est transmise à un
+            serveur, partagée avec des tiers, ni utilisée à des fins publicitaires ou analytiques.
+          </p>
+          <p class="st-privacy-p">
+            <strong class="privacy-strong">Journal d'erreurs local</strong><br />
+            En cas de dysfonctionnement, un court journal technique (clé
+            <code>scoretrack_errors</code>) est conservé sur l'appareil pour faciliter le
+            diagnostic. Il n'est jamais transmis et disparaît avec les autres données.
+          </p>
+          <p class="st-privacy-p">
+            <strong class="privacy-strong">Export et import</strong><br />
+            Depuis Réglages › Données, vous pouvez exporter vos données dans un fichier que vous
+            seul détenez, puis le réimporter sur un autre appareil. Ce fichier n'est envoyé nulle
+            part.
           </p>
           <p class="st-privacy-p">
             <strong class="privacy-strong">Cookies</strong><br />
@@ -162,45 +282,75 @@
           </p>
           <p class="st-privacy-p">
             <strong class="privacy-strong">Vos droits</strong><br />
-            Vous pouvez supprimer toutes les données stockées à tout moment en effaçant les données
-            du site dans les paramètres de votre navigateur.
+            Vous pouvez supprimer toutes les données à tout moment avec le bouton ci-dessous, ou en
+            effaçant les données du site dans les paramètres de votre navigateur.
           </p>
-          <p class="st-privacy-p st-privacy-p-last">
-            <strong class="privacy-strong">Effacer mes données</strong><br />
-            <button class="btn-clear-all" data-action="clear-all-data">
-              <span class="icon" data-icon="trash">🗑</span> Supprimer toutes les données
+          <div class="st-privacy-p st-privacy-p-last">
+            <button
+              type="button"
+              class="btn-clear-all"
+              id="btn-clear-all"
+              data-action="clear-all-data"
+            >
+              <span class="icon" data-icon="trash" aria-hidden="true">🗑</span>
+              <span class="btn-text">Supprimer toutes les données</span>
             </button>
-          </p>
-          <p class="st-privacy-date">Dernière mise à jour : avril 2026</p>
+          </div>
+          <p class="st-privacy-date">Dernière mise à jour : septembre 2026</p>
         </div>
         <button
+          type="button"
           class="modal-btn secondary st-privacy-close"
-          data-action="close-modal"
-          data-modal="privacy-modal"
+          data-action="close-privacy"
         >
           Fermer
         </button>
       </div>
     </div>
 
-    <div id="names-page" class="page">
-      <div class="names-title">Joueurs</div>
-      <div class="names-sub">Optionnel — laisser vide pour jouer sans nom</div>
-      <div class="names-actions">
-        <button class="names-action-btn" data-action="shuffle-players">
-          <span class="icon" data-icon="shuffle">🔀</span> Mélanger
+    <section id="names-page" class="page" aria-labelledby="names-title">
+      <h1 class="names-title" id="names-title" tabindex="-1">Joueurs</h1>
+      <p class="names-sub">Optionnel — une case vide donne « Joueur n »</p>
+      <div class="names-actions" role="group" aria-label="Actions sur les prénoms">
+        <button type="button" class="names-action-btn" data-action="shuffle-players">
+          <span class="icon" data-icon="shuffle" aria-hidden="true">🔀</span>
+          <span class="btn-text">Mélanger</span>
         </button>
-        <button class="names-action-btn" data-action="save-profiles">
-          <span class="icon" data-icon="save">💾</span> Mémoriser
+        <button type="button" class="names-action-btn" data-action="save-profiles">
+          <span class="icon" data-icon="save" aria-hidden="true">💾</span>
+          <span class="btn-text">Mémoriser</span>
         </button>
-        <button class="names-action-btn" data-action="clear-saved-names">✕ Effacer</button>
+        <button
+          type="button"
+          class="names-action-btn"
+          data-action="clear-saved-names"
+          aria-label="Oublier tous les prénoms mémorisés"
+        >
+          <span class="icon" data-icon="trash" aria-hidden="true">🗑</span>
+          <span class="btn-text">Oublier</span>
+        </button>
       </div>
-      <div class="profiles-list hidden" id="profiles-list"></div>
+      <div
+        class="profiles-list hidden"
+        id="profiles-list"
+        role="group"
+        aria-label="Prénoms mémorisés"
+      ></div>
       <div id="names-list"></div>
-      <button class="names-go-btn" data-action="start-game">Lancer ▶</button>
-      <button class="btn-vider-cases-st" data-action="clear-names">↺ Vider les cases</button>
-      <button class="names-back" data-action="show-setup">← Retour</button>
-    </div>
+      <button type="button" class="go-btn" id="names-go-btn" data-action="start-game">
+        <span class="icon" data-icon="play" aria-hidden="true">▶</span> Lancer la partie
+      </button>
+      <div class="setup-btn-row">
+        <button type="button" class="ghost-btn" data-action="clear-names">
+          <span class="icon" data-icon="refresh" aria-hidden="true">↺</span>
+          <span class="btn-text">Vider les cases</span>
+        </button>
+        <button type="button" class="ghost-btn" data-action="show-setup">
+          <span class="icon" data-icon="back" aria-hidden="true">←</span>
+          <span class="btn-text">Retour</span>
+        </button>
+      </div>
+    </section>
 
     <div id="game-screen">
       <div class="game-header"><div class="game-header-title">ScoreTrack</div></div>
@@ -209,7 +359,7 @@
 
     <div id="bar">
       <button class="bar-btn" id="undo-btn" disabled>
-        <span class="btn-icon">↩</span><span class="btn-label">Annuler</span>
+        <span class="btn-icon icon" data-icon="undo"></span><span class="btn-label">Annuler</span>
       </button>
       <button class="bar-btn accent-btn" data-action="rotate-players">
         <span class="btn-icon"><span class="icon" data-icon="rotate">🔄</span></span

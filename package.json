@@ -10,18 +10,23 @@
   },
   "scripts": {
     "dev": "http-server -p 8765 -s .",
-    "lint": "eslint . && prettier --check .",
+    "lint": "eslint . && prettier --check . && npm run lint:emoji",
+    "lint:emoji": "node scripts/lint-no-emoji.mjs",
     "format": "prettier --write .",
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
     "test": "npm run test:unit",
     "build:sw": "node scripts/build-sw.mjs",
     "check:sw": "node scripts/build-sw.mjs --check",
-    "check": "npm run lint && npm run check:sw && npm run test:unit && npm run test:e2e"
+    "check": "npm run lint && npm run check:sw && npm run test:unit && npm run test:e2e",
+    "lhci": "npx --yes @lhci/cli@0.15.1 autorun",
+    "audit": "npm audit --omit=dev --audit-level=high"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "1.56.1",
+    "@vitest/coverage-v8": "^5.0.1",
     "eslint": "^10.10.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.12.0",

@@ -1,0 +1,46 @@
+{
+  "players": [
+    { "playerName": "Joueur numér", "score": -1234567, "eliminated": false },
+    { "playerName": "Joueur numér", "score": 0, "eliminated": false },
+    { "playerName": "Joueur numér", "score": 0, "eliminated": false },
+    { "playerName": "Joueur numér", "score": 0, "eliminated": false },
+    { "playerName": "Joueur numér", "score": 0, "eliminated": false },
+    { "playerName": "Joueur numér", "score": 9999999, "eliminated": false },
+    { "playerName": "Joueur numér", "score": 0, "eliminated": false },
+    { "playerName": "Joueur numér", "score": 0, "eliminated": false },
+    { "playerName": "Joueur numér", "score": 0, "eliminated": false },
+    { "playerName": "Joueur numér", "score": 0, "eliminated": false },
+    { "playerName": "Joueur numér", "score": 0, "eliminated": false },
+    { "playerName": "Joueur numér", "score": -3, "eliminated": false }
+  ],
+  "seatOrder": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+  "history": [
+    {
+      "playerIdx": 0,
+      "who": "Joueur numér",
+      "entries": [{ "delta": -1234567 }],
+      "open": false,
+      "rank": 3
+    },
+    {
+      "playerIdx": 5,
+      "who": "Joueur numér",
+      "entries": [{ "delta": 9999999 }],
+      "open": false,
+      "rank": 2
+    },
+    {
+      "playerIdx": 11,
+      "who": "Joueur numér",
+      "entries": [{ "delta": -1 }, { "delta": -1 }, { "delta": -1 }],
+      "open": true,
+      "rank": 1
+    }
+  ],
+  "actionCounter": 3,
+  "numPlayers": 12,
+  "startPoints": 0,
+  "maxPoints": null,
+  "allowNeg": true,
+  "ts": 1789598914496
+}

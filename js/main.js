@@ -5,7 +5,17 @@ import { registerServiceWorker } from './platform/sw-client.js';
 import { clearAll, has } from './platform/storage.js';
 import { KEYS } from './core/save-schema.js';
 import { byId, showPage } from './ui/dom.js';
-import { loadSettings, showSettings } from './ui/settings.js';
+import { hydrateIcons } from './ui/icons.js';
+import {
+  armClearAll,
+  closePrivacy,
+  exportData,
+  importData,
+  initSettings,
+  loadSettings,
+  openPrivacy,
+  showSettings,
+} from './ui/settings.js';
 import {
   applyDefaults,
   initSetup,
@@ -17,7 +27,8 @@ import {
 import {
   clearNames,
   clearSavedNames,
-  collectNames,
+  collectNamesAndRemember,
+  quickStartNames,
   saveProfiles,
   showNamesScreen,
   shufflePlayers,
@@ -43,10 +54,11 @@ import {
   setSign,
 } from './ui/modals.js';
 import { hideRecap, showRecap } from './ui/recap.js';
+import './ui/update-banner.js';
 
 /** Délai (ms) avant le fondu du splash, puis durée du fondu. */
-const SPLASH_DELAY = 400;
-const SPLASH_FADE = 500;
+const SPLASH_DELAY = 150;
+const SPLASH_FADE = 200;
 
 /** Reset complet : ferme les surcouches, quitte le jeu, remet le setup à zéro. */
 function confirmReset() {
@@ -59,7 +71,7 @@ function confirmReset() {
 /** Efface toutes les données locales (politique de confidentialité). */
 function clearAllData() {
   clearAll();
-  closeModal('privacy-modal');
+  closePrivacy();
   confirmReset();
 }
 
@@ -68,8 +80,13 @@ const ACTIONS = {
   'show-settings': showSettings,
   'back-from-settings': () => showPage('setup-page'),
   'show-setup': () => showPage('setup-page'),
-  'show-privacy': () => openModal('privacy-modal'),
-  'clear-all-data': clearAllData,
+  'show-privacy': openPrivacy,
+  'close-privacy': closePrivacy,
+  'clear-all-data': (btn) => {
+    if (armClearAll(btn)) clearAllData();
+  },
+  'export-data': exportData,
+  'import-data': importData,
   'open-modal': (btn) => openModal(btn.dataset.modal),
   'close-modal': (btn) => closeModal(btn.dataset.modal),
   'restore-game': restoreGame,
@@ -82,7 +99,8 @@ const ACTIONS = {
   'save-profiles': saveProfiles,
   'clear-saved-names': clearSavedNames,
   'clear-names': clearNames,
-  'start-game': () => startGame(collectNames()),
+  'quick-start': () => startGame(quickStartNames()),
+  'start-game': () => startGame(collectNamesAndRemember()),
   'rotate-players': rotatePlayers,
   'show-recap': showRecap,
   'close-recap': hideRecap,
@@ -113,9 +131,11 @@ function hideSplash() {
 
 function init() {
   installErrorJournal();
+  hydrateIcons();
   registerServiceWorker();
   wireActions();
   initSetup();
+  initSettings();
   initScoreModal({ onConfirm: applyManualDelta });
   initGame();
   loadSettings();

@@ -10,7 +10,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SW_PATH = join(ROOT, 'sw-st.js');
 
 /** Dossiers précachés (récursifs) et fichiers racine. */
-const DIRS = ['css', 'js', 'assets/fonts', 'assets/icons', 'icons'];
+const DIRS = ['css', 'js', 'assets/fonts', 'assets/icons', 'assets/brand', 'icons'];
 const ROOT_FILES = ['index.html', 'manifest-st.json'];
 const EXTENSIONS = new Set([
   '.html',
