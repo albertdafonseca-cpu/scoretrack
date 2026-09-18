@@ -20,23 +20,29 @@ export const THEMES = [
 /** Thème par défaut : aucun attribut data-theme n'est posé pour lui. */
 export const DEFAULT_THEME = 'cyber';
 
-// Palette Paul Tol — daltonien-safe
+// Palette Paul Tol — daltonien-safe. Les teintes sont celles de Tol ; c'est leur ORDRE
+// D'ATTRIBUTION qui est optimisé : à n joueurs, seules les n premières couleurs sont en jeu, donc
+// l'ordre décide de la séparabilité réelle. Ordre mesuré par l'audit daltonisme
+// (`npm run audit:cvd`, matrices Machado 2009) : l'écart minimal ΔE2000 sous les trois
+// dichromaties passe de 8,6 à 15,1 à 6 joueurs, soit la porte « ≥ 14 » tenue jusqu'à 6 joueurs
+// au lieu de 4 (2 j. 40,2 · 3 j. 29,9 · 4 j. 20,1 · 5 j. 15,7 · 6 j. 15,1 · 7 j. 11,2).
+// L'indigo #332288 remplace #0077BB, trop proche de #4477AA (ΔE2000 4,4 en vision normale, 2,0 en
+// tritanopie : c'était le minimum de la palette) ; la paire passe à 27,5 / 20,1.
+// L'ordre DOIT rester identique à celui des jetons --tol-1…12 (css/tokens.css), dont dérivent les
+// fonds de carte --card-N : tests/unit/themes.test.js le vérifie index par index.
 export const COLORS = [
-  '#4477AA',
   '#EE6677',
-  '#CCBB44',
-  '#AA3377',
-  '#228833',
-  '#66CCEE',
-  '#BBBBBB',
-  '#EE7733',
-  // Indigo Tol « muted ». Remplace #0077BB, trop proche de #4477AA (ΔE2000 4,4 en vision normale,
-  // 2,0 en tritanopie : c'était le minimum de toute la palette). La paire passe à 27,5 / 20,1.
-  // Doit rester identique à --tol-9 (css/tokens.css) : tests/unit/themes.test.js le vérifie.
   '#332288',
-  '#EE3377',
-  '#44AA99',
+  '#66CCEE',
+  '#4477AA',
   '#DDCC77',
+  '#BBBBBB',
+  '#AA3377',
+  '#44AA99',
+  '#228833',
+  '#EE3377',
+  '#CCBB44',
+  '#EE7733',
 ];
 
 // Préréglages de jeux

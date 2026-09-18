@@ -146,14 +146,14 @@
 .sign-btn.plus.active {
   background: var(--gain);
   border-color: var(--gain);
-  /* Texte sur aplat sémantique : même jeton que les puces pressées (noir sur thème sombre,
-     blanc sur thème clair) — contraste garanti par l'audit de B sur les 14 thèmes. */
-  color: var(--chip-on-text);
+  /* Jeton dédié au texte posé SUR l'aplat de gain (--chip-on-text visait les puces et donnait
+     1,85:1 en « mono clair ») : audité par B sur les 14 thèmes. */
+  color: var(--on-gain);
 }
 .sign-btn.minus.active {
   background: var(--loss);
   border-color: var(--loss);
-  color: var(--chip-on-text);
+  color: var(--on-loss);
 }
 .modal-confirm-row {
   display: flex;

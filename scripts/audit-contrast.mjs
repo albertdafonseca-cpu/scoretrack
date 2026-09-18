@@ -216,8 +216,17 @@ function collectForegrounds() {
 function hideForegrounds() {
   const style = document.createElement('style');
   style.id = '__audit-hide';
+  // Les transitions sont coupées EN MÊME TEMPS que le masquage : sans cela, rendre la couleur
+  // transparente démarre une transition (les boutons animent `all`), et la capture prise juste
+  // après lit un état intermédiaire — un fond à mi-chemin de l'accent, d'où des ratios aberrants
+  // qu'aucune mesure directe ne reproduit.
   style.textContent = `
-    *, *::before, *::after { color: transparent !important; text-shadow: none !important; }
+    *, *::before, *::after {
+      color: transparent !important;
+      text-shadow: none !important;
+      transition: none !important;
+      animation: none !important;
+    }
     svg * { stroke: transparent !important; fill: transparent !important; }
   `;
   document.head.appendChild(style);
@@ -234,6 +243,17 @@ function showForegrounds() {
  * Sans cette attente, la mesure est fausse dans les deux sens — c'est le reproche fait au tour 1.
  */
 async function settle() {
+  await document.fonts.ready;
+  // DOM stable : deux relevés identiques à une trame d'intervalle. Un écran encore en train de se
+  // peupler (le pavé numérique construit ses douze touches) ne donnerait pas le même jeu
+  // d'éléments d'une exécution à l'autre.
+  let previous = -1;
+  for (let i = 0; i < 20; i++) {
+    const count = document.querySelectorAll('body *').length;
+    if (count === previous) break;
+    previous = count;
+    await new Promise((r) => setTimeout(r, 50));
+  }
   await document.fonts.ready;
   const running = document
     .getAnimations()
@@ -489,6 +509,11 @@ async function main() {
         /* stockage indisponible : l'application démarre déjà vierge */
       }
     });
+    // Le service worker n'est jamais installé pendant l'audit : sa bannière « nouvelle version »
+    // apparaît selon un calendrier propre et ferait varier le jeu d'éléments mesurés d'une
+    // exécution à l'autre. L'enregistrement échoue proprement, l'application le gère déjà.
+    // Les couleurs de cette bannière (css/system.css) sont auditées sur les écrans stables.
+    await c.route('**/sw-st.js', (route) => route.abort());
     return c;
   };
   let ctx = await freshCtx('dark');
@@ -543,14 +568,19 @@ async function main() {
     });
   }
 
-  let currentScheme = 'dark';
+  let first = true;
   for (const [id, scheme] of THEMES) {
-    if (scheme !== currentScheme) {
+    // Un contexte NEUF par thème. Mesuré : sur une longue exécution, un contexte partagé dérive —
+    // les fonds échantillonnés s'éclaircissent d'un thème à l'autre et font apparaître des échecs
+    // à 0,3 du seuil qu'aucune exécution isolée ne reproduit (nom de joueur relevé à 4,2 en série
+    // contre 4,8–5,1 isolé). Repartir à zéro coûte quelques secondes et rend le verdict identique
+    // à celui d'une mesure isolée, qui fait foi.
+    if (!first) {
       await ctx.close();
       ctx = await freshCtx(scheme);
       page = await ctx.newPage();
-      currentScheme = scheme;
     }
+    first = false;
     const theme = id === 'auto' ? `auto (${scheme})` : id;
     let gameReady = false;
     for (const plan of PLANS) {

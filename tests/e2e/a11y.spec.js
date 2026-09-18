@@ -174,20 +174,19 @@ test('contraste des pixels rendus là où axe reste indéterminé, sur tous les 
     if (open) await open();
     const sel =
       screen === 'noms' ? '#names-page' : screen === 'réglages' ? '#settings-page' : '#setup-page';
-    // La liste des nœuds indéterminés ne dépend que du balisage : calculée une fois par écran,
-    // puis mesurée sur chaque thème. Les pastilles de siège sont ajoutées d'office (axe ne les
-    // juge pas et leur contraste a déjà régressé une fois).
-    const targets = [
-      ...new Set([
-        ...(await undecidedContrastNodes(page, sel)),
-        ...(screen === 'noms'
-          ? ['.name-row:first-child .name-avatar', '.name-row:nth-child(4) .name-avatar']
-          : []),
-      ]),
-    ];
-    if (!targets.length) continue;
     for (const theme of themes) {
       await useTheme(page, theme);
+      // La liste est recalculée POUR CHAQUE THÈME : un nœud qu'un seul thème rend indéterminé
+      // (halo, dégradé propre à ce thème) doit entrer dans la mesure. Les pastilles de siège sont
+      // ajoutées d'office (axe ne les juge pas et leur contraste a déjà régressé une fois).
+      const targets = [
+        ...new Set([
+          ...(await undecidedContrastNodes(page, sel)),
+          ...(screen === 'noms'
+            ? ['.name-row:first-child .name-avatar', '.name-row:nth-child(4) .name-avatar']
+            : []),
+        ]),
+      ];
       for (const r of await renderedContrast(page, targets)) {
         if (r.ratio === undefined) {
           skipped.push({ theme, screen, ...r });
@@ -204,6 +203,26 @@ test('contraste des pixels rendus là où axe reste indéterminé, sur tous les 
   expect(measured).toBeGreaterThanOrEqual(300);
   // Un nœud non mesurable est compté et affiché : rien n'est écarté en silence.
   expect(skipped.length, JSON.stringify(skipped.slice(0, 10), null, 2)).toBeLessThanOrEqual(10);
+  expect(failures, JSON.stringify(failures, null, 2)).toEqual([]);
+});
+
+test('la coche des cartes de thème contraste sur le fond qu’elle marque, sur tous les thèmes', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await openApp(page);
+  await page.locator('.logo-gear').click();
+  const themes = await themeIds(page);
+  const failures = [];
+  for (const id of themes) {
+    // Sélectionner la carte applique son thème ET affiche sa coche : c'est l'état réel où la
+    // coche du thème prévisualisé doit rester lisible (elle empruntait l'accent du thème actif).
+    await page.locator(`#themes-grid .theme-card[data-theme="${id}"]`).click();
+    const sel = `#themes-grid .theme-card[data-theme="${id}"] .theme-check`;
+    const [r] = await renderedContrast(page, [sel]);
+    if (r.ratio === undefined || r.ratio < 4.5) failures.push({ theme: id, ...r });
+  }
   expect(failures, JSON.stringify(failures, null, 2)).toEqual([]);
 });
 

@@ -27,8 +27,6 @@ body {
 }
 
 :root {
-  /* Garde-fou D10 : aucun texte rendu sous 12 px, même si le jeton --fs-1 descend plus bas. */
-  --fs-min: max(var(--fs-1, 12px), 12px);
   /* Texte secondaire des écrans d'entrée : dérivé de --text pour garantir le contraste sur les
      fonds texturés, là où --muted2 descend sous 4,5:1 (mesuré sur les pixels rendus, D16). */
   --text-2: color-mix(in srgb, var(--text) 82%, var(--bg));
@@ -145,7 +143,7 @@ textarea,
 }
 .splash-sub {
   font-family: var(--score-font);
-  font-size: var(--fs-min);
+  font-size: var(--fs-1);
   letter-spacing: 0.2em;
   color: var(--muted2);
   text-transform: uppercase;

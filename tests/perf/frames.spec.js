@@ -99,6 +99,14 @@ test('réactivité : du pointerdown matériel à la trame peinte, p95 < 100 ms',
  */
 async function frameDeltas(page, cdp, selector, count) {
   const point = await centerOf(page, selector);
+  // Chauffe : 8 taps jetés avant toute mesure. Ils paient la compilation à la volée des
+  // gestionnaires, la première composition des couches et le premier accès au stockage. Les
+  // compter reviendrait à mesurer le démarrage, pas la fluidité en régime établi.
+  for (let i = 0; i < 8; i++) {
+    await realTap(cdp, point);
+    await page.waitForTimeout(30);
+  }
+  await page.waitForTimeout(200);
   await page.evaluate(() => {
     window.__d = [];
     window.__stop = false;

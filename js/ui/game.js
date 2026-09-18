@@ -41,6 +41,7 @@ import {
   computeFit,
   computeLayout,
   rotateSeats,
+  scoreRows,
 } from '../core/layout.js';
 import { KEYS, parseGame, serializeGame } from '../core/save-schema.js';
 import { readJSON, remove, scheduleWrite } from '../platform/storage.js';
@@ -94,7 +95,7 @@ const cards = [];
 const parts = new WeakMap();
 /** Sens du dernier tap par joueur : un changement de sens ouvre une nouvelle action. */
 const lastTapDir = new Map();
-/** Nombre de caractères du score affiché, par joueur (ré-ajustement seulement s'il change). */
+/** Texte du score affiché, par joueur : le ré-ajustement n'a lieu que s'il change vraiment. */
 const scoreLen = [];
 /** Repère lisible de chaque carte (`cardBox`), recalculé à chaque mesure. */
 const boxes = [];
@@ -188,6 +189,7 @@ export function leaveGame() {
   scoreLen.length = 0;
   boxes.length = 0;
   compact.length = 0;
+  scoreLines.length = 0;
   lastTapDir.clear();
   winnerFor = -1;
   remove(KEYS.save);
@@ -262,6 +264,7 @@ function buildGrid() {
   scoreLen.length = 0;
   boxes.length = 0;
   compact.length = 0;
+  scoreLines.length = 0;
   lastTapDir.clear();
   winnerFor = -1;
   wrap.style.paddingBottom = `${BAR_H}px`;
@@ -301,10 +304,16 @@ function applyLayout({ flip = false } = {}) {
   if (before) playFlip(before);
 }
 
-/** Texte du score d'un joueur, séparateurs de milliers compris sauf en mode compact. */
+/** Nombre de lignes sur lesquelles le score d'un joueur est rendu (décidé par le cœur). */
+const scoreLines = [];
+
+/** Texte du score d'un joueur : séparateurs de milliers sauf en mode compact, coupé si demandé. */
 function scoreText(pi) {
   const { score } = store.game.players[pi];
-  return compact[pi] ? String(score) : fmtNum(score);
+  const flat = compact[pi] ? String(score) : fmtNum(score);
+  // La découpe appartient au cœur (`scoreRows`) : même règle de frontière de milliers que celle
+  // dont `computeFit` a déduit la taille. Aucune heuristique d'interface.
+  return scoreRows(flat, scoreLines[pi] || 1).join('\n');
 }
 
 /**
@@ -318,6 +327,8 @@ function fitFor(pi, box) {
   let fit = computeFit(box, fmtNum(p.score));
   compact[pi] = fit.compact;
   if (fit.compact) fit = computeFit(box, String(p.score));
+  // `lines` vient du cœur : c'est lui qui sait si une ligne suffit à tenir le seuil de lisibilité.
+  scoreLines[pi] = Number.isInteger(fit.lines) && fit.lines > 1 ? fit.lines : 1;
   return fit;
 }
 
@@ -348,7 +359,7 @@ function measureCard(card, precomputed, ceiling = Infinity) {
     box,
     fit,
   );
-  scoreLen[pi] = ref.score.textContent.length;
+  scoreLen[pi] = ref.score.textContent;
   fitGap = Math.max(fitGap, lastFitGap());
 }
 
@@ -509,7 +520,7 @@ function updateScore(pi, direction) {
   if (ref.score.className !== cls) ref.score.className = cls;
   // Un changement du nombre de chiffres rebat les tailles de TOUTE la disposition (plafond
   // d'harmonisation) : on repasse donc sur l'ensemble des cartes, ce qui reste rare.
-  if (text.length !== scoreLen[pi]) measureAll();
+  if (text !== scoreLen[pi]) measureAll();
   refreshScoreLabel(pi);
 }
 

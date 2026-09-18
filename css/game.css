@@ -180,39 +180,57 @@
 .tap-half:disabled {
   cursor: default;
 }
-/* États pressé / flash / butée.
-   AUCUN voile ne passe sous le chiffre : le fond du score reste exactement la couleur de carte
-   auditée (mesure sur pixels rendus, D16). L'état est porté par un liseré intérieur de 4 px et par
-   un renfort de teinte cantonné au TIERS EXTÉRIEUR de la moitié, là où se trouve l'icône.
-   Le tout vit dans un pseudo-élément animé en OPACITÉ seule : composé, jamais repeint. */
-.tap-half::after {
+/* États pressé / flash / butée, en DEUX couches animées en opacité seule (composées, jamais
+   repeintes) :
+   - `::after` porte le LISERÉ intérieur de 4 px, sur toute la moitié : c'est lui qui dit quel côté
+     a été touché ;
+   - `::before` porte le renfort de TEINTE, cantonné au tiers extérieur ET démarrant sous la
+     bande d'identité : ni le chiffre (centré) ni le prénom (en haut) ne voient jamais leur fond
+     changer, donc leur contraste mesuré au repos vaut aussi en butée, en flash et sous le doigt. */
+.tap-half::after,
+.tap-half::before {
   content: '';
   position: absolute;
-  inset: 0;
   z-index: 0;
   pointer-events: none;
   opacity: 0;
   transition: opacity var(--dur-1) var(--ease-out);
 }
-.tap-half.minus::after {
-  background: linear-gradient(to left, transparent 50%, var(--half-press-minus) 100%);
-  box-shadow: inset 0 0 0 4px var(--loss);
+.tap-half::after {
+  inset: 0;
+}
+.tap-half::before {
+  inset: 32% 0 0;
 }
 .tap-half.plus::after {
-  background: linear-gradient(to right, transparent 50%, var(--half-press-plus) 100%);
   box-shadow: inset 0 0 0 4px var(--gain);
 }
+.tap-half.minus::after {
+  box-shadow: inset 0 0 0 4px var(--loss);
+}
 .tap-half.blocked::after {
-  background: linear-gradient(to left, transparent 50%, var(--half-blocked) 100%);
   box-shadow: inset 0 0 0 4px var(--warn);
 }
-.tap-half.plus.blocked::after {
+.tap-half.minus::before {
+  background: linear-gradient(to left, transparent 50%, var(--half-press-minus) 100%);
+}
+.tap-half.plus::before {
+  background: linear-gradient(to right, transparent 50%, var(--half-press-plus) 100%);
+}
+.tap-half.minus.blocked::before {
+  background: linear-gradient(to left, transparent 50%, var(--half-blocked) 100%);
+}
+.tap-half.plus.blocked::before {
   background: linear-gradient(to right, transparent 50%, var(--half-blocked) 100%);
 }
 .tap-half.pressed::after,
+.tap-half.pressed::before,
 .tap-half.flash-pos::after,
+.tap-half.flash-pos::before,
 .tap-half.flash-neg::after,
-.tap-half.blocked::after {
+.tap-half.flash-neg::before,
+.tap-half.blocked::after,
+.tap-half.blocked::before {
   opacity: 1;
 }
 .tap-half:focus-visible {
@@ -288,6 +306,7 @@
 }
 .pname {
   pointer-events: auto;
+  position: relative;
   display: flex;
   align-items: baseline;
   justify-content: center;
@@ -298,7 +317,8 @@
   border: 0;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  overflow: hidden;
+  /* Pas d'`overflow: hidden` ici : il RECOUPERAIT le pseudo-élément qui étend la zone tactile à
+     44 px. L'ellipse du prénom est portée par `.pplayer`, qui a son propre `overflow`. */
   font-size: var(--fs-2);
   line-height: 1.15;
 }
@@ -314,6 +334,21 @@
   border: 1px solid var(--card-sign);
   border-radius: var(--radius-sm);
   text-shadow: 0 1px 4px rgb(0 0 0 / 60%);
+}
+/* Cible tactile : le bloc d'identité ne fait que ~33 px de haut sur une petite carte. Plutôt que
+   d'imposer 44 px de HAUTEUR DE BOÎTE (qui prendrait 26 px au chiffre et ferait tomber la carte à
+   4 joueurs sous le seuil de 96 px de capitale), la zone ATTEIGNABLE est étendue à 44 × 44 px par
+   ce pseudo-élément, centré sur le texte. Vérifié par `elementFromPoint` dans les tests. */
+.pname::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  /* Ancrée sur le HAUT du bloc d'identité et débordant vers le bas : le bloc est collé au bord de
+     la carte, la seule direction libre est celle du score (qui n'y a pas d'encre à cet endroit). */
+  top: 0;
+  transform: translateX(-50%);
+  width: max(100%, var(--tap-min));
+  height: var(--tap-min);
 }
 .pname:focus-visible {
   outline: 3px solid var(--focus);
@@ -354,10 +389,13 @@
   font-family: var(--score-font);
   font-variant-numeric: tabular-nums;
   font-size: var(--fs-6);
-  line-height: 1;
+  /* `pre` conserve la coupure décidée par le cœur (score sur deux lignes sur les plus petites
+     cartes) ET interdit tout retour à la ligne automatique : la mesure de largeur reste fiable. */
+  white-space: pre;
+  /* = LINE_GAP de js/core/layout.js : la taille calculée par le cœur suppose cet interligne. */
+  line-height: 1.02;
   color: var(--score-color);
   text-align: center;
-  white-space: nowrap;
   text-shadow: 0 2px 6px rgb(0 0 0 / 60%);
 }
 .score.low {

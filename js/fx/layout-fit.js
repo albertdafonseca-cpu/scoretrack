@@ -8,7 +8,7 @@
 // aucune chasse moyenne ne peut couvrir cet écart, donc on mesure et on réduit si nécessaire.
 //
 // Trois passes au plus, toutes déterministes : aucune minuterie, aucun sondage.
-import { MAX_NAME_PX, MAX_SCORE_PX, MIN_NAME_PX, MIN_SCORE_PX } from '../core/layout.js';
+import { LINE_GAP, MAX_NAME_PX, MAX_SCORE_PX, MIN_NAME_PX, MIN_SCORE_PX } from '../core/layout.js';
 
 /** Fraction de la largeur du repère réellement utilisable (identique à `computeFit`). */
 const USABLE_W = 0.9;
@@ -98,7 +98,11 @@ export function fitCard(parts, box, fit) {
   //    contenu : `flex: 1 1 0` + `min-height: 0`) la borne, ce qui rend le chevauchement avec le
   //    nom géométriquement impossible quelles que soient les marges du thème.
   const wrap = score.parentElement;
-  const roof = wrap && wrap.clientHeight > 0 ? wrap.clientHeight : fit.scoreSz;
+  // Un score rendu sur deux lignes occupe deux interlignes : le plafond de hauteur est divisé
+  // d'autant, faute de quoi la seconde ligne déborderait sur le nom.
+  const rows = (score.textContent.match(/\n/g) || []).length + 1;
+  const space = wrap && wrap.clientHeight > 0 ? wrap.clientHeight : fit.scoreSz;
+  const roof = space / (rows * LINE_GAP);
   const scoreSz = shrinkToWidth(
     score,
     Math.min(fit.scoreSz, roof),

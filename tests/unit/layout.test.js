@@ -7,8 +7,12 @@ import {
   MAX_SCORE_PX,
   MIN_NAME_PX,
   MIN_SCORE_PX,
-  READABLE_SCORE_PX,
+  CAP_RATIO,
+  LINE_GAP,
+  READABLE_CAP_PX,
   cardBox,
+  scoreRows,
+  scoreWidth,
   computeFit,
   computeLayout,
   layoutStats,
@@ -280,8 +284,9 @@ describe('computeFit : seuils de lisibilité de la grille', () => {
     const four = computeFit(layoutStats(4, VP).minCard, '40');
     expect(four.scoreSz).toBeGreaterThanOrEqual(96);
     const twelve = computeFit(layoutStats(12, VP).minCard, fmtNum(9999999));
-    expect(twelve.scoreSz).toBeGreaterThanOrEqual(READABLE_SCORE_PX);
-    expect(twelve.compact).toBe(true);
+    expect(twelve.scoreSz * CAP_RATIO).toBeGreaterThanOrEqual(READABLE_CAP_PX);
+    expect(twelve.lines).toBe(2);
+    expect(twelve.compact).toBe(false);
     expect(computeFit(layoutStats(12, VP).minCard, '40').scoreSz).toBeGreaterThanOrEqual(30);
   });
 
@@ -292,6 +297,89 @@ describe('computeFit : seuils de lisibilité de la grille', () => {
       const fit = computeFit(minCard, '40');
       expect(fit.scoreSz).toBeGreaterThanOrEqual(Math.min(MAX_SCORE_PX, minCard.h * 0.65));
     }
+  });
+
+  it('1 à 12 joueurs × 1 à 7 chiffres : le rendu tient dans la carte ET la taille est maximale', () => {
+    for (let n = 1; n <= 12; n++) {
+      const { minCard } = layoutStats(n, VP);
+      const scoreH = minCard.h * 0.88 - computeFit(minCard, '0').nameSz * 1.2;
+      for (let d = 1; d <= 7; d++) {
+        const text = fmtNum(Number('9'.repeat(d)));
+        const fit = computeFit(minCard, text);
+        const rows = scoreRows(fit.compact ? text.replace(/\D/g, '') : text, fit.lines);
+        const label = `n=${n} ${d} chiffres`;
+        expect(`${label} lignes=${rows.length}`).toBe(`${label} lignes=${fit.lines}`);
+
+        // 1. Ça tient : largeur de la ligne la plus longue et hauteur totale.
+        const widest = Math.max(...rows.map((r) => scoreWidth(r, fit.scoreSz)));
+        expect(`${label} largeur`).toBe(
+          widest <= minCard.w * 0.9 + 0.01 ? `${label} largeur` : label,
+        );
+        const usedH = fit.scoreSz * (fit.lines === 1 ? 1 : fit.lines * LINE_GAP);
+        expect(`${label} hauteur`).toBe(usedH <= scoreH + 0.01 ? `${label} hauteur` : label);
+
+        // 2. C'est maximal : 5 % de plus déborderait (sauf si le plafond absolu est atteint).
+        if (fit.scoreSz < MAX_SCORE_PX - 0.01) {
+          const bigger = fit.scoreSz * 1.05;
+          const overflowsW = Math.max(...rows.map((r) => scoreWidth(r, bigger))) > minCard.w * 0.9;
+          const overflowsH = bigger * (fit.lines === 1 ? 1 : fit.lines * LINE_GAP) > scoreH;
+          expect(`${label} maximal`).toBe(overflowsW || overflowsH ? `${label} maximal` : label);
+        }
+      }
+    }
+  });
+
+  it('deux lignes seulement en cas de gain réel, et jamais sans point de coupure', () => {
+    for (let n = 1; n <= 12; n++) {
+      const { minCard } = layoutStats(n, VP);
+      for (let d = 1; d <= 7; d++) {
+        const text = fmtNum(Number('9'.repeat(d)));
+        const fit = computeFit(minCard, text);
+        const label = `n=${n} ${d} chiffres`;
+        if (d <= 3) {
+          // Moins de deux groupes de milliers : aucune coupure possible.
+          expect(`${label} lignes=${fit.lines}`).toBe(`${label} lignes=1`);
+          expect(scoreRows(text, 2)).toHaveLength(1);
+        }
+        if (fit.lines === 2) {
+          // Le gain doit être significatif : au moins 5 % de plus qu'une seule ligne.
+          const oneLine = Math.min(
+            minCard.h * 0.88 - fit.nameSz * 1.2,
+            (minCard.w * 0.9) / (scoreWidth(text, 1) || 1),
+          );
+          expect(`${label} gain`).toBe(
+            fit.scoreSz > oneLine * 1.05 ? `${label} gain` : `${label} sans gain`,
+          );
+        }
+      }
+    }
+  });
+
+  it('à 12 joueurs, 30 px de capitale sont atteints jusqu’à 7 chiffres', () => {
+    const { minCard } = layoutStats(12, VP);
+    for (let d = 1; d <= 7; d++) {
+      const fit = computeFit(minCard, fmtNum(Number('9'.repeat(d))));
+      const cap = fit.scoreSz * CAP_RATIO;
+      expect(`${d} chiffres : ${cap >= READABLE_CAP_PX}`).toBe(`${d} chiffres : true`);
+    }
+    // Cas documenté où le seuil ne peut pas être tenu sur deux lignes : à 11 joueurs la grille
+    // 2×6 donne la carte la plus étroite du jeu (122 px de largeur lisible contre 146 à 12).
+    const eleven = computeFit(layoutStats(11, VP).minCard, fmtNum(9999999));
+    expect(eleven.lines).toBe(2);
+    expect(eleven.scoreSz * CAP_RATIO).toBeLessThan(READABLE_CAP_PX);
+    expect(eleven.scoreSz * CAP_RATIO).toBeGreaterThan(28);
+  });
+
+  it('scoreRows coupe aux milliers, signe sur la première ligne', () => {
+    expect(scoreRows(fmtNum(9999999), 2)).toEqual(['9\u202f999', '999']);
+    expect(scoreRows(fmtNum(-1234567), 2)).toEqual(['-1\u202f234', '567']);
+    expect(scoreRows(fmtNum(99999), 2)).toEqual(['99', '999']);
+    expect(scoreRows('9999999', 2)).toEqual(['9\u202f999', '999']);
+    expect(scoreRows(fmtNum(999), 2)).toEqual(['999']);
+    expect(scoreRows(fmtNum(9999), 1)).toEqual([fmtNum(9999)]);
+    expect(scoreRows('', 2)).toEqual(['']);
+    expect(scoreRows(null, 2)).toEqual(['']);
+    expect(scoreRows(fmtNum(9999999), 3)).toEqual(['9', '999', '999']);
   });
 
   it('tous les nombres de joueurs tiennent le plancher, même à 7 chiffres négatifs', () => {
@@ -307,16 +395,28 @@ describe('computeFit : seuils de lisibilité de la grille', () => {
     }
   });
 
-  it('demande le mode compact seulement quand les séparateurs coûtent la lisibilité', () => {
-    const small = layoutStats(12, VP).minCard;
-    const big = layoutStats(1, VP).minCard;
-    expect(computeFit(small, fmtNum(1234567)).compact).toBe(true);
-    expect(computeFit(big, fmtNum(1234567)).compact).toBe(false);
-    expect(computeFit(small, '40').compact).toBe(false);
-    // Le mode compact rend le nombre plus grand que la version séparée.
-    const sepAdvantage =
-      computeFit(small, fmtNum(1234567)).scoreSz > computeFit(small, '1 234 567').scoreSz * 0.99;
-    expect(sepAdvantage).toBe(true);
+  it('le mode compact est un dernier recours, et implique toujours une seule ligne', () => {
+    for (let n = 1; n <= 12; n++) {
+      const { minCard } = layoutStats(n, VP);
+      for (const d of [1, 2, 3, 4, 5, 6, 7]) {
+        const fit = computeFit(minCard, fmtNum(Number('9'.repeat(d))));
+        if (fit.compact) {
+          expect(fit.lines).toBe(1);
+          // On ne retire les séparateurs que si la lisibilité n'est pas atteinte autrement.
+          expect(fit.scoreSz * CAP_RATIO).toBeLessThan(READABLE_CAP_PX);
+        }
+      }
+    }
+    // Carte étroite et haute : la largeur est la contrainte, et deux lignes n'y changent rien —
+    // retirer les séparateurs est alors la seule option qui agrandit le nombre.
+    const narrow = computeFit({ w: 90, h: 60 }, fmtNum(1234567));
+    expect(narrow.compact).toBe(true);
+    expect(narrow.lines).toBe(1);
+    expect(narrow.scoreSz).toBeGreaterThan(
+      computeFit({ w: 90, h: 60 }, '1 234 567').scoreSz * 0.99,
+    );
+    // Carte large et très basse : c'est la hauteur qui borne, les séparateurs ne coûtent rien.
+    expect(computeFit({ w: 120, h: 34 }, fmtNum(1234567)).compact).toBe(false);
   });
 
   it('tient compte des DEUX dimensions : une carte large et basse écrit plus grand', () => {

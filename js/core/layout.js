@@ -35,8 +35,17 @@ export const MIN_NAME_PX = 12;
 /** Plafonds au-delà desquels agrandir n'apporte plus rien. */
 export const MAX_SCORE_PX = 240;
 export const MAX_NAME_PX = 34;
-/** Hauteur de chiffre en deçà de laquelle on préfère supprimer les séparateurs de milliers. */
-export const READABLE_SCORE_PX = 30;
+/**
+ * Hauteur de CAPITALE (px) visée par la grille pour un score lisible à 1 m, et rapport moyen
+ * hauteur de capitale / taille de police des familles du projet (mesuré par A : 45 px de police
+ * donnent 31 px de capitale).
+ */
+export const READABLE_CAP_PX = 30;
+export const CAP_RATIO = 0.7;
+/** Interligne d'un score rendu sur deux lignes (identique à celui appliqué par js/fx/layout-fit.js). */
+export const LINE_GAP = 1.02;
+/** Gain minimal (5 %) exigé pour basculer un score sur deux lignes. */
+const SWITCH_GAIN = 0.05;
 
 const L = 'rot-l';
 const R = 'rot-r';
@@ -204,6 +213,32 @@ const ADV_SEP = 0.28;
 const ADV_SIGN = 0.45;
 const ADV_LETTER = 0.62;
 
+/**
+ * Découpe un score en `lines` lignes aux frontières de milliers — exactement la règle appliquée au
+ * rendu : les chiffres sont groupés par trois depuis la droite, les groupes répartis en lignes
+ * égales (la première en compte le plus), le signe reste sur la première ligne, les groupes d'une
+ * même ligne sont séparés par une espace fine insécable.
+ * @param {string} str score formaté ou brut
+ * @param {number} [lines] nombre de lignes souhaité
+ * @returns {string[]} les lignes (une seule si la coupure est impossible ou inutile)
+ */
+export function scoreRows(str, lines = 1) {
+  const text = String(str === undefined || str === null ? '' : str);
+  if (lines < 2) return [text];
+  const sign = text.trimStart().startsWith('-') ? '-' : '';
+  const digits = text.replace(/[^0-9]/g, '');
+  const groups = [];
+  for (let end = digits.length; end > 0; end -= 3) {
+    groups.unshift(digits.slice(Math.max(0, end - 3), end));
+  }
+  if (groups.length < 2) return [text];
+  const per = Math.ceil(groups.length / lines);
+  const rows = [];
+  for (let i = 0; i < groups.length; i += per) rows.push(groups.slice(i, i + per).join('\u202f'));
+  rows[0] = sign + rows[0];
+  return rows;
+}
+
 /** Largeur (en em) d'une chaîne de score : chiffres, séparateurs de milliers et signe. */
 function scoreAdvance(str, withSeparators) {
   let adv = 0;
@@ -216,19 +251,38 @@ function scoreAdvance(str, withSeparators) {
 }
 
 /**
+ * Largeur (px) d'une ligne de score à cette taille de police — modèle de chasse du cœur, utile
+ * pour vérifier qu'un rendu tient avant de le mesurer dans le DOM.
+ * @param {string} line une ligne de score
+ * @param {number} fontSize taille de police (px)
+ * @param {boolean} [withSeparators] compter les séparateurs de milliers
+ */
+export function scoreWidth(line, fontSize, withSeparators = true) {
+  return scoreAdvance(String(line), withSeparators) * fontSize;
+}
+
+/**
  * Tailles de texte (px) d'une carte à partir de son repère lisible et du score affiché.
  *
  * Le score est contraint par les DEUX dimensions du repère : sa hauteur de glyphe par la hauteur
  * restante sous le nom, sa largeur par la largeur disponible (une carte latérale est large et
  * basse : c'est ce que l'ancienne formule, fondée sur la seule plus petite dimension, ratait).
- * Quand les séparateurs de milliers font tomber le score sous `READABLE_SCORE_PX`, la fonction
- * demande à l'interface de les retirer (`compact: true`) plutôt que de rapetisser le nombre.
+ *
+ * La fonction choisit aussi la MISE EN LIGNES, plutôt que de laisser l'interface la deviner :
+ *   - `lines: 2` quand couper le score aux milliers (voir `scoreRows`) fait gagner au moins 5 %
+ *     de hauteur de glyphe — à 12 joueurs, un score à 7 chiffres passe ainsi de 22 à 32 px de
+ *     capitale ; le gain est réel parce que la largeur exigée est presque divisée par deux alors
+ *     que la hauteur n'est divisée que par deux interlignes ;
+ *   - `compact: true` en dernier recours, quand la capitale reste sous `READABLE_CAP_PX` et que
+ *     retirer les séparateurs de milliers fait mieux que toutes les autres options. `compact`
+ *     implique toujours `lines: 1` (sans séparateur, il n'y a plus de point de coupure rendu).
  *
  * @param {{w:number,h:number}} box repère APRÈS rotation (voir `cardBox`) : largeur × hauteur
  *   vues par le joueur assis en face de la carte
  * @param {string} scoreStr score tel qu'il serait affiché (`fmtNum`, séparateurs compris)
- * @returns {{scoreSz:number, nameSz:number, signSz:number, deltaSz:number, ghostH:number,
- *   compact:boolean}} tailles en px ; `compact` = afficher le score sans séparateurs de milliers
+ * @returns {{scoreSz:number, lines:1|2, compact:boolean, nameSz:number, signSz:number,
+ *   deltaSz:number, ghostH:number}} tailles en px ; `lines` = nombre de lignes à rendre
+ *   (`scoreRows(texte, lines)` donne la coupure exacte), `compact` = retirer les séparateurs
  */
 export function computeFit(box, scoreStr) {
   const w = box && box.w > 0 ? box.w : 0;
@@ -242,20 +296,41 @@ export function computeFit(box, scoreStr) {
   const str = String(
     scoreStr === undefined || scoreStr === null || scoreStr === '' ? '0' : scoreStr,
   );
-  const full = scoreAdvance(str, true);
-  const compactAdv = scoreAdvance(str, false);
-  const sizeFull = Math.min(scoreH, usableW / full);
-  const sizeCompact = Math.min(scoreH, usableW / compactAdv);
-  const compact = compactAdv < full && sizeFull < READABLE_SCORE_PX;
-  const scoreSz = clamp(compact ? sizeCompact : sizeFull, MIN_SCORE_PX, MAX_SCORE_PX);
+  // Trois candidats : une ligne telle quelle, deux lignes coupées aux milliers, une ligne sans
+  // séparateurs. On garde celui qui écrit le plus gros, à gain significatif près.
+  const oneFull = Math.min(scoreH, usableW / scoreAdvance(str, true));
+  const rows = scoreRows(str, 2);
+  const twoLines =
+    rows.length === 2
+      ? Math.min(
+          scoreH / (2 * LINE_GAP),
+          usableW / Math.max(...rows.map((r) => scoreAdvance(r, true))),
+        )
+      : 0;
+  const oneCompact = Math.min(scoreH, usableW / scoreAdvance(str, false));
+
+  let scoreSz = oneFull;
+  let lines = 1;
+  let compact = false;
+  if (twoLines > oneFull * (1 + SWITCH_GAIN)) {
+    scoreSz = twoLines;
+    lines = 2;
+  }
+  if (scoreSz * CAP_RATIO < READABLE_CAP_PX && oneCompact > scoreSz) {
+    scoreSz = oneCompact;
+    lines = 1;
+    compact = true;
+  }
+  scoreSz = clamp(scoreSz, MIN_SCORE_PX, MAX_SCORE_PX);
 
   return {
     scoreSz,
+    lines,
+    compact,
     nameSz,
     signSz: clamp(Math.min(w, h) * 0.18, 24, 72),
     deltaSz: clamp(scoreSz * 0.34, MIN_NAME_PX, 44),
     ghostH: Math.round(nameSz * 1.15),
-    compact,
   };
 }
 

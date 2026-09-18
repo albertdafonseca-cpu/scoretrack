@@ -1,7 +1,7 @@
 // Parcours d'entrée : lancement à froid en ≤ 2 clics, parcours nommé, reprise avec aperçu,
 // préréglages et ligne « Personnalisé », mémoire des noms par préréglage, erreurs de saisie.
 import { expect, test } from '@playwright/test';
-import { collectErrors, openApp, tapCard } from './helpers.js';
+import { collectErrors, measureLayoutShift, openApp, tapCard, validSave } from './helpers.js';
 
 test('à froid : le CTA est actif et le premier score change en 2 clics', async ({ page }) => {
   const errors = collectErrors(page);
@@ -319,4 +319,55 @@ test('18 caractères restent saisissables et la mémoire ne perd jamais un prén
     JSON.parse(localStorage.getItem('scoretrack_last_names')),
   );
   expect(Object.values(stored.byPreset)[0][0]).toBe(long);
+});
+
+/**
+ * Budget D11 : le décalage cumulé de mise en page doit rester sous 0,1 sur TOUS les chemins
+ * d'entrée, pas seulement sur un profil vierge — c'est précisément là qu'un outil de mesure
+ * lancé sur un profil neuf ne regarde jamais.
+ */
+test('décalage cumulé ≤ 0,1 sur les six chemins d’entrée (D11)', async ({ page }) => {
+  test.setTimeout(240_000);
+  const cases = [
+    ['à froid, stockage vide', {}],
+    ['sauvegarde valide', { storage: { scoretrack_save: validSave(2) } }],
+    ['sauvegarde valide, 12 joueurs', { storage: { scoretrack_save: validSave(12) } }],
+    ['sauvegarde corrompue', { storage: { scoretrack_save: '{"players":[' } }],
+    ['clé vide', { storage: { scoretrack_save: '' } }],
+    ['clé « null »', { storage: { scoretrack_save: 'null' } }],
+    [
+      'sauvegarde valide + ?action=new',
+      { storage: { scoretrack_save: validSave(2) }, query: '?action=new' },
+    ],
+  ];
+  const measured = [];
+  for (const [name, options] of cases) {
+    measured.push([name, await measureLayoutShift(page, options)]);
+  }
+  // Les valeurs mesurées sont journalisées : une régression se lit directement dans la sortie.
+  console.log('décalage cumulé par chemin :', JSON.stringify(measured));
+  const over = measured.filter(([, cls]) => cls > 0.1);
+  expect(over, JSON.stringify(measured, null, 2)).toEqual([]);
+  // D17 : la mesure doit avoir eu lieu sur tous les cas, et au moins un cas doit être non nul,
+  // sinon l'instrumentation est muette et le test ne prouverait rien.
+  expect(measured).toHaveLength(cases.length);
+  expect(measured.some(([, cls]) => cls > 0)).toBe(true);
+});
+
+test('un identifiant de thème inconnu est normalisé, rien d’inconnu ne reste sur le document', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.evaluate(() =>
+    localStorage.setItem('scoretrack_settings', JSON.stringify({ v: 1, theme: 'evil' })),
+  );
+  await page.reload();
+  await expect(page.locator('#setup-page')).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', '');
+  // Le réglage persisté est ramené à une valeur connue dès qu'il est réécrit.
+  await page.locator('.logo-gear').click();
+  await expect(page.locator('#themes-grid .theme-card[data-theme="cyber"]')).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
 });

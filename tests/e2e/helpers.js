@@ -246,3 +246,66 @@ export async function obstructedTargets(page, rootSelector = 'body') {
       .filter(Boolean);
   }, rootSelector);
 }
+
+/** Sauvegarde minimale valide, pour les scénarios de reprise. */
+export function validSave(players = 2) {
+  return JSON.stringify({
+    v: 2,
+    players: Array.from({ length: players }, (_, i) => ({
+      playerName: `Joueur ${i + 1}`,
+      score: 10 + i,
+      eliminated: false,
+    })),
+    seatOrder: Array.from({ length: players }, (_, i) => i),
+    log: { entries: [], cursor: 0 },
+    numPlayers: players,
+    startPoints: 10,
+    maxPoints: null,
+    allowNeg: false,
+    ts: Date.now(),
+  });
+}
+
+/**
+ * Décalage cumulé de mise en page (CLS) d'un chargement, mesuré comme le fait un outil de terrain :
+ * `PerformanceObserver({type:'layout-shift'})`, décalages consécutifs à un geste exclus, CPU bridé
+ * pour que le JavaScript s'exécute après le premier rendu (sans bridage, le défaut reste invisible).
+ * `storage` est écrit avant le chargement mesuré ; `query` s'ajoute à l'URL.
+ */
+export async function measureLayoutShift(page, { storage = {}, query = '', cpu = 4 } = {}) {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: cpu });
+  await page.goto('/');
+  // La mesure doit porter sur la version courante : un service worker déjà actif servirait la
+  // version précédente et fausserait le résultat dans les deux sens.
+  await page.evaluate(async () => {
+    if (navigator.serviceWorker) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => r.unregister()));
+    }
+  });
+  await page.addInitScript(() => {
+    if (!navigator.serviceWorker) return;
+    navigator.serviceWorker.register = () => new Promise(() => {});
+    navigator.serviceWorker.getRegistrations = () => Promise.resolve([]);
+  });
+  await page.evaluate((entries) => {
+    localStorage.clear();
+    for (const [k, v] of Object.entries(entries)) localStorage.setItem(k, v);
+  }, storage);
+  // Idempotent : `addInitScript` s'accumule sur une même page, et deux observateurs compteraient
+  // chaque décalage deux fois (défaut qui gonflait la mesure d'un facteur égal au nombre d'appels).
+  await page.addInitScript(() => {
+    if (window.__clsObserver) return;
+    window.__shifts = [];
+    window.__clsObserver = new PerformanceObserver((list) => {
+      for (const e of list.getEntries()) if (!e.hadRecentInput) window.__shifts.push(e.value);
+    });
+    window.__clsObserver.observe({ type: 'layout-shift', buffered: true });
+  });
+  await page.goto(`/${query}`, { waitUntil: 'load' });
+  await page.waitForTimeout(2500);
+  const shifts = await page.evaluate(() => window.__shifts);
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+  return Number(shifts.reduce((a, b) => a + b, 0).toFixed(4));
+}

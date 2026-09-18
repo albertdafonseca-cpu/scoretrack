@@ -282,19 +282,30 @@ export function savePreviewText(players, limit = 6) {
 }
 
 /** Affiche (avec aperçu : noms, scores, date relative) ou masque la bannière de reprise. */
+/**
+ * Libère la place réservée à la bannière — mais seulement après un geste de l'utilisateur.
+ * Effondrer la boîte décale toute la page ; tant que l'utilisateur n'a rien fait, ce décalage
+ * lui serait imputé à tort (et compterait dans le budget D11), alors qu'après un clic il est
+ * attendu et exclu de la mesure. Sans geste, la boîte reste réservée mais invisible.
+ */
+function releaseReservedBox() {
+  const activated = navigator.userActivation ? navigator.userActivation.hasBeenActive : true;
+  if (activated) document.documentElement.removeAttribute('data-has-save');
+}
+
 export function setRestoreBannerVisible(visible) {
   const banner = byId('restore-banner');
   if (!visible) {
     hide(banner);
     banner.classList.remove('is-visible');
-    document.documentElement.removeAttribute('data-has-save');
+    releaseReservedBox();
     return;
   }
   const parsed = parseGame(readJSON(KEYS.save, null));
   if (!parsed.ok) {
     hide(banner);
     banner.classList.remove('is-visible');
-    document.documentElement.removeAttribute('data-has-save');
+    releaseReservedBox();
     return;
   }
   byId('restore-preview').textContent = savePreviewText(parsed.game.players);

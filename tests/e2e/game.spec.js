@@ -590,16 +590,27 @@ test('taps SIMULTANÉS : chaque doigt compte (2 puis 3 cartes à la fois)', asyn
   expect(errors).toEqual([]);
 });
 
-test('contraste du score et du numéro de joueur sur pixels rendus, 14 thèmes × 3 états (D16)', async ({
+test('contraste sur pixels rendus : 14 thèmes × 7 états × 3 textes de carte (D16)', async ({
   page,
 }, testInfo) => {
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
   await openApp(page);
-  await startGame(page, { players: 4, start: 40, names: ['Alice', 'Bruno', 'Chloé', 'David'] });
+  // Un prénom long touche les zones teintées : c'est le pire cas, celui qu'il faut mesurer.
+  await startGame(page, { players: 4, start: 40, names: Array(4).fill('Bartholomew Longn') });
   const themes = await page.evaluate(async () =>
     (await import('./js/core/constants.js')).THEMES.map((t) => t.id),
   );
   expect(themes.length, 'thèmes à auditer').toBeGreaterThanOrEqual(14);
+  /** Tous les états visuels transitoires d'une moitié, pas seulement le repos. */
+  const STATES = [
+    ['repos', null, null],
+    ['pressé+', 'plus', 'pressed'],
+    ['pressé-', 'minus', 'pressed'],
+    ['flash+', 'plus', 'flash-pos'],
+    ['flash-', 'minus', 'flash-neg'],
+    ['butée+', 'plus', 'blocked'],
+    ['butée-', 'minus', 'blocked'],
+  ];
   const failures = [];
   const rows = [];
   for (const id of themes) {
@@ -607,38 +618,104 @@ test('contraste du score et du numéro de joueur sur pixels rendus, 14 thèmes �
       (t) => document.documentElement.setAttribute('data-theme', t === 'cyber' ? '' : t),
       id,
     );
-    // Le thème change de police : tant que la nouvelle fonte n'est pas chargée, le texte peut être
-    // rendu invisible (`font-display`), ce qui mesurerait un aplat uniforme au lieu d'un contraste.
+    // Le thème change de police : tant qu'elle n'est pas chargée, le texte peut être rendu
+    // invisible (`font-display`), ce qui mesurerait un aplat uniforme au lieu d'un contraste.
     await page.evaluate(() => document.fonts.ready);
     await page.waitForTimeout(150);
-    for (const state of ['repos', 'plus', 'minus']) {
-      if (state !== 'repos') {
+    for (const [state, half, cls] of STATES) {
+      if (half) {
         await page.evaluate(
-          (sel) => document.querySelector(`#card-0 .tap-half.${sel}`).classList.add('pressed'),
-          state,
+          ([h, c]) => document.querySelector(`#card-0 .tap-half.${h}`).classList.add(c),
+          [half, cls],
+        );
+        await page.waitForTimeout(150);
+      }
+      const [score, seat, name] = await renderedContrast(page, [
+        '#sc-0',
+        '#card-0 .pseat',
+        '#card-0 .pplayer',
+      ]);
+      if (half) {
+        await page.evaluate(
+          ([h, c]) => document.querySelector(`#card-0 .tap-half.${h}`).classList.remove(c),
+          [half, cls],
         );
       }
-      await page.waitForTimeout(120);
-      const [score, seat] = await renderedContrast(page, ['#sc-0', '#card-0 .pseat']);
-      if (state !== 'repos') {
-        await page.evaluate(
-          (sel) => document.querySelector(`#card-0 .tap-half.${sel}`).classList.remove('pressed'),
-          state,
-        );
+      rows.push({ id, state, score: score.ratio, seat: seat.ratio, name: name.ratio });
+      for (const [cible, r] of [
+        ['score', score.ratio],
+        ['numéro', seat.ratio],
+        ['prénom', name.ratio],
+      ]) {
+        if (!(r >= 4.5)) failures.push({ id, state, cible, ratio: r });
       }
-      rows.push({ id, state, score: score.ratio, seat: seat.ratio });
-      // Le seuil des composants (3:1) ne s'applique pas ici : ce sont des TEXTES.
-      if (!(score.ratio >= 4.5)) failures.push({ id, state, cible: 'score', ratio: score.ratio });
-      if (!(seat.ratio >= 4.5)) failures.push({ id, state, cible: 'numéro', ratio: seat.ratio });
     }
   }
+  const worst = rows.reduce((a, r) => Math.min(a, r.score, r.seat, r.name), Infinity);
   testInfo.annotations.push({
     type: 'contraste-rendu',
-    description: rows.map((r) => `${r.id}/${r.state} score ${r.score} siège ${r.seat}`).join(' · '),
+    description: `${rows.length} mesures (14 thèmes × 7 états × 3 textes) · pire rapport ${worst}`,
   });
-  // D17 : la mesure doit avoir réellement eu lieu.
-  expect(rows.length).toBe(themes.length * 3);
+  // D17 : la mesure doit avoir réellement eu lieu, sur TOUS les états.
+  expect(rows.length).toBe(themes.length * STATES.length);
   expect(failures, JSON.stringify(failures)).toEqual([]);
+});
+
+test('le nom de joueur est une cible tactile d’au moins 44 × 44 px', async ({ page }, testInfo) => {
+  const errors = collectErrors(page);
+  await openApp(page);
+  // 12 joueurs sans prénom : le bloc d'identité s'y réduit au numéro, c'est le pire cas.
+  await startGame(page, { players: 12, start: 40 });
+  // La zone ATTEIGNABLE est ce qui compte, pas la boîte du texte : on balaie depuis le centre
+  // jusqu'à ce que le point ne vise plus le bouton, dans les quatre directions de l'ÉCRAN. La
+  // somme de deux directions opposées donne la dimension réelle de la cible, quelle que soit
+  // l'orientation de la carte.
+  const sizes = await page.evaluate(() => {
+    const reach = (btn, r, ax, ay) => {
+      let k = 0;
+      while (k <= 80) {
+        const e = document.elementFromPoint(
+          r.left + r.width / 2 + ax * k,
+          r.top + r.height / 2 + ay * k,
+        );
+        if (!e || e.closest('.pname') !== btn) break;
+        k++;
+      }
+      return k - 1;
+    };
+    return [...document.querySelectorAll('.pname')].map((btn) => {
+      const r = btn.getBoundingClientRect();
+      return {
+        id: btn.closest('.pcard').id,
+        x: reach(btn, r, 1, 0) + reach(btn, r, -1, 0) + 1,
+        y: reach(btn, r, 0, 1) + reach(btn, r, 0, -1) + 1,
+      };
+    });
+  });
+  testInfo.annotations.push({
+    type: 'cible-nom',
+    description: sizes.map((s) => `${s.id} ${s.x}×${s.y}`).join(' · '),
+  });
+  const small = sizes.filter((s) => s.x < 44 || s.y < 44);
+  expect(small, JSON.stringify(small)).toEqual([]);
+
+  // Et un tap franc au BORD de cette zone (donc hors du texte) ouvre bien la feuille joueur.
+  const point = await page.evaluate(() => {
+    const btn = document.querySelector('#card-0 .pname');
+    const r = btn.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    let k = 0;
+    while (k <= 80) {
+      const e = document.elementFromPoint(cx, cy + k + 1);
+      if (!e || e.closest('.pname') !== btn) break;
+      k++;
+    }
+    return { x: Math.round(cx), y: Math.round(cy + k) };
+  });
+  await page.touchscreen.tap(point.x, point.y);
+  await expect(page.locator('#player-modal')).toBeVisible();
+  expect(errors).toEqual([]);
 });
 
 test('aucun prénom COURT tronqué, de 1 à 12 joueurs, et écart de taille du score borné', async ({
@@ -728,9 +805,13 @@ test('hauteur de capitale du score à 2, 4 et 7 chiffres, au gabarit 390 × 844'
         await page.waitForTimeout(200);
       }
       const values = await page.evaluate(measure);
+      const rows = await page.evaluate(
+        () => (document.querySelector('.score').textContent.match(/\n/g) || []).length + 1,
+      );
       caps[`${players}-${digits}`] = Math.min(...values);
+      caps[`${players}-${digits}-rows`] = rows;
       lines.push(
-        `${players} joueurs / ${digits} chiffres : ${Math.min(...values)}–${Math.max(...values)} px`,
+        `${players} joueurs / ${digits} chiffres : ${Math.min(...values)}–${Math.max(...values)} px (${rows} ligne${rows > 1 ? 's' : ''})`,
       );
     }
   }
@@ -740,10 +821,12 @@ test('hauteur de capitale du score à 2, 4 et 7 chiffres, au gabarit 390 × 844'
   expect(caps['4-4'], '4 joueurs, 4 chiffres').toBeGreaterThanOrEqual(96 * 0.75);
   expect(caps['12-2'], '12 joueurs, 2 chiffres').toBeGreaterThanOrEqual(30);
   expect(caps['12-4'], '12 joueurs, 4 chiffres').toBeGreaterThanOrEqual(30);
-  // Le score à 7 chiffres à 12 joueurs ne tient PAS le seuil de 30 px : c'est une limite
-  // géométrique documentée (carte de 130 × 146 px), pas une régression — on la verrouille ici pour
-  // que toute amélioration future soit visible, et que toute dégradation échoue.
-  expect(caps['12-7'], '12 joueurs, 7 chiffres').toBeGreaterThanOrEqual(19);
+  // Le score à 7 chiffres à 12 joueurs tient le seuil grâce au rendu sur DEUX lignes décidé par
+  // `computeFit` : sur une seule ligne, la même carte plafonnait à 22 px.
+  expect(caps['12-7'], '12 joueurs, 7 chiffres').toBeGreaterThanOrEqual(30);
+  expect(caps['12-7-rows'], '12 joueurs, 7 chiffres : rendu sur deux lignes').toBe(2);
+  // Et une grande carte garde son score sur UNE ligne : la coupure n'est pas systématique.
+  expect(caps['4-7-rows'], '4 joueurs, 7 chiffres : une seule ligne').toBe(1);
 });
 
 test('un tap réel = UN seul changement de score (tactile, souris, clavier)', async ({ page }) => {

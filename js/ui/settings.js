@@ -17,15 +17,23 @@ import { byId, el, hide, icon, qsa, show, showPage } from './dom.js';
 
 // ── Réglages ────────────────────────────────────────────────────────
 
+/** Identifiant de thème connu, ou le thème par défaut : rien d'inconnu ne reste sur le document. */
+export function normalizeTheme(id) {
+  return THEMES.some((t) => t.id === id) ? id : DEFAULT_THEME;
+}
+
 /** Applique un thème au document (le thème par défaut n'a pas d'attribut). */
 export function applyTheme(id) {
-  document.documentElement.setAttribute('data-theme', id === DEFAULT_THEME ? '' : id);
-  store.settings.theme = id;
+  const theme = normalizeTheme(id);
+  document.documentElement.setAttribute('data-theme', theme === DEFAULT_THEME ? '' : theme);
+  store.settings.theme = theme;
 }
 
 /** Charge les réglages depuis le stockage et applique le thème. */
 export function loadSettings() {
   store.settings = parseSettings(readJSON(KEYS.settings, {}));
+  // `applyTheme` normalise : un identifiant inconnu écrit dans le stockage (ou posé avant le
+  // premier rendu) ne reste pas sur la racine du document.
   applyTheme(store.settings.theme || DEFAULT_THEME);
 }
 
