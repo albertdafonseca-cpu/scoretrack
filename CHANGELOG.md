@@ -37,12 +37,19 @@ Refonte complète de la qualité sur la base de l'audit de septembre 2026 (voir
 - Sauvegarde atomique de la partie (`.tmp` → bascule), conservation de la dernière sauvegarde
   valide (`.prev`), quarantaine d'une sauvegarde illisible (`.corrupt`) proposée à la reprise au
   lieu d'un effacement silencieux, écritures coalescées, `navigator.storage.persist()`.
-- Journal d'erreurs local (`scoretrack_errors`, borné, jamais transmis) et texte de diagnostic à
-  copier (version du SW, navigateur, quota).
+- Journal d'erreurs local (`scoretrack_errors`, borné, jamais transmis) et fonction de diagnostic
+  `exportDiagnostics()` (version du service worker, navigateur, quota, journal). Elle n'est pas
+  encore reliée à un bouton de l'interface : l'accès se fait par la console (voir
+  `docs/EXPLOITATION.md` § 5).
 - Export / import des données en JSON (validation stricte, jamais d'écrasement partiel).
-- Journal d'actions v2 (`js/core/history.js`) : une entrée par modification atomique, annulation
-  par inversion, rétablissement et retour à un point de l'historique côté logique (exposition dans
-  l'interface : voir « En cours »).
+- Journal d'actions v2 (`js/core/history.js`) : une entrée par modification atomique ; annulation
+  par inversion, rétablissement (`redo`) et retour à un point de l'historique (`jumpTo`) câblés dans
+  l'écran de jeu ; classement avec ex æquo (`ranking`) dans le récapitulatif.
+- Placement des cartes sans cellule vide de 1 à 12 joueurs (`js/core/layout.js`), cartes centrales
+  orientées.
+- Animations isolées dans `js/fx/` (roulement du score, transition FLIP à la rotation, anneau
+  d'appui long, confettis de victoire, ajustement des tailles) — toutes coupées sous
+  `prefers-reduced-motion`.
 - Icônes SVG (`currentColor`) à la place des emojis système ; couleurs sémantiques gain/perte
   daltonien-safe (bleu/orange) doublées d'un glyphe.
 - Accessibilité : rôles et noms accessibles, focus visible, navigation clavier (puces, modales avec
@@ -58,21 +65,20 @@ Refonte complète de la qualité sur la base de l'audit de septembre 2026 (voir
 ### Modifié
 
 - `index.html` (106 Ko monolithique : CSS, JS et 39 `onclick` inline) découpé en une coquille de
-  13 Ko, huit feuilles CSS et des modules ES natifs (`js/core`, `js/ui`, `js/platform`, `js/fx`).
+  structure (24 Ko au 17 septembre 2026, sans une ligne de script ni de style inline), neuf feuilles
+  CSS et des modules ES natifs (`js/core`, `js/ui`, `js/platform`, `js/fx`).
 - Schéma de sauvegarde versionné : v0 (historique, sans version) → v1 (types assainis) → v2
   (journal d'actions) ; migrations testées sur fixtures.
 - Service worker : cache `st-<hash>` versionné par le contenu, purge de `st-v1`/`st-fonts-v1`,
   navigation servie depuis le cache avec page hors ligne intégrée, réseau d'abord pour les
   ressources non précachées.
 
-### En cours (élément A — écran de jeu ; entrées déplacées dans « Ajouté » à la fusion)
+### En cours (élément A — écran de jeu ; à recaler à la fusion)
 
-- Rétablissement, retour à un point de l'historique et récapitulatif chronologique dans
-  l'interface (la logique est livrée et testée).
-- Placement sans cellule vide pour 7, 9 et 11 joueurs, cartes centrales orientées.
-- Mise à jour différentielle du DOM en jeu (plus de reconstruction complète à chaque tap, undo ou
-  rotation), roulement de chiffres, transition FLIP à la rotation, adaptation des tailles sans
-  sondage, `js/fx/`.
+- Récapitulatif chronologique : `timeline(log)` est livrée et testée dans `js/core/history.js` mais
+  n'est pas encore appelée par `js/ui/recap.js`.
+- Diagnostic : `exportDiagnostics()` n'est exposé par aucun bouton de l'interface.
+- Raccourcis du manifeste (`?action=new`, `?action=resume`) : déclarés, pas encore câblés (D14).
 
 ### Supprimé
 

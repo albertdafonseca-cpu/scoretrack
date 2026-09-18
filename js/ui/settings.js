@@ -5,7 +5,14 @@ import { KEYS, parseSettings, serializeSettings } from '../core/save-schema.js';
 import { logError } from '../platform/errors.js';
 import { readJSON, remove, writeJSON } from '../platform/storage.js';
 import { store } from '../store.js';
-import { announce, rovingGroup, syncRovingTabs, trapFocus } from './a11y.js';
+import {
+  announce,
+  armConfirm,
+  disarmConfirm,
+  rovingGroup,
+  syncRovingTabs,
+  trapFocus,
+} from './a11y.js';
 import { byId, el, hide, icon, qsa, show, showPage } from './dom.js';
 
 // ── Réglages ────────────────────────────────────────────────────────
@@ -71,21 +78,19 @@ function themeCard(t) {
     {
       type: 'button',
       className: 'theme-card',
-      style: `background:${t.bg}`,
+      role: 'radio',
+      style: `--theme-bg:${t.bg};--theme-a:${t.a};--theme-b:${t.b}`,
       dataset: { theme: t.id },
-      'aria-pressed': String(store.settings.theme === t.id),
+      'aria-checked': String(store.settings.theme === t.id),
     },
     el('span', { className: 'theme-check', 'aria-hidden': 'true' }, icon('check', '✓')),
-    el('span', { className: 'theme-card-name', style: `color:${t.a}`, text: t.name }),
+    el('span', { className: 'theme-card-name', text: t.name }),
     el(
       'span',
       { className: 'theme-swatches', 'aria-hidden': 'true' },
-      el('span', { className: 'theme-swatch', style: `background:${t.a}` }),
-      el('span', { className: 'theme-swatch', style: `background:${t.b}` }),
-      el('span', {
-        className: 'theme-swatch',
-        style: `background:${t.bg};border:1px solid ${t.a}`,
-      }),
+      el('span', { className: 'theme-swatch swatch-a' }),
+      el('span', { className: 'theme-swatch swatch-b' }),
+      el('span', { className: 'theme-swatch swatch-bg' }),
     ),
   );
   card.addEventListener('click', () => selectTheme(t));
@@ -94,7 +99,7 @@ function themeCard(t) {
 
 function selectTheme(t) {
   qsa('.theme-card').forEach((c) =>
-    c.setAttribute('aria-pressed', String(c.dataset.theme === t.id)),
+    c.setAttribute('aria-checked', String(c.dataset.theme === t.id)),
   );
   applyTheme(t.id);
   persistSettings();
@@ -119,7 +124,7 @@ export function showSettings() {
 
 /** Câblage unique de la page Réglages (navigation par flèches dans les thèmes). */
 export function initSettings() {
-  rovingGroup(byId('themes-grid'), '.theme-card');
+  rovingGroup(byId('themes-grid'), '.theme-card', { activate: true });
 }
 
 // ── Données : export / import (module chargé à la demande) ──────────
@@ -170,7 +175,6 @@ export async function importData() {
 // ── Modale de confidentialité ───────────────────────────────────────
 
 let releasePrivacyTrap = null;
-let clearArmTimer = null;
 
 /** Ouvre la modale (dialogue modal, piège de focus, Échap ferme). */
 export function openPrivacy() {
@@ -195,11 +199,7 @@ export function closePrivacy() {
 }
 
 function disarmClearAll() {
-  clearTimeout(clearArmTimer);
-  const btn = byId('btn-clear-all');
-  if (!btn.dataset.armed) return;
-  delete btn.dataset.armed;
-  btn.querySelector('.btn-text').textContent = 'Supprimer toutes les données';
+  disarmConfirm(byId('btn-clear-all'));
 }
 
 /**
@@ -207,13 +207,8 @@ function disarmClearAll() {
  * le second dans les 5 s confirme. Renvoie true quand la suppression est confirmée.
  */
 export function armClearAll(btn) {
-  if (btn.dataset.armed) {
-    disarmClearAll();
-    return true;
-  }
-  btn.dataset.armed = '1';
-  btn.querySelector('.btn-text').textContent = 'Confirmer la suppression';
-  announce('Appuyez de nouveau pour confirmer la suppression de toutes les données', 'assertive');
-  clearArmTimer = setTimeout(disarmClearAll, 5000);
-  return false;
+  return armConfirm(btn, {
+    label: 'Confirmer la suppression',
+    message: 'Appuyez de nouveau pour confirmer la suppression de toutes les données',
+  });
 }

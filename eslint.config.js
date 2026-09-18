@@ -24,6 +24,7 @@ export default [
       'playwright-report/**',
       '.lighthouseci/**',
       'coverage/**',
+      'dist/**',
       'assets/**',
       'icons/**',
     ],

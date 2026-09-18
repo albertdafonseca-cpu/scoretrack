@@ -28,6 +28,7 @@ export async function startStaticServer({ root, port = 0 }) {
   let swVersion = null;
   const sockets = new Set();
   const requests = [];
+  const blocked = new Set();
 
   async function handle(req, res) {
     const url = new URL(req.url, `http://localhost:${port}`);
@@ -36,6 +37,11 @@ export async function startStaticServer({ root, port = 0 }) {
     const file = normalize(join(base, pathname));
     if (!file.startsWith(base)) {
       res.writeHead(403).end();
+      return;
+    }
+    if (blocked.has(pathname)) {
+      requests.push({ path: pathname, status: 404 });
+      res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Bloqué');
       return;
     }
     try {
@@ -98,6 +104,11 @@ export async function startStaticServer({ root, port = 0 }) {
     /** VERSION servie dans sw-st.js (null = fichier du dépôt tel quel). */
     setSwVersion(v) {
       swVersion = v;
+    },
+    /** Chemins renvoyés en 404 (simulation d'un actif indisponible pendant le précache). */
+    setBlocked(paths) {
+      blocked.clear();
+      paths.forEach((p) => blocked.add(p));
     },
   };
 }

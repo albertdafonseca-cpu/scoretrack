@@ -13,12 +13,38 @@ export function focusables(container) {
 }
 
 /**
- * Piège le focus dans `container` : Tab/Maj+Tab cyclent, Échap appelle `onEscape`.
+ * Rend le reste de la page inopérant pour le pointeur, le clavier ET l'arbre d'accessibilité.
+ * `inert` est utilisé quand il est pris en charge, sinon `aria-hidden` sert de repli.
+ * Renvoie la fonction de restauration.
+ */
+export function inertOutside(container) {
+  const supportsInert = 'inert' in HTMLElement.prototype;
+  const touched = [];
+  for (const node of Array.from(document.body.children)) {
+    if (node === container || node.contains(container)) continue;
+    if (node.getAttribute('aria-hidden') === 'true' && !supportsInert) continue;
+    touched.push([node, node.inert, node.getAttribute('aria-hidden')]);
+    if (supportsInert) node.inert = true;
+    else node.setAttribute('aria-hidden', 'true');
+  }
+  return function restore() {
+    for (const [node, wasInert, ariaHidden] of touched) {
+      if (supportsInert) node.inert = wasInert;
+      if (ariaHidden === null) node.removeAttribute('aria-hidden');
+      else node.setAttribute('aria-hidden', ariaHidden);
+    }
+  };
+}
+
+/**
+ * Piège le focus dans `container` : Tab/Maj+Tab cyclent, Échap appelle `onEscape`, et le reste
+ * de la page devient inerte (retiré de l'arbre d'accessibilité).
  * Le premier élément focalisable (ou `initialFocus`) reçoit le focus ; la fonction renvoyée
  * libère le piège et rend le focus à l'élément actif au moment de l'appel.
  */
 export function trapFocus(container, { onEscape, initialFocus } = {}) {
   const previous = document.activeElement;
+  const restoreInert = inertOutside(container);
   const onKeydown = (e) => {
     if (e.key === 'Escape') {
       if (onEscape) {
@@ -50,6 +76,7 @@ export function trapFocus(container, { onEscape, initialFocus } = {}) {
   target.focus({ preventScroll: true });
   return function release() {
     document.removeEventListener('keydown', onKeydown, true);
+    restoreInert();
     if (previous && typeof previous.focus === 'function' && document.contains(previous)) {
       previous.focus({ preventScroll: true });
     }
@@ -96,11 +123,12 @@ export function onKey(map, target = document) {
 }
 
 /**
- * Tabindex tournant : un seul élément du groupe est dans l'ordre de tabulation (celui qui est
- * pressé, sinon le premier) ; les flèches, Début et Fin déplacent le focus entre les éléments.
- * `syncRovingTabs` est à rappeler après tout changement d'état pressé.
+ * Tabindex tournant, réservé aux widgets composites (`role="radiogroup"`) : un seul élément est
+ * dans l'ordre de tabulation (celui qui est coché, sinon le premier) ; les flèches, Début et Fin
+ * déplacent le focus et, pour un groupe de boutons radio (`activate`), sélectionnent au passage,
+ * conformément au motif APG. `syncRovingTabs` est à rappeler après tout changement d'état.
  */
-export function rovingGroup(container, selector) {
+export function rovingGroup(container, selector, { activate = false } = {}) {
   container.addEventListener('keydown', (e) => {
     const keys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'];
     if (!keys.includes(e.key)) return;
@@ -115,11 +143,12 @@ export function rovingGroup(container, selector) {
     const next =
       step !== undefined ? (i + step + items.length) % items.length : e.key === 'Home' ? 0 : last;
     items[next].focus();
+    if (activate) items[next].click();
   });
   syncRovingTabs(container, selector);
 }
 
-/** Met à jour les tabindex du groupe : l'élément pressé (ou le premier actif) vaut 0, les autres -1. */
+/** Met à jour les tabindex du groupe : l'élément coché (ou le premier actif) vaut 0, les autres -1. */
 export function syncRovingTabs(container, selector) {
   const items = Array.from(container.querySelectorAll(selector));
   const active = items.filter((n) => !n.disabled && !n.hidden);
@@ -130,4 +159,46 @@ export function syncRovingTabs(container, selector) {
   items.forEach((n) => {
     n.tabIndex = n === pressed ? 0 : -1;
   });
+}
+
+// ── Confirmation en deux temps des actions destructrices ────────────
+
+const armedButtons = new WeakMap();
+
+/** Désarme un bouton (restaure son libellé) sans déclencher l'action. */
+export function disarmConfirm(btn) {
+  const state = armedButtons.get(btn);
+  if (!state) return;
+  clearTimeout(state.timer);
+  armedButtons.delete(btn);
+  btn.classList.remove('armed');
+  delete btn.dataset.armed;
+  if (state.textNode) state.textNode.textContent = state.originalText;
+  if (state.originalLabel !== null) btn.setAttribute('aria-label', state.originalLabel);
+}
+
+/**
+ * Arme une action destructrice : le premier appui prévient, le second (dans `timeout` ms)
+ * confirme. Renvoie true quand l'action doit réellement s'exécuter.
+ * `label` remplace le texte de `.btn-text` ; `ariaLabel` remplace le nom accessible d'une icône.
+ */
+export function armConfirm(btn, { label, ariaLabel, message, timeout = 5000 } = {}) {
+  if (armedButtons.has(btn)) {
+    disarmConfirm(btn);
+    return true;
+  }
+  const textNode = label ? btn.querySelector('.btn-text') : null;
+  const state = {
+    textNode,
+    originalText: textNode ? textNode.textContent : '',
+    originalLabel: btn.getAttribute('aria-label'),
+    timer: setTimeout(() => disarmConfirm(btn), timeout),
+  };
+  armedButtons.set(btn, state);
+  btn.classList.add('armed');
+  btn.dataset.armed = '1';
+  if (textNode) textNode.textContent = label;
+  if (ariaLabel) btn.setAttribute('aria-label', ariaLabel);
+  announce(message || 'Appuyez de nouveau pour confirmer', 'assertive');
+  return false;
 }

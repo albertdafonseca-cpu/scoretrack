@@ -1,40 +1,31 @@
 import { describe, expect, it } from 'vitest';
 import {
   GROUP_DELAY,
+  MAX_LOG_ENTRIES,
   SCORE_VIAS,
-  UNDO_LIMIT,
   VIAS,
-  addGroupedDelta,
-  addManualDelta,
+  appliedState,
   applyEntry,
   canRedo,
   canUndo,
-  closeAllGroups,
   closeGroup,
-  closeOpenGroup,
   createLog,
-  findOpenGroup,
-  groupSum,
   groups,
-  groupsFromLog,
   invert,
   isLog,
   jumpTo,
   logFromGroups,
   playerRecap,
-  popUndo,
-  pushUndo,
   record,
   recordElim,
   recordRename,
   recordRotate,
   recordScore,
   redo,
-  snapshot,
   timeline,
   undo,
 } from '../../js/core/history.js';
-import { makePlayers, randInt, rng } from './helpers.js';
+import { identity, makePlayers, randInt, rng } from './helpers.js';
 
 const T0 = 1_700_000_000_000;
 
@@ -48,7 +39,7 @@ function sample() {
   return log;
 }
 
-/** Rejoue toutes les entrées appliquées d'un journal sur des joueurs au score initial donné. */
+/** Rejoue toutes les entrées appliquées d'un journal sur un état. */
 function replay(log, game) {
   log.entries.slice(0, log.cursor).forEach((e) => applyEntry(game, e));
   return game;
@@ -57,7 +48,7 @@ function replay(log, game) {
 describe('constantes', () => {
   it('conserve les délais historiques et expose les moyens reconnus', () => {
     expect(GROUP_DELAY).toBe(1500);
-    expect(UNDO_LIMIT).toBe(40);
+    expect(MAX_LOG_ENTRIES).toBe(2000);
     expect(VIAS).toEqual(['tap', 'keypad', 'rotate', 'elim', 'unelim', 'rename']);
     expect(SCORE_VIAS).toEqual(['tap', 'keypad']);
     expect(Object.isFrozen(VIAS)).toBe(true);
@@ -65,18 +56,63 @@ describe('constantes', () => {
 });
 
 describe('createLog / isLog', () => {
-  it('crée exactement { entries: [], cursor: 0 }', () => {
-    expect(createLog()).toEqual({ entries: [], cursor: 0 });
+  it('crée un journal vide avec curseur et plancher', () => {
+    expect(createLog()).toEqual({ entries: [], cursor: 0, floor: 0 });
   });
   it('reconnaît un journal valide et rejette les formes fausses', () => {
     expect(isLog(createLog())).toBe(true);
     expect(isLog(sample())).toBe(true);
+    expect(isLog({ entries: [], cursor: 0 })).toBe(true);
     expect(isLog(null)).toBe(false);
     expect(isLog({ entries: [] })).toBe(false);
     expect(isLog({ entries: [], cursor: 1 })).toBe(false);
     expect(isLog({ entries: [], cursor: -1 })).toBe(false);
     expect(isLog({ entries: {}, cursor: 0 })).toBe(false);
+    expect(isLog({ entries: [], cursor: 0, floor: 1 })).toBe(false);
+    expect(isLog({ entries: [], cursor: 0, floor: -1 })).toBe(false);
     expect(isLog([])).toBe(false);
+  });
+});
+
+describe('journal mal formé : assainissement plutôt que tableau creux', () => {
+  it('record sur un curseur hors bornes ne crée aucun trou', () => {
+    const log = { entries: [], cursor: 3 };
+    record(log, { playerIdx: 0, from: 0, to: 1, via: 'tap', t: T0 });
+    expect(log.entries).toHaveLength(1);
+    expect(log.entries.every((e) => e !== undefined)).toBe(true);
+    expect(log.cursor).toBe(1);
+    expect(() => groups(log)).not.toThrow();
+    expect(groups(log)).toHaveLength(1);
+  });
+
+  it('undo, redo, groups et timeline tolèrent un curseur absent ou aberrant', () => {
+    const base = sample();
+    const cases = [undefined, -5, 99, 1.5, 'x', null];
+    for (const cursor of cases) {
+      const log = { entries: base.entries.map((e) => ({ ...e })), cursor };
+      expect(() => groups(log)).not.toThrow();
+      expect(log.cursor).toBeGreaterThanOrEqual(0);
+      expect(log.cursor).toBeLessThanOrEqual(log.entries.length);
+      expect(() => timeline(log)).not.toThrow();
+      expect(() => undo(log)).not.toThrow();
+      expect(() => redo(log)).not.toThrow();
+      expect(() => jumpTo(log, 1)).not.toThrow();
+    }
+  });
+
+  it('un plancher aberrant est ramené entre 0 et le curseur', () => {
+    const log = sample();
+    log.floor = 99;
+    expect(canUndo(log)).toBe(false);
+    expect(log.floor).toBe(log.cursor);
+    log.floor = -3;
+    expect(canUndo(log)).toBe(true);
+    expect(log.floor).toBe(0);
+  });
+
+  it('lève si entries n’est pas un tableau', () => {
+    expect(() => groups({ entries: 'x', cursor: 0 })).toThrow(TypeError);
+    expect(() => record(null, { playerIdx: 0, from: 0, to: 1, via: 'tap' })).toThrow(TypeError);
   });
 });
 
@@ -92,6 +128,12 @@ describe('record', () => {
     expect(e.t).toBeLessThanOrEqual(Date.now());
     expect(log.entries).toEqual([e]);
     expect(log.cursor).toBe(1);
+  });
+
+  it('recalcule toujours delta, même si un delta faux est fourni', () => {
+    const log = createLog();
+    const e = record(log, { playerIdx: 0, from: 10, to: 12, via: 'keypad', delta: 999 });
+    expect(e.delta).toBe(2);
   });
 
   it('regroupe les taps rapprochés du même joueur en une action', () => {
@@ -182,7 +224,7 @@ describe('record', () => {
   it('refuse les entrées invalides sans modifier le journal', () => {
     const log = createLog();
     expect(() => record(log, null)).toThrow(TypeError);
-    expect(() => record(log, { via: 'magic', playerIdx: 0, from: 0, to: 1 })).toThrow(RangeError);
+    expect(() => record(log, { via: 'magic', playerIdx: 0, from: 0, to: 1 })).toThrow(TypeError);
     expect(() => record(log, { via: 'tap', playerIdx: -1, from: 0, to: 1 })).toThrow(RangeError);
     expect(() => record(log, { via: 'tap', playerIdx: 1.5, from: 0, to: 1 })).toThrow(RangeError);
     expect(() => record(log, { via: 'tap', playerIdx: 0, from: 3, to: 3 })).toThrow(RangeError);
@@ -198,6 +240,23 @@ describe('record', () => {
     const log = createLog();
     const e = recordScore(log, 11, -1234567, 9999999, 'keypad', T0);
     expect(e.delta).toBe(11234566);
+  });
+
+  it('oublie les plus vieux groupes au-delà de MAX_LOG_ENTRIES, sans couper une action', () => {
+    const log = createLog();
+    for (let i = 0; i < MAX_LOG_ENTRIES + 50; i++) {
+      // Taps groupés deux par deux (même joueur, horodatages rapprochés)
+      recordScore(log, 0, i, i + 1, 'tap', T0 + Math.floor(i / 2) * 10_000);
+    }
+    expect(log.entries.length).toBeLessThanOrEqual(MAX_LOG_ENTRIES);
+    expect(log.cursor).toBe(log.entries.length);
+    // Aucune action n'est coupée en deux : la première entrée ouvre bien son groupe
+    const first = log.entries[0];
+    expect(log.entries.filter((e) => e.groupId === first.groupId)).toHaveLength(2);
+    expect(canUndo(log)).toBe(true);
+    expect(log.entries.map((e) => e.id)).toEqual(
+      [...log.entries.map((e) => e.id)].sort((a, b) => a - b),
+    );
   });
 });
 
@@ -248,7 +307,7 @@ describe('invert / applyEntry', () => {
     const e = { id: 1, playerIdx: 0, delta: 3, from: 1, to: 4, via: 'tap', groupId: 1 };
     expect(invert(invert(e))).toEqual({ ...e, inverse: false });
   });
-  it('applique chaque type sur un état et ignore les indices hors limites', () => {
+  it('applique chaque type sur un état', () => {
     const game = { players: makePlayers([10, 20]), seatOrder: [0, 1] };
     applyEntry(game, { via: 'tap', playerIdx: 0, to: 11 });
     applyEntry(game, { via: 'keypad', playerIdx: 1, to: -5 });
@@ -257,7 +316,6 @@ describe('invert / applyEntry', () => {
     const seats = [1, 0];
     applyEntry(game, { via: 'rotate', to: seats });
     seats.push(9);
-    applyEntry(game, { via: 'tap', playerIdx: 7, to: 99 });
     expect(game.players).toEqual([
       { playerName: 'Zoé', score: 11, eliminated: false },
       { playerName: 'J2', score: -5, eliminated: true },
@@ -265,6 +323,23 @@ describe('invert / applyEntry', () => {
     expect(game.seatOrder).toEqual([1, 0]);
     applyEntry(game, { via: 'unelim', playerIdx: 1, to: false });
     expect(game.players[1].eliminated).toBe(false);
+  });
+  it('ignore un via inconnu sans rien changer', () => {
+    const game = { players: makePlayers([10]), seatOrder: [0] };
+    const before = JSON.stringify(game);
+    expect(() => applyEntry(game, { via: 'zzz', playerIdx: 0, to: 99 })).not.toThrow();
+    expect(JSON.stringify(game)).toBe(before);
+  });
+
+  it('ignore une entrée visant un joueur absent, sans erreur ni effet de bord', () => {
+    const game = { players: makePlayers([10, 20]), seatOrder: [0, 1] };
+    const before = JSON.stringify(game);
+    for (const idx of [7, -1, 2, 99]) {
+      expect(() => applyEntry(game, { via: 'tap', playerIdx: idx, to: 999 })).not.toThrow();
+      expect(() => applyEntry(game, { via: 'elim', playerIdx: idx, to: true })).not.toThrow();
+      expect(() => applyEntry(game, { via: 'rename', playerIdx: idx, to: 'X' })).not.toThrow();
+    }
+    expect(JSON.stringify(game)).toBe(before);
   });
 });
 
@@ -279,9 +354,9 @@ describe('undo / redo', () => {
 
   it('annule un groupe de taps comme une seule action, avec le delta cumulé inversé', () => {
     const log = sample();
-    const a = undo(log); // pavé du joueur 1
+    const a = undo(log);
     expect(a).toMatchObject({ playerIdx: 1, delta: 15, from: 25, to: 40, inverse: true });
-    const b = undo(log); // les 3 taps du joueur 0
+    const b = undo(log);
     expect(b).toMatchObject({
       playerIdx: 0,
       delta: -3,
@@ -308,13 +383,24 @@ describe('undo / redo', () => {
     expect(redo(log)).toBeNull();
   });
 
+  it('le plancher interdit d’annuler les entrées historiques mais pas les nouvelles', () => {
+    const log = sample();
+    log.floor = log.cursor;
+    expect(canUndo(log)).toBe(false);
+    expect(undo(log)).toBeNull();
+    recordScore(log, 2, 40, 41, 'tap', T0 + 20_000);
+    expect(canUndo(log)).toBe(true);
+    expect(undo(log)).toMatchObject({ playerIdx: 2, delta: -1 });
+    expect(canUndo(log)).toBe(false);
+  });
+
   it('undo(redo(x)) = x et redo(undo(x)) = x sur des séquences aléatoires (graine fixe)', () => {
     for (let seed = 1; seed <= 25; seed++) {
       const next = rng(seed);
       const n = randInt(next, 1, 12);
-      const start = makePlayers(identityScores(n, 40));
+      const start = Array.from({ length: n }, () => 40);
       const log = createLog();
-      const game = { players: start.map((p) => ({ ...p })), seatOrder: identityOrder(n) };
+      const game = { players: makePlayers(start), seatOrder: identity(n) };
       let t = T0;
       for (let k = 0; k < 60; k++) {
         t += randInt(next, 0, 3000);
@@ -326,7 +412,7 @@ describe('undo / redo', () => {
           recordScore(log, pi, p.score, to, 'tap', t);
           p.score = to;
         } else if (kind < 0.8) {
-          const to = p.score + randInt(next, -500, 500) || p.score + 1;
+          const to = p.score + (randInt(next, -500, 500) || 1);
           recordScore(log, pi, p.score, to, 'keypad', t);
           p.score = to;
         } else if (kind < 0.9 && n > 1) {
@@ -346,9 +432,9 @@ describe('undo / redo', () => {
         undone++;
       }
       expect(undone).toBe(groups(log).length);
-      expect(game.players.map((p) => p.score)).toEqual(identityScores(n, 40));
+      expect(game.players.map((p) => p.score)).toEqual(start);
       expect(game.players.every((p) => !p.eliminated)).toBe(true);
-      expect(game.seatOrder).toEqual(identityOrder(n));
+      expect(game.seatOrder).toEqual(identity(n));
       while ((e = redo(log))) applyEntry(game, e);
       expect(JSON.stringify(game)).toBe(final);
     }
@@ -378,7 +464,7 @@ describe('jumpTo', () => {
     expect(log.cursor).toBe(4);
   });
 
-  it("revient avant toute action avec 0 et renvoie les entrées inversées dans l'ordre d'application", () => {
+  it("revient avant toute action avec 0 et renvoie les entrées inversées dans l'ordre", () => {
     const log = sample();
     const steps = jumpTo(log, 0);
     expect(steps.map((s) => s.id)).toEqual([4, 3, 2, 1]);
@@ -391,7 +477,7 @@ describe('jumpTo', () => {
 
   it("se cale à la fin de l'action contenant l'entrée visée, sans perdre le rétablissement", () => {
     const log = sample();
-    const steps = jumpTo(log, 2); // milieu du groupe 1-2-3 → état après l'action 1
+    const steps = jumpTo(log, 2);
     expect(steps.map((s) => s.id)).toEqual([4]);
     expect(log.cursor).toBe(3);
     expect(canRedo(log)).toBe(true);
@@ -409,6 +495,18 @@ describe('jumpTo', () => {
     forward.forEach((s) => applyEntry(game, s));
     expect(game.players[0].score).toBe(43);
     expect(jumpTo(log, 3)).toEqual([]);
+  });
+
+  it('refuse une cible sous le plancher, autorise les frontières au-dessus', () => {
+    const log = sample();
+    log.floor = 3;
+    expect(jumpTo(log, 0)).toBeNull();
+    expect(log.cursor).toBe(4);
+    // L'action 1 se termine à l'indice 3 = le plancher lui-même : le retour y est légitime.
+    expect(jumpTo(log, 1).map((s) => s.id)).toEqual([4]);
+    expect(log.cursor).toBe(3);
+    expect(jumpTo(log, 0)).toBeNull();
+    expect(log.cursor).toBe(3);
   });
 
   it('sur des journaux aléatoires, jumpTo(x) puis jumpTo(fin) redonne l’état final', () => {
@@ -465,9 +563,17 @@ describe('groups / timeline', () => {
       t: T0,
       tEnd: T0 + 600,
       undone: false,
+      locked: false,
       approx: false,
     });
     expect(g[1]).toMatchObject({ n: 2, playerIdx: 1, delta: -15, undone: true });
+  });
+
+  it('marque locked les actions sous le plancher', () => {
+    const log = sample();
+    log.floor = 3;
+    const g = groups(log);
+    expect(g.map((a) => a.locked)).toEqual([true, false]);
   });
 
   it("timeline : après 3 actions sur 2 joueurs, l'ordre affiché est l'ordre réel", () => {
@@ -484,10 +590,15 @@ describe('groups / timeline', () => {
     expect(tl.every((e) => e.undone === false)).toBe(true);
   });
 
-  it('timeline détaille chaque tap avec le numéro de son action', () => {
-    const tl = timeline(sample());
-    expect(tl.map((e) => e.n)).toEqual([1, 1, 1, 2]);
-    expect(tl.map((e) => e.id)).toEqual([1, 2, 3, 4]);
+  it('timeline marque undone les entrées au-delà du curseur', () => {
+    const log = sample();
+    undo(log);
+    undo(log);
+    const tl = timeline(log);
+    expect(tl.map((e) => e.undone)).toEqual([true, true, true, true]);
+    redo(log);
+    expect(timeline(log).map((e) => e.undone)).toEqual([false, false, false, true]);
+    expect(timeline(log).map((e) => e.n)).toEqual([1, 1, 1, 2]);
   });
 
   it('groups regroupe par contiguïté : un même groupId non contigu donne deux actions', () => {
@@ -497,15 +608,38 @@ describe('groups / timeline', () => {
     record(log, { via: 'keypad', playerIdx: 0, from: 1, to: 2, groupId: 1, t: T0 });
     expect(groups(log).map((g) => g.n)).toEqual([1, 2, 3]);
   });
+
+  it('timeline et groups restent linéaires sur un très gros journal', () => {
+    // Journal construit directement : `record` plafonne à MAX_LOG_ENTRIES (politique de taille).
+    const entries = Array.from({ length: 20_000 }, (_, i) => ({
+      id: i + 1,
+      t: T0 + i,
+      playerIdx: 0,
+      delta: 1,
+      from: i,
+      to: i + 1,
+      via: 'keypad',
+      groupId: i + 1,
+    }));
+    const log = { entries, cursor: 20_000, floor: 0 };
+    const t0 = performance.now();
+    const tl = timeline(log);
+    const g = groups(log);
+    const ms = performance.now() - t0;
+    expect(tl).toHaveLength(20_000);
+    expect(g).toHaveLength(20_000);
+    // Linéaire ≈ 15 ms ; la version quadratique dépassait 400 ms à 20 000 entrées.
+    expect(ms).toBeLessThan(150);
+  });
 });
 
-describe('playerRecap (v2)', () => {
+describe('playerRecap', () => {
   it('ne retient que les actions de score en vigueur du joueur, avec total et courbe', () => {
     const log = sample();
     recordRotate(log, [0, 1], [1, 0], T0 + 6000);
     recordElim(log, 0, true, T0 + 7000);
     recordScore(log, 0, 43, 33, 'keypad', T0 + 8000);
-    undo(log); // annule le pavé −10
+    undo(log);
     const r = playerRecap(log, 0);
     expect(r.actions.map((a) => a.delta)).toEqual([3]);
     expect(r.total).toBe(3);
@@ -520,8 +654,27 @@ describe('playerRecap (v2)', () => {
   });
 });
 
-describe('passerelles v1 ↔ v2', () => {
-  const players = makePlayers([39, 0, 25, 38], ['Alice', 'Bob', 'Chloé', '']);
+describe('appliedState', () => {
+  it('donne le dernier score appliqué par joueur et le dernier ordre de sièges', () => {
+    const log = sample();
+    recordRotate(log, [0, 1], [1, 0], T0 + 6000);
+    const { scores, seats } = appliedState(log);
+    expect(scores.get(0)).toBe(43);
+    expect(scores.get(1)).toBe(25);
+    expect(seats).toEqual([1, 0]);
+  });
+  it('ignore ce qui est au-delà du curseur ; pas de rotation appliquée ⇒ seats null', () => {
+    const log = sample();
+    undo(log);
+    const { scores, seats } = appliedState(log);
+    expect(scores.has(1)).toBe(false);
+    expect(scores.get(0)).toBe(43);
+    expect(seats).toBeNull();
+  });
+});
+
+describe('migration depuis un historique v0/v1', () => {
+  const players = makePlayers([39, 0, 25, 38], ['Alice', 'Bob', 'Chloé', 'J4']);
   const history = [
     { playerIdx: 3, who: 'J4', entries: [{ delta: -1 }, { delta: -1 }], open: true, rank: 4 },
     { playerIdx: 1, who: 'Bob', entries: [{ delta: -40 }], open: false, rank: 3 },
@@ -541,8 +694,7 @@ describe('passerelles v1 ↔ v2', () => {
     ]);
     expect(log.entries.every((e) => e.t === T0 && e.approx === true)).toBe(true);
     expect(log.entries[4].closed).toBe(true);
-    const ids = log.entries.map((e) => e.id);
-    expect(ids).toEqual([1, 2, 3, 4, 5]);
+    expect(log.entries.map((e) => e.id)).toEqual([1, 2, 3, 4, 5]);
   });
 
   it('logFromGroups ignore les groupes invalides, vides ou hors limites', () => {
@@ -552,6 +704,7 @@ describe('passerelles v1 ↔ v2', () => {
         { playerIdx: 9, entries: [{ delta: 1 }], rank: 1 },
         { playerIdx: 0, entries: [{ delta: 0 }, { delta: 'x' }], rank: 2 },
         { playerIdx: 0, entries: 'nope', rank: 3 },
+        { playerIdx: 'x', entries: [{ delta: 1 }], rank: 5 },
         { playerIdx: 0, entries: [{ delta: 2 }], rank: 4 },
       ],
       players,
@@ -560,144 +713,23 @@ describe('passerelles v1 ↔ v2', () => {
     expect(log.entries).toHaveLength(1);
     expect(log.entries[0]).toMatchObject({ from: 37, to: 39, via: 'keypad' });
     expect(logFromGroups([], players)).toEqual(createLog());
+    // Groupes sans rang : ils sont traités comme rang 0 et restent dans leur ordre d'arrivée.
+    const noRank = logFromGroups(
+      [
+        { playerIdx: 0, entries: [{ delta: 1 }] },
+        { playerIdx: 1, entries: [{ delta: 2 }] },
+      ],
+      players,
+      T0,
+    );
+    expect(noRank.entries.map((e) => e.playerIdx)).toEqual([0, 1]);
   });
 
-  it("groupsFromLog projette le journal en historique v1 (plus récent d'abord, rangs séquentiels)", () => {
+  it('le journal migré est cohérent avec les scores enregistrés', () => {
     const log = logFromGroups(history, players, T0);
-    const { history: back, actionCounter } = groupsFromLog(log, players);
-    expect(actionCounter).toBe(4);
-    expect(back).toEqual(history.map((g) => ({ ...g, open: false })));
-  });
-
-  it('groupsFromLog écarte les actions annulées et les actions sans score', () => {
-    const log = sample();
-    recordRotate(log, [0, 1], [1, 0], T0 + 6000);
-    recordElim(log, 1, true, T0 + 7000);
-    undo(log);
-    undo(log);
-    undo(log); // annule le pavé
-    const { history: h, actionCounter } = groupsFromLog(log, makePlayers([43, 40]));
-    expect(actionCounter).toBe(1);
-    expect(h).toEqual([
-      {
-        playerIdx: 0,
-        who: 'J1',
-        entries: [{ delta: 1 }, { delta: 1 }, { delta: 1 }],
-        open: false,
-        rank: 1,
-      },
-    ]);
+    const { scores } = appliedState(log);
+    players.forEach((p, i) => {
+      if (scores.has(i)) expect(scores.get(i)).toBe(p.score);
+    });
   });
 });
-
-// ── API v1 dépréciée (toujours utilisée par l'interface actuelle) ───
-
-const newGame = () => ({
-  players: makePlayers([40, 40], ['Alice', 'Bob']),
-  seatOrder: [0, 1],
-  history: [],
-  actionCounter: 0,
-});
-
-describe('API v1 : groupement des taps', () => {
-  it("regroupe les taps successifs d'un même joueur dans une seule action", () => {
-    const g = newGame();
-    const a = addGroupedDelta(g, 0, +1);
-    const b = addGroupedDelta(g, 0, +1);
-    const c = addGroupedDelta(g, 0, -1);
-    expect(a.group).toBe(b.group);
-    expect(c.sum).toBe(1);
-    expect(g.history).toHaveLength(1);
-    expect(g.actionCounter).toBe(1);
-    expect(g.history[0]).toMatchObject({ playerIdx: 0, who: 'Alice', open: true, rank: 1 });
-    expect(g.history[0].entries).toEqual([{ delta: 1 }, { delta: 1 }, { delta: -1 }]);
-  });
-
-  it('ouvre un groupe distinct par joueur, le plus récent en tête', () => {
-    const g = newGame();
-    addGroupedDelta(g, 0, +1);
-    addGroupedDelta(g, 1, -2);
-    expect(g.history.map((h) => h.playerIdx)).toEqual([1, 0]);
-    expect(g.history.map((h) => h.rank)).toEqual([2, 1]);
-  });
-
-  it('ferme un groupe et en ouvre un nouveau ensuite', () => {
-    const g = newGame();
-    addGroupedDelta(g, 0, +1);
-    expect(closeOpenGroup(g.history, 0)).toBe(true);
-    expect(closeOpenGroup(g.history, 0)).toBe(false);
-    expect(findOpenGroup(g.history, 0)).toBeUndefined();
-    addGroupedDelta(g, 0, +1);
-    expect(g.history).toHaveLength(2);
-    expect(g.history[0].rank).toBe(2);
-  });
-
-  it('la saisie manuelle crée un groupe fermé et séparé', () => {
-    const g = newGame();
-    addGroupedDelta(g, 0, +1);
-    const manual = addManualDelta(g, 0, -15);
-    expect(manual).toMatchObject({ playerIdx: 0, open: false, rank: 2, entries: [{ delta: -15 }] });
-    expect(g.history[0]).toBe(manual);
-    expect(groupSum(manual)).toBe(-15);
-  });
-
-  it('closeAllGroups ferme tout', () => {
-    const g = newGame();
-    addGroupedDelta(g, 0, +1);
-    addGroupedDelta(g, 1, +1);
-    closeAllGroups(g.history);
-    expect(g.history.every((h) => !h.open)).toBe(true);
-  });
-
-  it('playerRecap(tableau v1) trie par rang et totalise', () => {
-    const g = newGame();
-    addGroupedDelta(g, 0, +3);
-    closeOpenGroup(g.history, 0);
-    addManualDelta(g, 1, +10);
-    addManualDelta(g, 0, -5);
-    const r = playerRecap(g.history, 0);
-    expect(r.groups.map((x) => x.rank)).toEqual([1, 3]);
-    expect(r.total).toBe(-2);
-    expect(playerRecap(g.history, 1).total).toBe(10);
-  });
-});
-
-describe("API v1 : pile d'annulation", () => {
-  it('empile un instantané indépendant (journal compris) et le restitue', () => {
-    const g = { ...newGame(), log: createLog() };
-    const stack = [];
-    pushUndo(stack, g);
-    g.players[0].score = 41;
-    addGroupedDelta(g, 0, +1);
-    recordScore(g.log, 0, 40, 41);
-    const prev = popUndo(stack);
-    expect(prev.players[0].score).toBe(40);
-    expect(prev.history).toEqual([]);
-    expect(prev.actionCounter).toBe(0);
-    expect(prev.seatOrder).toEqual([0, 1]);
-    expect(prev.log).toEqual(createLog());
-    expect(popUndo(stack)).toBeNull();
-    expect(JSON.parse(snapshot(g)).log.entries).toHaveLength(1);
-  });
-
-  it('est bornée à 40 niveaux (les plus anciens sortent)', () => {
-    const g = newGame();
-    const stack = [];
-    for (let i = 0; i < 45; i++) {
-      g.players[0].score = i;
-      pushUndo(stack, g);
-    }
-    expect(stack).toHaveLength(UNDO_LIMIT);
-    expect(popUndo(stack).players[0].score).toBe(44);
-    let last;
-    while (stack.length) last = popUndo(stack);
-    expect(last.players[0].score).toBe(5);
-  });
-});
-
-function identityScores(n, v) {
-  return Array.from({ length: n }, () => v);
-}
-function identityOrder(n) {
-  return Array.from({ length: n }, (_, i) => i);
-}

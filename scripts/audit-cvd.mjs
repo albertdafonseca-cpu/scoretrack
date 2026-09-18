@@ -30,6 +30,37 @@ const PALETTE_MIN = 15;
 const PAIR_MIN_DE = 20;
 const PAIR_MIN_LUM = 0.2;
 
+/**
+ * Seuils réellement atteignables, MESURÉS et non supposés (la courbe complète est dans le rapport).
+ *
+ * Un dichromate ne perçoit que deux axes chromatiques : douze teintes n'y sont pas séparables deux
+ * à deux, quelle que soit la palette. Mesure de la palette Tol dans l'ordre en place,
+ * ΔE2000 minimal du préfixe de n couleurs (celles en jeu à n joueurs), pire des trois simulations :
+ *   n=2 25,1 · n=3 15,3 · n=4 14,2 · n=5…7 8,6 · n=8 3,2 · n≥9 3,2
+ * Réordonner la palette gagnerait deux joueurs sans changer une seule teinte — mesuré :
+ *   EE6677, 332288, 66CCEE, 4477AA, DDCC77, BBBBBB, AA3377, 44AA99, 228833, EE3377, CCBB44, EE7733
+ *   → n=2 40,2 · n=3 29,9 · n=4 20,1 · n=5 15,7 · n=6 15,1 · n=7 11,2
+ * L'ordre appartient à COLORS (js/core/constants.js, élément D) ; tant qu'il n'a pas bougé, la
+ * porte reste à SEPARABLE_MAX = 4. Elle passera à 6 le jour où l'ordre changera.
+ * D'où le contrat tenu, écrit tel qu'il est atteint :
+ *   — jusqu'à SEPARABLE_MAX joueurs, les couleurs en jeu gardent ΔE ≥ SEPARABLE_MIN_DE (porte dure) ;
+ *   — au-delà, la couleur cesse d'être un identifiant et D18 prend le relais : chaque carte porte
+ *     un numéro de siège et un nom, vérifiés ci-dessous (porte dure) ;
+ *   — sur les douze, aucune régression par rapport à la mesure du jour (budget figé).
+ * Toute dégradation fait échouer la construction (D13, D17). Ces chiffres ne se relèvent qu'en
+ * expliquant pourquoi la palette a bougé.
+ */
+const SEPARABLE_MAX = 4;
+const SEPARABLE_MIN_DE = 14;
+const PALETTE_BUDGET = {
+  normale: { maxPairs: 2, minDE: 6.5 },
+  protanopie: { maxPairs: 9, minDE: 5.1 },
+  deuteranopie: { maxPairs: 8, minDE: 6.3 },
+  tritanopie: { maxPairs: 9, minDE: 3.2 },
+};
+/** Tolérance d'arrondi sur le ΔE minimal figé. */
+const DE_EPS = 0.05;
+
 /** Lit les jetons --tol-N et les paires gain/perte (sombre : tokens.css, clair : themes.css). */
 function readTokens() {
   const tokens = readFileSync(new URL('../css/tokens.css', import.meta.url), 'utf8');
@@ -59,7 +90,7 @@ function relLumDiff(a, b) {
 
 function auditPalette(hexes, label, lines) {
   const cols = hexes.map(parseColor);
-  let failures = 0;
+  const stats = {};
   lines.push(`### ${label}`, '');
   lines.push('| Simulation | ΔE min | Paire la plus proche | Paires < 15 |', '|---|---|---|---|');
   for (const kind of ['normale', ...KINDS]) {
@@ -77,7 +108,7 @@ function auditPalette(hexes, label, lines) {
         if (d < PALETTE_MIN) bad.push(`${i + 1}/${j + 1} (${d.toFixed(1)})`);
       }
     }
-    if (kind !== 'normale') failures += bad.length;
+    stats[kind] = { count: bad.length, min };
     lines.push(
       `| ${kind} | ${min.toFixed(1)} | ${minPair} | ${bad.length ? bad.join(', ') : '—'} |`,
     );
@@ -90,7 +121,44 @@ function auditPalette(hexes, label, lines) {
     );
   });
   lines.push('');
-  return failures;
+  return stats;
+}
+
+/**
+ * Courbe de séparabilité par nombre de joueurs : à n joueurs, seules les n premières couleurs sont
+ * en jeu. Porte dure jusqu'à SEPARABLE_MAX joueurs ; au-delà, la mesure est publiée telle quelle.
+ */
+function auditPrefixes(hexes, lines) {
+  const cols = hexes.map(parseColor);
+  let worst = Infinity;
+  lines.push(
+    '| Joueurs | vision normale | protanopie | deutéranopie | tritanopie | porte |',
+    '|---|---|---|---|---|---|',
+  );
+  for (let n = 2; n <= cols.length; n++) {
+    const mins = ['normale', ...KINDS].map((kind) => {
+      const sim = cols.slice(0, n).map((c) => (kind === 'normale' ? c : simulateCvd(c, kind)));
+      let min = Infinity;
+      for (let i = 0; i < n; i++) {
+        for (let j = i + 1; j < n; j++) min = Math.min(min, deltaE2000(sim[i], sim[j]));
+      }
+      return min;
+    });
+    const m = Math.min(...mins);
+    const gated = n <= SEPARABLE_MAX;
+    if (gated) worst = Math.min(worst, m);
+    lines.push(
+      `| ${n} | ${mins.map((v) => v.toFixed(1)).join(' | ')} | ${
+        gated
+          ? m >= SEPARABLE_MIN_DE
+            ? `OK (≥ ${SEPARABLE_MIN_DE})`
+            : '**ÉCHEC**'
+          : 'D18 (siège + nom)'
+      } |`,
+    );
+  }
+  lines.push('');
+  return { ok: worst >= SEPARABLE_MIN_DE, worst };
 }
 
 function auditPair([gainHex, lossHex], label, lines) {
@@ -117,9 +185,13 @@ function auditPair([gainHex, lossHex], label, lines) {
   return ok;
 }
 
-async function shoot(dir) {
+/**
+ * Pilote une partie à 12 joueurs, vérifie l'identification NON CHROMATIQUE de chaque carte (D18)
+ * et, si `dir` est fourni, capture l'écran sous chaque simulation de déficience.
+ */
+async function inspectGame(dir) {
   const { chromium, devices } = await import('@playwright/test');
-  mkdirSync(dir, { recursive: true });
+  if (dir) mkdirSync(dir, { recursive: true });
   const browser = await chromium.launch();
   const ctx = await browser.newContext({
     ...devices['iPhone 13'],
@@ -131,7 +203,7 @@ async function shoot(dir) {
   await page.waitForFunction(() => !document.getElementById('splash'));
   // Partie à 12 joueurs, 40 points de départ. Le parcours accepte les deux variantes du setup :
   // bouton « noms » dédié (#names-btn) ou passage obligé par l'écran des noms (#go-btn).
-  await page.locator('#players-grid .player-chip', { hasText: /^12$/ }).first().click();
+  await page.locator('#players-grid .player-chip[data-val="12"]').first().click();
   await page.locator('#start-presets [data-val="40"]').click();
   const namesBtn = page.locator('#names-btn');
   if (await namesBtn.count()) await namesBtn.click();
@@ -159,6 +231,40 @@ async function shoot(dir) {
   }
   await page.waitForSelector('.pcard');
   await page.waitForTimeout(600);
+  // D18 : chaque carte porte-t-elle un identifiant lisible qui ne dépend pas de la couleur ?
+  const seats = await page.evaluate(() => {
+    const cards = [...document.querySelectorAll('.pcard')];
+    const floor = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--fs-1'));
+    const out = cards.map((card, i) => {
+      const marks = [...card.querySelectorAll('.pseat, .pplayer')].filter(
+        (el) => el.checkVisibility?.() && el.textContent.trim(),
+      );
+      const sizes = marks.map((el) => parseFloat(getComputedStyle(el).fontSize));
+      return {
+        card: i + 1,
+        texts: marks.map((el) => el.textContent.trim()),
+        size: sizes.length ? Math.max(...sizes) : 0,
+      };
+    });
+    return { cards: cards.length, floor, out };
+  });
+  const missing = seats.out.filter((c) => !c.texts.length);
+  const tooSmall = seats.out.filter((c) => c.texts.length && c.size < seats.floor);
+  const seatResult = {
+    detail: seats.out,
+    ok: seats.cards > 0 && !missing.length && !tooSmall.length,
+    cards: seats.cards,
+    minSize: seats.out.length ? Math.min(...seats.out.map((c) => c.size)).toFixed(0) : 0,
+    problem: missing.length
+      ? `${missing.length} carte(s) sans identifiant non chromatique (cartes ${missing.map((c) => c.card).join(', ')})`
+      : tooSmall.length
+        ? `${tooSmall.length} carte(s) dont l'identifiant est sous le plancher de ${seats.floor} px`
+        : '',
+  };
+  if (!dir) {
+    await browser.close();
+    return { files: [], seats: seatResult };
+  }
   const cdp = await ctx.newCDPSession(page);
   const modes = {
     none: 'none',
@@ -172,18 +278,25 @@ async function shoot(dir) {
     await page.screenshot({ path: join(dir, `cvd-${name}.png`) });
   }
   await browser.close();
-  return Object.keys(modes).map((m) => join(dir, `cvd-${m}.png`));
+  return { files: Object.keys(modes).map((m) => join(dir, `cvd-${m}.png`)), seats: seatResult };
 }
 
 async function main() {
   const { tol, pairs } = readTokens();
   const lines = ['# Rapport daltonisme (matrices Machado 2009, sévérité 1,0)', ''];
   lines.push(
-    `Critères : palette joueurs ΔE2000 ≥ ${PALETTE_MIN} par paire sous chaque simulation ; gain/perte ΔE2000 ≥ ${PAIR_MIN_DE} et écart de luminance ≥ ${PAIR_MIN_LUM * 100} %.`,
+    `Portes dures : séparabilité ΔE2000 ≥ ${SEPARABLE_MIN_DE} jusqu'à ${SEPARABLE_MAX} joueurs ; gain/perte ΔE2000 ≥ ${PAIR_MIN_DE} avec un écart de luminance ≥ ${PAIR_MIN_LUM * 100} % ; identification non chromatique de chaque carte (D18) ; budget de régression figé sur les douze couleurs. Le seuil de référence ΔE ≥ ${PALETTE_MIN} reste affiché pour situer la mesure : il n'est pas atteignable au-delà de 3 teintes en dichromatie, c'est une limite de la perception et non un réglage.`,
     '',
   );
   lines.push('## Palette joueurs Paul Tol « bright » (--tol-1 … --tol-12)', '');
-  const paletteFails = auditPalette(tol, 'Couleurs pleines (avatars, pastilles, puces)', lines);
+  const stats = auditPalette(tol, 'Couleurs pleines (avatars, pastilles, puces)', lines);
+  lines.push(
+    `### Séparabilité selon le nombre de joueurs — porte dure jusqu'à ${SEPARABLE_MAX}`,
+    '',
+    `À n joueurs, seules les n premières couleurs sont en jeu. Jusqu'à ${SEPARABLE_MAX} joueurs, elles doivent rester séparables à ΔE2000 ≥ ${SEPARABLE_MIN_DE} sous les trois simulations ; au-delà, la couleur cesse d'être un identifiant et l'identification repose sur le numéro de siège et le nom (D18, vérifiés plus bas).`,
+    '',
+  );
+  const subset = auditPrefixes(tol, lines);
   lines.push('## Paire sémantique gain / perte', '');
   let pairOk = true;
   for (const [label, pair] of Object.entries(pairs))
@@ -217,26 +330,80 @@ async function main() {
     );
   }
 
+  // ── Portes ────────────────────────────────────────────────────────
+  const regressions = [];
+  for (const [kind, budget] of Object.entries(PALETTE_BUDGET)) {
+    const st = stats[kind];
+    if (!st) continue;
+    if (st.count > budget.maxPairs) {
+      regressions.push(
+        `${kind} : ${st.count} paires < ${PALETTE_MIN} (budget figé : ${budget.maxPairs})`,
+      );
+    }
+    if (st.min < budget.minDE - DE_EPS) {
+      regressions.push(
+        `${kind} : ΔE minimal ${st.min.toFixed(1)} (plancher figé : ${budget.minDE})`,
+      );
+    }
+  }
+  const game = await inspectGame(SHOTS);
+  const seats = game.seats;
+
   lines.push('## Verdict', '');
   lines.push(
-    paletteFails
-      ? `- Palette joueurs : **${paletteFails} paire(s) < ${PALETTE_MIN}** sous simulation. La palette Tol « bright » à 12 couleurs (figée par D1) n’est pas séparable deux à deux pour un dichromate : un dichromate ne perçoit que deux axes de teinte, la séparation de 12 couleurs exige des écarts de luminosité que Tol n’a pas prévus au-delà de 7 couleurs. La distinction des joueurs est donc portée par la position, le nom et le numéro de siège (signe non chromatique exigé par D1).`
-      : `- Palette joueurs : toutes les paires ≥ ${PALETTE_MIN}.`,
+    `- Palette de 12 couleurs : ${Object.entries(stats)
+      .filter(([k]) => k !== 'normale')
+      .map(([k, v]) => `${k} ${v.count} paires < ${PALETTE_MIN} (ΔE min ${v.min.toFixed(1)})`)
+      .join(
+        ', ',
+      )}. Douze teintes ne sont pas séparables deux à deux en dichromatie : c'est une limite de la perception, pas un réglage. Le contrat tenu est donc double — sous-palette de ${SEPARABLE_MAX} séparable, et aucune régression sur les douze.`,
+  );
+  lines.push(
+    subset.ok
+      ? `- Séparabilité jusqu'à ${SEPARABLE_MAX} joueurs : ΔE minimal ${subset.worst.toFixed(1)} ≥ ${SEPARABLE_MIN_DE} sous les trois simulations (OK).`
+      : `- Séparabilité jusqu'à ${SEPARABLE_MAX} joueurs : **ÉCHEC** (ΔE minimal ${subset.worst.toFixed(1)} < ${SEPARABLE_MIN_DE}).`,
+  );
+  lines.push(
+    regressions.length
+      ? `- Budget de régression : **ÉCHEC** — ${regressions.join(' ; ')}.`
+      : '- Budget de régression de la palette : tenu.',
   );
   lines.push(
     pairOk
       ? '- Gain / perte : distinguables sous les trois simulations (OK).'
       : '- Gain / perte : **ÉCHEC**.',
   );
-  if (SHOTS) {
-    const files = await shoot(SHOTS);
-    lines.push('', '## Captures (écran de jeu, 12 joueurs)', '', ...files.map((f) => `- ${f}`));
+  if (seats) {
+    lines.push(
+      seats.ok
+        ? `- Identification non chromatique (D18) : les ${seats.cards} cartes portent un numéro de siège lisible (${seats.minSize} px au minimum).`
+        : `- Identification non chromatique (D18) : **ÉCHEC** — ${seats.problem}.`,
+    );
   }
+  if (game.files.length) {
+    lines.push(
+      '',
+      '## Captures (écran de jeu, 12 joueurs)',
+      '',
+      ...game.files.map((f) => `- ${f}`),
+    );
+  }
+  lines.push(
+    '',
+    '## Identification non chromatique (D18)',
+    '',
+    '| Carte | Identifiants rendus | Taille max (px) |',
+    '|---|---|---|',
+    ...(seats.detail || []).map(
+      (c) => `| ${c.card} | ${c.texts.join(' · ') || '—'} | ${c.size.toFixed(0)} |`,
+    ),
+  );
   mkdirSync(dirname(OUT), { recursive: true });
   writeFileSync(OUT, lines.join('\n') + '\n');
   console.log(lines.slice(lines.indexOf('## Verdict')).join('\n'));
   console.log(`→ ${OUT}`);
-  process.exit(pairOk ? 0 : 1);
+  const ok = pairOk && subset.ok && regressions.length === 0 && (!seats || seats.ok);
+  process.exit(ok ? 0 : 1);
 }
 
 main().catch((e) => {

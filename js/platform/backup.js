@@ -55,7 +55,9 @@ function validateSettings(raw) {
   if (raw.theme !== undefined && typeof raw.theme !== 'string') {
     return { error: 'Réglages : thème invalide.' };
   }
-  return { value: { ...raw, ...serializeSettings(parseSettings(raw)) } };
+  // Liste blanche stricte : seules les clés du schéma sont conservées (aucune clé inconnue du fichier
+  // importé n'est persistée, `constructor`/`__proto__` compris).
+  return { value: serializeSettings(parseSettings(raw)) };
 }
 
 function validateSave(raw) {

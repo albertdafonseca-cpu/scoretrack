@@ -30,7 +30,10 @@ export const COLORS = [
   '#66CCEE',
   '#BBBBBB',
   '#EE7733',
-  '#0077BB',
+  // Indigo Tol « muted ». Remplace #0077BB, trop proche de #4477AA (ΔE2000 4,4 en vision normale,
+  // 2,0 en tritanopie : c'était le minimum de toute la palette). La paire passe à 27,5 / 20,1.
+  // Doit rester identique à --tol-9 (css/tokens.css) : tests/unit/themes.test.js le vérifie.
+  '#332288',
   '#EE3377',
   '#44AA99',
   '#DDCC77',
@@ -53,5 +56,8 @@ export const GAME_PRESETS = [
   { name: 'Skyjo', detail: '4j · scores négatifs', players: 4, start: 0, max: 0, neg: true },
 ];
 
+/** Touche symbolique « effacer » du pavé : rendue par l'icône SVG `back` (aucun glyphe système). */
+export const KEYPAD_BACK = 'back';
+
 /** Touches du pavé numérique de la modale de score. */
-export const KEYPAD_KEYS = [1, 2, 3, 4, 5, 6, 7, 8, 9, '⌫', 0, '00'];
+export const KEYPAD_KEYS = [1, 2, 3, 4, 5, 6, 7, 8, 9, KEYPAD_BACK, 0, '00'];

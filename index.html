@@ -8,7 +8,7 @@
     />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'; connect-src 'self'; manifest-src 'self'"
+      content="default-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'; worker-src 'self'; connect-src 'self'; manifest-src 'self'"
     />
     <meta name="color-scheme" content="dark light" />
     <meta
@@ -23,6 +23,20 @@
     <link rel="icon" href="icons/icon-192.png" type="image/png" />
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
     <title>ScoreTrack</title>
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href="assets/fonts/orbitron-400-900-latin.woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href="assets/fonts/share-tech-mono-400-latin.woff2"
+      crossorigin
+    />
     <link rel="stylesheet" href="css/fonts.css" />
     <link rel="stylesheet" href="css/tokens.css" />
     <link rel="stylesheet" href="css/themes.css" />
@@ -36,202 +50,608 @@
   </head>
   <body>
     <div id="splash" aria-hidden="true">
-      <div class="splash-icon"><span class="icon" data-icon="target">🎯</span></div>
+      <div class="splash-icon">
+        <svg
+          class="icon"
+          data-icon="target"
+          viewBox="0 0 512 512"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <path stroke-width="40" d="M172 110.51A168 168 0 0 1 340 110.51" />
+          <path stroke-width="40" d="M401.49 172A168 168 0 0 1 401.49 340" />
+          <path stroke-width="40" d="M340 401.49A168 168 0 0 1 172 401.49" />
+          <path stroke-width="40" d="M110.51 340A168 168 0 0 1 110.51 172" />
+          <path stroke-width="30" d="M200 192v128" />
+          <path stroke-width="30" d="M256 192v128" />
+          <path stroke-width="30" d="M312 192v128" />
+          <path stroke-width="30" d="M166 322 346 190" />
+        </svg>
+      </div>
       <div class="splash-title">ScoreTrack</div>
       <div class="splash-sub">Compteur universel</div>
     </div>
 
-    <section id="setup-page" class="page active" aria-labelledby="app-title">
-      <header class="logo">
-        <button type="button" class="logo-gear" data-action="show-settings" aria-label="Réglages">
-          <span class="icon" data-icon="gear" aria-hidden="true">⚙️</span>
-        </button>
-        <div class="logo-mark" aria-hidden="true">
-          <span class="icon" data-icon="target">🎯</span>
-        </div>
-        <h1 class="logo-name" id="app-title">ScoreTrack</h1>
-        <p class="logo-sub">Compteur universel</p>
-      </header>
-
-      <section class="restore-banner hidden" id="restore-banner" aria-labelledby="restore-title">
-        <div class="restore-banner-text">
-          <h2 class="restore-title" id="restore-title">
-            <span class="icon" data-icon="gamepad" aria-hidden="true">🎮</span> Partie en cours
-          </h2>
-          <p class="restore-preview" id="restore-preview"></p>
-          <time class="restore-when" id="restore-when"></time>
-        </div>
-        <div class="restore-banner-btns">
-          <button type="button" class="restore-btn yes" data-action="restore-game">
-            Reprendre
+    <main id="app-main">
+      <section id="setup-page" class="page active" aria-labelledby="app-title">
+        <header class="logo">
+          <button type="button" class="logo-gear" data-action="show-settings" aria-label="Réglages">
+            <svg
+              class="icon"
+              data-icon="gear"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <circle cx="12" cy="12" r="3" />
+              <circle cx="12" cy="12" r="7" />
+              <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+              <path
+                d="M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12"
+              />
+            </svg>
           </button>
-          <button type="button" class="restore-btn no" data-action="discard-save">Effacer</button>
-        </div>
-      </section>
-
-      <section class="setup-section">
-        <h2 class="setup-label" id="lbl-presets">Préréglages</h2>
-        <div class="presets-grid" id="presets-grid" role="group" aria-labelledby="lbl-presets">
-          <button
-            type="button"
-            class="preset-card preset-card-custom"
-            id="preset-custom"
-            aria-pressed="true"
-            hidden
-          >
-            <span class="preset-card-name">Personnalisé</span>
-            <span class="preset-card-detail">Réglages ci-dessous</span>
-          </button>
-        </div>
-      </section>
-
-      <section class="setup-section">
-        <h2 class="setup-label" id="lbl-players">Nombre de joueurs</h2>
-        <div
-          class="players-grid"
-          id="players-grid"
-          role="group"
-          aria-labelledby="lbl-players"
-        ></div>
-      </section>
-
-      <section class="setup-section">
-        <h2 class="setup-label" id="lbl-start">Points de départ</h2>
-        <div class="points-presets" id="start-presets" role="group" aria-labelledby="lbl-start">
-          <button type="button" class="points-chip" data-val="0" aria-pressed="false">0</button>
-          <button type="button" class="points-chip" data-val="10" aria-pressed="false">10</button>
-          <button type="button" class="points-chip" data-val="20" aria-pressed="false">20</button>
-          <button type="button" class="points-chip" data-val="40" aria-pressed="false">40</button>
-          <button type="button" class="points-chip" data-val="50" aria-pressed="false">50</button>
-          <button type="button" class="points-chip" data-val="100" aria-pressed="false">100</button>
-        </div>
-        <label class="sr-only" for="points-custom">Points de départ, autre valeur</label>
-        <input
-          class="points-input"
-          id="points-custom"
-          type="number"
-          inputmode="numeric"
-          placeholder="Autre valeur…"
-          min="0"
-          max="9999999"
-          step="1"
-          aria-describedby="start-error"
-        />
-        <p class="field-error" id="start-error" role="alert" hidden></p>
-      </section>
-
-      <section class="setup-section">
-        <h2 class="setup-label" id="lbl-max">Points maximum</h2>
-        <div class="points-presets" id="max-presets" role="group" aria-labelledby="lbl-max">
-          <button type="button" class="points-chip" data-val="10" aria-pressed="false">10</button>
-          <button type="button" class="points-chip" data-val="20" aria-pressed="false">20</button>
-          <button type="button" class="points-chip" data-val="40" aria-pressed="false">40</button>
-          <button type="button" class="points-chip" data-val="50" aria-pressed="false">50</button>
-          <button type="button" class="points-chip" data-val="100" aria-pressed="false">100</button>
-          <button type="button" class="points-chip" data-val="200" aria-pressed="false">200</button>
-        </div>
-        <label class="sr-only" for="max-custom"
-          >Points maximum, autre valeur (vide = sans limite)</label
-        >
-        <input
-          class="points-input"
-          id="max-custom"
-          type="number"
-          inputmode="numeric"
-          placeholder="Sans limite"
-          min="0"
-          max="9999999"
-          step="1"
-          aria-describedby="max-error"
-        />
-        <p class="field-error" id="max-error" role="alert" hidden></p>
-      </section>
-
-      <section class="setup-section">
-        <div class="toggle-row">
-          <div>
-            <div class="toggle-label" id="neg-label">Scores négatifs</div>
-            <div class="toggle-sub" id="neg-sub">Permettre de descendre sous 0</div>
+          <div class="logo-mark" aria-hidden="true">
+            <svg
+              class="icon"
+              data-icon="target"
+              viewBox="0 0 512 512"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path stroke-width="40" d="M172 110.51A168 168 0 0 1 340 110.51" />
+              <path stroke-width="40" d="M401.49 172A168 168 0 0 1 401.49 340" />
+              <path stroke-width="40" d="M340 401.49A168 168 0 0 1 172 401.49" />
+              <path stroke-width="40" d="M110.51 340A168 168 0 0 1 110.51 172" />
+              <path stroke-width="30" d="M200 192v128" />
+              <path stroke-width="30" d="M256 192v128" />
+              <path stroke-width="30" d="M312 192v128" />
+              <path stroke-width="30" d="M166 322 346 190" />
+            </svg>
           </div>
+          <h1 class="logo-name" id="app-title" tabindex="-1">ScoreTrack</h1>
+          <p class="logo-sub">Compteur universel</p>
+        </header>
+
+        <section class="restore-banner hidden" id="restore-banner" aria-labelledby="restore-title">
+          <div class="restore-banner-text">
+            <h2 class="restore-title" id="restore-title">
+              <svg
+                class="icon"
+                data-icon="gamepad"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path
+                  d="M7 7h10a5 5 0 0 1 5 5v1a4 4 0 0 1-7 2.6l-.6-.6H9.6l-.6.6A4 4 0 0 1 2 13v-1a5 5 0 0 1 5-5z"
+                />
+                <path d="M6 11h4M8 9v4" />
+                <circle cx="15" cy="12" r="1.25" fill="currentColor" stroke="none" />
+                <circle cx="17.5" cy="9.5" r="1.25" fill="currentColor" stroke="none" />
+              </svg>
+              Partie en cours
+            </h2>
+            <p class="restore-preview" id="restore-preview"></p>
+            <time class="restore-when" id="restore-when"></time>
+          </div>
+          <div class="restore-banner-btns">
+            <button type="button" class="restore-btn yes" data-action="restore-game">
+              Reprendre
+            </button>
+            <button
+              type="button"
+              class="restore-btn no"
+              id="discard-btn"
+              data-action="discard-save"
+            >
+              <span class="btn-text">Effacer</span>
+            </button>
+          </div>
+        </section>
+
+        <section class="setup-section">
+          <h2 class="setup-label" id="lbl-presets">Préréglages</h2>
+          <!-- Rendus dans le HTML (et non construits au chargement) pour éviter tout décalage
+               de mise en page ; leur conformité à GAME_PRESETS est vérifiée par setup.spec.js. -->
+          <div
+            class="presets-grid"
+            id="presets-grid"
+            role="radiogroup"
+            aria-labelledby="lbl-presets"
+          >
+            <button
+              type="button"
+              class="preset-card"
+              role="radio"
+              data-preset="Loi du Milieu"
+              aria-checked="false"
+            >
+              <span class="preset-card-name">Loi du Milieu</span>
+              <span class="preset-card-detail">6j · 40pts · élim à 0</span>
+            </button>
+            <button
+              type="button"
+              class="preset-card"
+              role="radio"
+              data-preset="Poker"
+              aria-checked="false"
+            >
+              <span class="preset-card-name">Poker</span>
+              <span class="preset-card-detail">6j · 1000 jetons</span>
+            </button>
+            <button
+              type="button"
+              class="preset-card"
+              role="radio"
+              data-preset="Uno"
+              aria-checked="false"
+            >
+              <span class="preset-card-name">Uno</span>
+              <span class="preset-card-detail">4j · 500pts</span>
+            </button>
+            <button
+              type="button"
+              class="preset-card"
+              role="radio"
+              data-preset="Bohnanza"
+              aria-checked="false"
+            >
+              <span class="preset-card-name">Bohnanza</span>
+              <span class="preset-card-detail">4j · 0 départ</span>
+            </button>
+            <button
+              type="button"
+              class="preset-card"
+              role="radio"
+              data-preset="Magic"
+              aria-checked="false"
+            >
+              <span class="preset-card-name">Magic</span>
+              <span class="preset-card-detail">4j · 20 PV · élim à 0</span>
+            </button>
+            <button
+              type="button"
+              class="preset-card"
+              role="radio"
+              data-preset="Skyjo"
+              aria-checked="false"
+            >
+              <span class="preset-card-name">Skyjo</span>
+              <span class="preset-card-detail">4j · scores négatifs</span>
+            </button>
+          </div>
+          <p class="preset-note" id="preset-note" hidden>
+            <span class="preset-note-name">Personnalisé</span>
+            <span class="preset-note-detail">réglages choisis ci-dessous</span>
+          </p>
+        </section>
+
+        <section class="setup-section">
+          <h2 class="setup-label" id="lbl-players">Nombre de joueurs</h2>
+          <div
+            class="players-grid"
+            id="players-grid"
+            role="radiogroup"
+            aria-labelledby="lbl-players"
+          >
+            <button type="button" class="player-chip" data-val="1">1</button>
+            <button type="button" class="player-chip" data-val="2">2</button>
+            <button type="button" class="player-chip" data-val="3">3</button>
+            <button type="button" class="player-chip" data-val="4">4</button>
+            <button type="button" class="player-chip" data-val="5">5</button>
+            <button type="button" class="player-chip" data-val="6">6</button>
+            <button type="button" class="player-chip" data-val="7">7</button>
+            <button type="button" class="player-chip" data-val="8">8</button>
+            <button type="button" class="player-chip" data-val="9">9</button>
+            <button type="button" class="player-chip" data-val="10">10</button>
+            <button type="button" class="player-chip" data-val="11">11</button>
+            <button type="button" class="player-chip" data-val="12">12</button>
+          </div>
+        </section>
+
+        <section class="setup-section">
+          <h2 class="setup-label" id="lbl-start">Points de départ</h2>
+          <div
+            class="points-presets"
+            id="start-presets"
+            role="radiogroup"
+            aria-labelledby="lbl-start"
+          >
+            <button
+              type="button"
+              class="points-chip"
+              role="radio"
+              data-val="0"
+              aria-checked="false"
+            >
+              0
+            </button>
+            <button
+              type="button"
+              class="points-chip"
+              role="radio"
+              data-val="10"
+              aria-checked="false"
+            >
+              10
+            </button>
+            <button
+              type="button"
+              class="points-chip"
+              role="radio"
+              data-val="20"
+              aria-checked="false"
+            >
+              20
+            </button>
+            <button
+              type="button"
+              class="points-chip"
+              role="radio"
+              data-val="40"
+              aria-checked="false"
+            >
+              40
+            </button>
+            <button
+              type="button"
+              class="points-chip"
+              role="radio"
+              data-val="50"
+              aria-checked="false"
+            >
+              50
+            </button>
+            <button
+              type="button"
+              class="points-chip"
+              role="radio"
+              data-val="100"
+              aria-checked="false"
+            >
+              100
+            </button>
+          </div>
+          <label class="sr-only" for="points-custom">Points de départ, autre valeur</label>
+          <input
+            class="points-input"
+            id="points-custom"
+            type="number"
+            inputmode="numeric"
+            placeholder="Autre valeur…"
+            min="0"
+            max="9999999"
+            step="1"
+          />
+          <p class="field-error" id="start-error" role="alert" hidden></p>
+        </section>
+
+        <section class="setup-section">
+          <h2 class="setup-label" id="lbl-max">Points maximum</h2>
+          <div class="points-presets" id="max-presets" role="group" aria-labelledby="lbl-max">
+            <button type="button" class="points-chip" data-val="10" aria-pressed="false">10</button>
+            <button type="button" class="points-chip" data-val="20" aria-pressed="false">20</button>
+            <button type="button" class="points-chip" data-val="40" aria-pressed="false">40</button>
+            <button type="button" class="points-chip" data-val="50" aria-pressed="false">50</button>
+            <button type="button" class="points-chip" data-val="100" aria-pressed="false">
+              100
+            </button>
+            <button type="button" class="points-chip" data-val="200" aria-pressed="false">
+              200
+            </button>
+          </div>
+          <label class="sr-only" for="max-custom"
+            >Points maximum, autre valeur (vide&nbsp;= sans limite)</label
+          >
+          <input
+            class="points-input"
+            id="max-custom"
+            type="number"
+            inputmode="numeric"
+            placeholder="Sans limite"
+            min="0"
+            max="9999999"
+            step="1"
+          />
+          <p class="field-error" id="max-error" role="alert" hidden></p>
+        </section>
+
+        <section class="setup-section">
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label" id="neg-label">Scores négatifs</div>
+              <div class="toggle-sub" id="neg-sub">Permettre de descendre sous 0</div>
+            </div>
+            <button
+              type="button"
+              class="toggle-switch"
+              id="neg-toggle"
+              role="switch"
+              aria-checked="false"
+              aria-labelledby="neg-label"
+              aria-describedby="neg-sub"
+              data-action="toggle-negative"
+            ></button>
+          </div>
+        </section>
+
+        <p class="setup-summary" id="setup-summary" aria-live="polite"></p>
+        <p class="setup-names-hint" id="setup-names-hint" hidden></p>
+        <button type="button" class="go-btn" id="go-btn" data-action="quick-start">
+          <svg
+            class="icon"
+            data-icon="play"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z" />
+          </svg>
+          Lancer la partie
+        </button>
+        <button type="button" class="names-go-btn" id="names-btn" data-action="show-names">
+          <svg
+            class="icon"
+            data-icon="edit"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path d="M12 20h9" />
+            <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+          </svg>
+          Nommer les joueurs
+        </button>
+        <div class="setup-btn-row">
+          <button type="button" class="ghost-btn" data-action="apply-defaults">
+            <svg
+              class="icon"
+              data-icon="refresh"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M3 12a9 9 0 0 1 15.5-6.3L21 8" />
+              <path d="M21 3v5h-5" />
+              <path d="M21 12a9 9 0 0 1-15.5 6.3L3 16" />
+              <path d="M3 21v-5h5" />
+            </svg>
+            <span class="btn-text">Valeurs par défaut</span>
+          </button>
           <button
             type="button"
-            class="toggle-switch"
-            id="neg-toggle"
-            role="switch"
-            aria-checked="false"
-            aria-labelledby="neg-label"
-            aria-describedby="neg-sub"
-            data-action="toggle-negative"
-          ></button>
+            class="ghost-btn"
+            id="save-default-btn"
+            data-action="save-as-default"
+          >
+            <svg
+              class="icon"
+              data-icon="save"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+              <path d="M17 21v-8H7v8" />
+              <path d="M7 3v5h8" />
+            </svg>
+            <span class="btn-text">Enregistrer par défaut</span>
+          </button>
         </div>
       </section>
 
-      <p class="setup-summary" id="setup-summary" aria-live="polite"></p>
-      <p class="setup-names-hint" id="setup-names-hint" hidden></p>
-      <button type="button" class="go-btn" id="go-btn" data-action="quick-start">
-        <span class="icon" data-icon="play" aria-hidden="true">▶</span> Lancer la partie
-      </button>
-      <button type="button" class="names-go-btn" id="names-btn" data-action="show-names">
-        <span class="icon" data-icon="edit" aria-hidden="true">✎</span> Nommer les joueurs
-      </button>
-      <div class="setup-btn-row">
-        <button type="button" class="ghost-btn" data-action="apply-defaults">
-          <span class="icon" data-icon="refresh" aria-hidden="true">↺</span>
-          <span class="btn-text">Défauts</span>
-        </button>
-        <button type="button" class="ghost-btn" data-action="save-as-default">
-          <span class="icon" data-icon="save" aria-hidden="true">💾</span>
-          <span class="btn-text">Sauver comme défaut</span>
-        </button>
-      </div>
-    </section>
-
-    <section id="settings-page" class="page" aria-labelledby="settings-title">
-      <header class="settings-header">
-        <button
-          type="button"
-          class="back-btn"
-          data-action="back-from-settings"
-          aria-label="Retour à l'accueil"
-        >
-          <span class="icon" data-icon="back" aria-hidden="true">←</span>
-        </button>
-        <h1 class="settings-title" id="settings-title" tabindex="-1">Réglages</h1>
-      </header>
-      <section class="setup-section">
-        <h2 class="setup-label" id="lbl-theme">Thème</h2>
-        <div class="themes-grid" id="themes-grid" role="group" aria-labelledby="lbl-theme"></div>
-      </section>
-      <section class="setup-section">
-        <h2 class="setup-label" id="lbl-data">Données</h2>
-        <p class="setup-help">
-          Réglages, partie en cours et prénoms restent sur cet appareil. Exportez-les pour les
-          conserver ou les transférer.
-        </p>
-        <div class="settings-row">
-          <button type="button" class="ghost-btn" data-action="export-data">
-            <span class="icon" data-icon="download" aria-hidden="true">↓</span>
-            <span class="btn-text">Exporter mes données</span>
+      <section id="settings-page" class="page" aria-labelledby="settings-title">
+        <header class="settings-header">
+          <button
+            type="button"
+            class="back-btn"
+            data-action="back-from-settings"
+            aria-label="Retour à l’accueil"
+          >
+            <svg
+              class="icon"
+              data-icon="back"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M19 12H5" />
+              <path d="M12 19l-7-7 7-7" />
+            </svg>
           </button>
-          <button type="button" class="ghost-btn" data-action="import-data">
-            <span class="icon" data-icon="upload" aria-hidden="true">↑</span>
-            <span class="btn-text">Importer</span>
+          <h1 class="settings-title" id="settings-title" tabindex="-1">Réglages</h1>
+        </header>
+        <section class="setup-section">
+          <h2 class="setup-label" id="lbl-theme">Thème</h2>
+          <div
+            class="themes-grid"
+            id="themes-grid"
+            role="radiogroup"
+            aria-labelledby="lbl-theme"
+          ></div>
+        </section>
+        <section class="setup-section">
+          <h2 class="setup-label" id="lbl-data">Données</h2>
+          <p class="setup-help">
+            Réglages, partie en cours et prénoms restent sur cet appareil. Exportez-les pour les
+            conserver ou les transférer.
+          </p>
+          <div class="settings-row">
+            <button type="button" class="ghost-btn" data-action="export-data">
+              <svg
+                class="icon"
+                data-icon="download"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path d="M12 3v12" />
+                <path d="M7 10l5 5 5-5" />
+                <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+              </svg>
+              <span class="btn-text">Exporter mes données</span>
+            </button>
+            <button type="button" class="ghost-btn" data-action="import-data">
+              <svg
+                class="icon"
+                data-icon="upload"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path d="M12 15V3" />
+                <path d="M7 8l5-5 5 5" />
+                <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+              </svg>
+              <span class="btn-text">Importer des données</span>
+            </button>
+          </div>
+          <p class="setup-status" id="data-status" role="status"></p>
+        </section>
+        <section class="setup-section">
+          <h2 class="setup-label" id="lbl-privacy">Confidentialité</h2>
+          <p class="setup-help">
+            Aucune donnée ne quitte l’appareil&nbsp;: pas de compte, pas de serveur, pas de mesure
+            d’audience.
+          </p>
+          <button type="button" class="ghost-btn" data-action="show-privacy">
+            <svg
+              class="icon"
+              data-icon="lock"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <rect x="4" y="11" width="16" height="10" rx="2" />
+              <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+            </svg>
+            <span class="btn-text">Lire la politique de confidentialité</span>
+          </button>
+        </section>
+      </section>
+
+      <section id="names-page" class="page" aria-labelledby="names-title">
+        <h1 class="names-title" id="names-title" tabindex="-1">Joueurs</h1>
+        <p class="names-sub">Optionnel&nbsp;— une case vide donne «&nbsp;Joueur&nbsp;n&nbsp;»</p>
+        <div class="names-actions" role="group" aria-label="Actions sur les prénoms">
+          <button
+            type="button"
+            class="names-action-btn"
+            id="shuffle-btn"
+            data-action="shuffle-players"
+          >
+            <svg
+              class="icon"
+              data-icon="shuffle"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M16 3h5v5" />
+              <path d="M4 20L21 3" />
+              <path d="M21 16v5h-5" />
+              <path d="M15 15l6 6" />
+              <path d="M4 4l5 5" />
+            </svg>
+            <span class="btn-text">Mélanger</span>
+          </button>
+          <button
+            type="button"
+            class="names-action-btn"
+            id="memorize-btn"
+            data-action="save-profiles"
+          >
+            <svg
+              class="icon"
+              data-icon="save"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+              <path d="M17 21v-8H7v8" />
+              <path d="M7 3v5h8" />
+            </svg>
+            <span class="btn-text">Mémoriser</span>
+          </button>
+          <button
+            type="button"
+            class="names-action-btn"
+            id="clear-profiles-btn"
+            data-action="clear-saved-names"
+            aria-label="Vider la liste des prénoms mémorisés"
+          >
+            <svg
+              class="icon"
+              data-icon="trash"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M3 6h18" />
+              <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+              <path d="M10 11v6M14 11v6" />
+            </svg>
+            <span class="btn-text">Vider la liste</span>
           </button>
         </div>
-        <p class="setup-status" id="data-status" role="status"></p>
-      </section>
-      <section class="setup-section">
-        <h2 class="setup-label" id="lbl-privacy">Confidentialité</h2>
-        <p class="setup-help">
-          Aucune donnée ne quitte l'appareil : pas de compte, pas de serveur, pas de mesure
-          d'audience.
+        <p class="names-limit" id="names-limit" hidden></p>
+        <p class="names-help" id="profiles-help">
+          «&nbsp;Mémoriser&nbsp;» garde les prénoms saisis pour les parties suivantes.
         </p>
-        <button type="button" class="ghost-btn" data-action="show-privacy">
-          <span class="icon" data-icon="lock" aria-hidden="true">🔒</span>
-          <span class="btn-text">Politique de confidentialité</span>
+        <div
+          class="profiles-list hidden"
+          id="profiles-list"
+          role="group"
+          aria-label="Prénoms mémorisés"
+        ></div>
+        <div id="names-list"></div>
+        <button type="button" class="go-btn" id="names-go-btn" data-action="start-game">
+          <svg
+            class="icon"
+            data-icon="play"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z" />
+          </svg>
+          Lancer la partie
         </button>
+        <div class="setup-btn-row">
+          <button type="button" class="ghost-btn" id="clear-names-btn" data-action="clear-names">
+            <svg
+              class="icon"
+              data-icon="refresh"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M3 12a9 9 0 0 1 15.5-6.3L21 8" />
+              <path d="M21 3v5h-5" />
+              <path d="M21 12a9 9 0 0 1-15.5 6.3L3 16" />
+              <path d="M3 21v-5h5" />
+            </svg>
+            <span class="btn-text">Vider les cases</span>
+          </button>
+          <button type="button" class="ghost-btn" data-action="show-setup">
+            <svg
+              class="icon"
+              data-icon="back"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M19 12H5" />
+              <path d="M12 19l-7-7 7-7" />
+            </svg>
+            <span class="btn-text">Retour</span>
+          </button>
+        </div>
       </section>
-    </section>
+    </main>
 
     <!-- MODALE CONFIDENTIALITÉ -->
     <div
@@ -242,11 +662,10 @@
       aria-labelledby="privacy-title"
     >
       <div class="modal-box st-privacy-box">
-        <div class="modal-handle" aria-hidden="true"></div>
-        <h2 class="modal-title" id="privacy-title" tabindex="-1">Confidentialité</h2>
+        <h2 class="modal-title" id="privacy-title" tabindex="-1">Politique de confidentialité</h2>
         <div class="st-privacy-body">
           <p class="st-privacy-intro">
-            ScoreTrack ne collecte aucune donnée personnelle et n'envoie aucune requête à un serveur
+            ScoreTrack ne collecte aucune donnée personnelle et n’envoie aucune requête à un serveur
             tiers.
           </p>
           <p class="st-privacy-p">
@@ -258,26 +677,26 @@
           </p>
           <p class="st-privacy-p">
             <strong class="privacy-strong">Aucune requête externe</strong><br />
-            Les polices et les icônes sont embarquées dans l'application : aucune requête n'est
-            envoyée à Google Fonts ni à un réseau de diffusion. Aucune donnée n'est transmise à un
+            Les polices et les icônes sont embarquées dans l’application&nbsp;: aucune requête n’est
+            envoyée à Google Fonts ni à un réseau de diffusion. Aucune donnée n’est transmise à un
             serveur, partagée avec des tiers, ni utilisée à des fins publicitaires ou analytiques.
           </p>
           <p class="st-privacy-p">
-            <strong class="privacy-strong">Journal d'erreurs local</strong><br />
+            <strong class="privacy-strong">Journal d’erreurs local</strong><br />
             En cas de dysfonctionnement, un court journal technique (clé
-            <code>scoretrack_errors</code>) est conservé sur l'appareil pour faciliter le
-            diagnostic. Il n'est jamais transmis et disparaît avec les autres données.
+            <code>scoretrack_errors</code>) est conservé sur l’appareil pour faciliter le
+            diagnostic. Il n’est jamais transmis et disparaît avec les autres données.
           </p>
           <p class="st-privacy-p">
             <strong class="privacy-strong">Export et import</strong><br />
             Depuis Réglages › Données, vous pouvez exporter vos données dans un fichier que vous
-            seul détenez, puis le réimporter sur un autre appareil. Ce fichier n'est envoyé nulle
+            seul détenez, puis le réimporter sur un autre appareil. Ce fichier n’est envoyé nulle
             part.
           </p>
           <p class="st-privacy-p">
             <strong class="privacy-strong">Cookies</strong><br />
-            ScoreTrack n'utilise pas de cookies. Le localStorage employé est strictement nécessaire
-            au fonctionnement de l'application et est exempté de consentement selon la
+            ScoreTrack n’utilise pas de cookies. Le localStorage employé est strictement nécessaire
+            au fonctionnement de l’application et est exempté de consentement selon la
             réglementation RGPD et la directive ePrivacy.
           </p>
           <p class="st-privacy-p">
@@ -292,11 +711,22 @@
               id="btn-clear-all"
               data-action="clear-all-data"
             >
-              <span class="icon" data-icon="trash" aria-hidden="true">🗑</span>
+              <svg
+                class="icon"
+                data-icon="trash"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path d="M3 6h18" />
+                <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                <path d="M10 11v6M14 11v6" />
+              </svg>
               <span class="btn-text">Supprimer toutes les données</span>
             </button>
           </div>
-          <p class="st-privacy-date">Dernière mise à jour : septembre 2026</p>
+          <p class="st-privacy-date">Dernière mise à jour&nbsp;: septembre 2026</p>
         </div>
         <button
           type="button"
@@ -308,139 +738,303 @@
       </div>
     </div>
 
-    <section id="names-page" class="page" aria-labelledby="names-title">
-      <h1 class="names-title" id="names-title" tabindex="-1">Joueurs</h1>
-      <p class="names-sub">Optionnel — une case vide donne « Joueur n »</p>
-      <div class="names-actions" role="group" aria-label="Actions sur les prénoms">
-        <button type="button" class="names-action-btn" data-action="shuffle-players">
-          <span class="icon" data-icon="shuffle" aria-hidden="true">🔀</span>
-          <span class="btn-text">Mélanger</span>
-        </button>
-        <button type="button" class="names-action-btn" data-action="save-profiles">
-          <span class="icon" data-icon="save" aria-hidden="true">💾</span>
-          <span class="btn-text">Mémoriser</span>
-        </button>
-        <button
-          type="button"
-          class="names-action-btn"
-          data-action="clear-saved-names"
-          aria-label="Oublier tous les prénoms mémorisés"
-        >
-          <span class="icon" data-icon="trash" aria-hidden="true">🗑</span>
-          <span class="btn-text">Oublier</span>
-        </button>
-      </div>
-      <div
-        class="profiles-list hidden"
-        id="profiles-list"
-        role="group"
-        aria-label="Prénoms mémorisés"
-      ></div>
-      <div id="names-list"></div>
-      <button type="button" class="go-btn" id="names-go-btn" data-action="start-game">
-        <span class="icon" data-icon="play" aria-hidden="true">▶</span> Lancer la partie
-      </button>
-      <div class="setup-btn-row">
-        <button type="button" class="ghost-btn" data-action="clear-names">
-          <span class="icon" data-icon="refresh" aria-hidden="true">↺</span>
-          <span class="btn-text">Vider les cases</span>
-        </button>
-        <button type="button" class="ghost-btn" data-action="show-setup">
-          <span class="icon" data-icon="back" aria-hidden="true">←</span>
-          <span class="btn-text">Retour</span>
-        </button>
-      </div>
-    </section>
-
     <div id="game-screen">
       <div class="game-header"><div class="game-header-title">ScoreTrack</div></div>
       <div class="players-wrap" id="players-wrap"></div>
     </div>
 
-    <div id="bar">
-      <button class="bar-btn" id="undo-btn" disabled>
+    <div id="bar" role="toolbar" aria-label="Actions de la partie">
+      <button type="button" class="bar-btn" id="undo-btn" disabled>
         <span class="btn-icon icon" data-icon="undo"></span><span class="btn-label">Annuler</span>
       </button>
-      <button class="bar-btn accent-btn" data-action="rotate-players">
-        <span class="btn-icon"><span class="icon" data-icon="rotate">🔄</span></span
+      <button type="button" class="bar-btn" id="redo-btn" data-action="redo-action" disabled>
+        <span class="btn-icon icon" data-icon="redo"></span><span class="btn-label">Rétablir</span>
+      </button>
+      <button type="button" class="bar-btn accent-btn" data-action="rotate-players">
+        <span class="btn-icon icon" data-icon="rotate"></span
         ><span class="btn-label">Rotation</span>
       </button>
-      <button class="bar-btn" data-action="show-recap">
-        <span class="btn-icon"><span class="icon" data-icon="list">📋</span></span
-        ><span class="btn-label">Récap</span>
+      <button type="button" class="bar-btn" data-action="show-recap">
+        <span class="btn-icon icon" data-icon="list"></span><span class="btn-label">Récap</span>
       </button>
-      <button class="bar-btn danger" data-action="open-modal" data-modal="reset-modal">
-        <span class="btn-icon">✕</span><span class="btn-label">Reset</span>
+      <button
+        type="button"
+        class="bar-btn danger"
+        data-action="open-modal"
+        data-modal="reset-modal"
+      >
+        <span class="btn-icon icon" data-icon="close"></span><span class="btn-label">Reset</span>
       </button>
     </div>
 
-    <div class="modal-overlay hidden" id="score-modal">
+    <!-- PAVÉ NUMÉRIQUE (saisie d'une valeur exacte) -->
+    <div
+      class="modal-overlay hidden"
+      id="score-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="score-modal-title"
+    >
       <div class="modal-box">
-        <div class="modal-handle"></div>
-        <div class="modal-title">Modifier les points</div>
+        <div class="modal-handle" aria-hidden="true"></div>
+        <h2 class="modal-title" id="score-modal-title">Modifier les points</h2>
         <div class="modal-player" id="score-modal-player"></div>
-        <div class="modal-score-display pos" id="score-modal-display">+0</div>
-        <div class="modal-sign-row">
-          <button class="sign-btn minus" id="sign-minus" data-action="set-sign" data-sign="-1">
-            － Perte
+        <div class="modal-score-display pos" id="score-modal-display" aria-live="polite">+0</div>
+        <div class="modal-sign-row" role="group" aria-label="Signe de la saisie">
+          <button
+            type="button"
+            class="sign-btn minus"
+            id="sign-minus"
+            data-action="set-sign"
+            data-sign="-1"
+            aria-pressed="false"
+          >
+            <svg
+              class="icon"
+              data-icon="minus"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M5 12h14" />
+            </svg>
+            <span class="sign-label">Perte</span>
           </button>
-          <button class="sign-btn plus active" id="sign-plus" data-action="set-sign" data-sign="1">
-            ＋ Gain
+          <button
+            type="button"
+            class="sign-btn plus active"
+            id="sign-plus"
+            data-action="set-sign"
+            data-sign="1"
+            aria-pressed="true"
+          >
+            <svg
+              class="icon"
+              data-icon="plus"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M12 5v14" />
+              <path d="M5 12h14" />
+            </svg>
+            <span class="sign-label">Gain</span>
           </button>
         </div>
-        <div class="modal-keypad" id="modal-keypad"></div>
+        <div class="modal-keypad" id="modal-keypad" role="group" aria-label="Pavé numérique"></div>
         <div class="modal-confirm-row">
-          <button class="modal-btn secondary" data-action="close-score-modal">Annuler</button>
-          <button class="modal-btn primary" data-action="confirm-score-modal">Appliquer</button>
+          <button type="button" class="modal-btn secondary" data-action="close-score-modal">
+            Annuler
+          </button>
+          <button type="button" class="modal-btn primary" data-action="confirm-score-modal">
+            Appliquer
+          </button>
         </div>
       </div>
     </div>
 
-    <div class="modal-overlay hidden" id="winner-modal">
-      <div class="modal-box winner-modal-box">
-        <div class="winner-icon"><span class="icon" data-icon="trophy">🏆</span></div>
+    <!-- FEUILLE JOUEUR (renommer, éliminer, réintégrer) -->
+    <div
+      class="modal-overlay hidden"
+      id="player-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="player-modal-title"
+    >
+      <div class="modal-box">
+        <div class="modal-handle" aria-hidden="true"></div>
+        <h2 class="modal-title" id="player-modal-title">Joueur</h2>
+        <div class="modal-player" id="player-modal-sub"></div>
+        <label class="sr-only" for="player-name-input"
+          >Prénom du joueur (18 caractères maximum)</label
+        >
+        <input
+          class="player-name-input"
+          id="player-name-input"
+          type="text"
+          maxlength="18"
+          autocomplete="off"
+          autocapitalize="words"
+          spellcheck="false"
+        />
+        <button
+          type="button"
+          class="modal-btn secondary player-elim-btn"
+          id="player-elim-btn"
+          data-action="toggle-player-elim"
+        ></button>
+        <div class="modal-confirm-row">
+          <button type="button" class="modal-btn secondary" data-action="close-player-sheet">
+            Fermer
+          </button>
+          <button type="button" class="modal-btn primary" data-action="confirm-player-sheet">
+            Enregistrer
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- VAINQUEUR -->
+    <div
+      class="modal-overlay hidden"
+      id="winner-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="winner-name"
+    >
+      <div class="simple-modal-box winner-modal-box">
+        <div class="winner-icon">
+          <svg
+            class="icon"
+            data-icon="trophy"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path d="M8 21h8M12 17v4" />
+            <path d="M7 4h10v6a5 5 0 0 1-10 0z" />
+            <path d="M7 6H4a1 1 0 0 0-1 1v1a3 3 0 0 0 3 3h1" />
+            <path d="M17 6h3a1 1 0 0 1 1 1v1a3 3 0 0 1-3 3h-1" />
+          </svg>
+        </div>
+        <div class="winner-title" id="winner-title">Dernier survivant</div>
         <div class="winner-name" id="winner-name">—</div>
         <div class="winner-sub" id="winner-sub">—</div>
         <div class="winner-btns">
-          <button class="modal-btn primary" data-action="show-recap">Voir le récap</button>
-          <button class="modal-btn secondary" data-action="confirm-reset">Nouvelle partie</button>
+          <button type="button" class="modal-btn primary" data-action="show-recap">
+            Voir le récap
+          </button>
+          <button type="button" class="modal-btn secondary" data-action="undo-action">
+            Annuler la dernière action
+          </button>
+          <button type="button" class="modal-btn secondary" data-action="confirm-reset">
+            Nouvelle partie
+          </button>
         </div>
       </div>
     </div>
 
-    <div class="modal-overlay hidden" id="reset-modal">
+    <!-- RESET -->
+    <div
+      class="modal-overlay hidden"
+      id="reset-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="reset-modal-title"
+    >
       <div class="simple-modal-box">
-        <div class="simple-modal-title danger">Reset ?</div>
+        <h2 class="simple-modal-title danger" id="reset-modal-title">Reset ?</h2>
         <div class="simple-modal-sub">La partie en cours sera perdue.</div>
         <div class="simple-modal-btns">
-          <button class="modal-btn secondary" data-action="close-modal" data-modal="reset-modal">
+          <button
+            type="button"
+            class="modal-btn secondary"
+            data-action="close-modal"
+            data-modal="reset-modal"
+          >
             Annuler
           </button>
-          <button class="modal-btn primary" data-action="confirm-reset">Confirmer</button>
+          <button type="button" class="modal-btn primary" data-action="confirm-reset">
+            Confirmer
+          </button>
         </div>
       </div>
     </div>
 
-    <div class="modal-overlay hidden" id="elim-modal">
+    <!-- CONFIRMATION D'ÉLIMINATION -->
+    <div
+      class="modal-overlay hidden"
+      id="elim-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="elim-confirm-name"
+    >
       <div class="simple-modal-box">
-        <div class="winner-icon elim-icon-sm"><span class="icon" data-icon="skull">💀</span></div>
+        <div class="winner-icon elim-icon-sm">
+          <svg
+            class="icon"
+            data-icon="skull"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path
+              d="M12 2a8 8 0 0 0-8 8c0 2.6 1.2 4.9 3 6.4V19a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2.6c1.8-1.5 3-3.8 3-6.4a8 8 0 0 0-8-8z"
+            />
+            <circle cx="9" cy="11" r="1.5" />
+            <circle cx="15" cy="11" r="1.5" />
+            <path d="M10 21v-3M14 21v-3" />
+            <path d="M11 16h2" />
+          </svg>
+        </div>
         <div class="elim-confirm-name" id="elim-confirm-name">—</div>
         <div class="elim-confirm-sub">Score à 0 — confirmer l'élimination ?</div>
         <div class="simple-modal-btns">
-          <button class="modal-btn secondary" data-action="cancel-elim">Annuler</button>
-          <button class="modal-btn primary btn-elim-confirm" data-action="confirm-elim">
+          <button type="button" class="modal-btn secondary" data-action="cancel-elim">
+            Annuler
+          </button>
+          <button
+            type="button"
+            class="modal-btn primary btn-elim-confirm"
+            data-action="confirm-elim"
+          >
             Éliminer
           </button>
         </div>
       </div>
     </div>
 
-    <div class="fullpage hidden" id="recap">
+    <!-- RÉCAPITULATIF -->
+    <div
+      class="fullpage hidden"
+      id="recap"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="recap-title"
+    >
       <div class="fullpage-header">
-        <div class="fullpage-title">Récapitulatif</div>
-        <button class="fullpage-close" id="recap-close-btn" data-action="close-recap">✕</button>
+        <h2 class="fullpage-title" id="recap-title">Récapitulatif</h2>
+        <button
+          type="button"
+          class="fullpage-close"
+          id="recap-close-btn"
+          data-action="close-recap"
+          aria-label="Fermer le récapitulatif"
+        >
+          <svg
+            class="icon"
+            data-icon="close"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path d="M18 6L6 18" />
+            <path d="M6 6l12 12" />
+          </svg>
+        </button>
       </div>
       <div id="recap-body"></div>
+      <!-- CONFIRMATION « REVENIR ICI » -->
+      <div
+        class="modal-overlay hidden"
+        id="jump-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="jump-modal-title"
+      >
+        <div class="simple-modal-box">
+          <h2 class="simple-modal-title" id="jump-modal-title">Revenir à ce point ?</h2>
+          <div class="simple-modal-sub" id="jump-modal-sub">—</div>
+          <div class="simple-modal-btns">
+            <button type="button" class="modal-btn secondary" data-action="cancel-jump">
+              Annuler
+            </button>
+            <button type="button" class="modal-btn primary" data-action="confirm-jump">
+              Revenir
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </body>
 </html>

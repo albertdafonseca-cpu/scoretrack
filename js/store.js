@@ -1,15 +1,15 @@
 // État partagé de l'application (mutable, un seul exemplaire). Aucune logique ici.
 //
-// `game.log` est le journal v2 (js/core/history.js) : annulation ET rétablissement y sont portés
-// par le curseur (`undo(game.log)` / `redo(game.log)`). `game.history`, `game.actionCounter` et
-// `undoStack` sont les structures v1 encore consommées par l'interface actuelle ; `redoStack`
-// leur fait pendant pour une éventuelle transition douce. Ils disparaîtront avec l'API v1.
-import { createLog } from './core/history.js';
+// Une seule représentation de la partie : `game = { players, seatOrder, log }`, où `log` est le
+// journal (js/core/history.js). L'annulation ET le rétablissement sont portés par le curseur du
+// journal (`undo(game.log)` / `redo(game.log)`) : il n'y a plus ni pile d'instantanés, ni
+// historique en groupes, ni compteur d'actions à tenir à jour en parallèle.
+import { createLog, isLog } from './core/history.js';
 import { DEFAULT_SETTINGS } from './core/save-schema.js';
 
 /** Partie vide (aucun joueur), journal neuf. */
 export function emptyGame() {
-  return { players: [], seatOrder: [], log: createLog(), history: [], actionCounter: 0 };
+  return { players: [], seatOrder: [], log: createLog() };
 }
 
 export const store = {
@@ -17,12 +17,8 @@ export const store = {
   config: { numPlayers: 0, startPoints: 0, maxPoints: Infinity, allowNeg: false },
   /** Réglages persistants (thème, défauts). */
   settings: { ...DEFAULT_SETTINGS },
-  /** Partie en cours : { players, seatOrder, log, history (v1), actionCounter (v1) }. */
+  /** Partie en cours : { players, seatOrder, log }. */
   game: emptyGame(),
-  /** Pile d'annulation v1 (instantanés JSON). @deprecated → game.log */
-  undoStack: [],
-  /** Pile de rétablissement v1 (instantanés JSON). @deprecated → game.log */
-  redoStack: [],
   /** Minuteries de fermeture de groupe, par indice joueur. */
   groupTimers: {},
   /** Indice du joueur en attente de confirmation d'élimination (-1 = aucun). */
@@ -30,18 +26,11 @@ export const store = {
 };
 
 /**
- * Remplace la partie en cours et remet à zéro les piles v1 et les minuteries.
- * Garantit la présence d'un journal (`log`) et des champs v1.
+ * Remplace la partie en cours et remet à zéro les minuteries. Un journal absent ou mal formé est
+ * remplacé par un journal neuf : aucune fonction du cœur ne reçoit jamais de curseur hors bornes.
  */
 export function setGame(game) {
-  store.game = {
-    ...game,
-    log: game.log || createLog(),
-    history: Array.isArray(game.history) ? game.history : [],
-    actionCounter: Number.isInteger(game.actionCounter) ? game.actionCounter : 0,
-  };
-  store.undoStack = [];
-  store.redoStack = [];
+  store.game = { ...game, log: isLog(game.log) ? game.log : createLog() };
   Object.values(store.groupTimers).forEach(clearTimeout);
   store.groupTimers = {};
   store.elimPending = -1;

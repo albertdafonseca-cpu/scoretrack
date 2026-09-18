@@ -2,9 +2,11 @@
 // variante, ZWJ, drapeaux, modificateurs de peau) subsiste dans index.html, js/**/*.js ou
 // css/**/*.css hors commentaires.
 //
-// Exceptions (remplacées à l'exécution par js/ui/icons.js → hydrateIcons) :
-//   - HTML : l'emoji est l'unique contenu d'un <span class="icon" data-icon="…">…</span> ;
-//   - JS   : glyphe de secours passé en second argument à icon('nom', '…').
+// Aucune exception en HTML : un emoji de repli dans `index.html` est PEINT au premier rendu, avant
+// l'exécution des modules (FCP mesuré à 136 ms, hydratation ensuite) — et il reste à l'écran si le
+// JavaScript échoue. Les icônes du HTML initial sont donc du SVG en ligne.
+// Seule exception (JS) : le glyphe de secours passé en second argument à icon('nom', '…'), qui
+// n'est peint que si le nom d'icône est inconnu, c'est-à-dire jamais en fonctionnement normal.
 // Les glyphes typographiques hors sous-ensembles de polices (flèches U+2190–21FF, ⌫, ▶, ✕, ✓,
 // signes pleine chasse ＋ －) sont signalés en avertissement ; `--strict` les rend bloquants.
 //
@@ -25,8 +27,6 @@ const GLYPH = new RegExp(
   'u',
 );
 
-const ALLOWED_HTML =
-  /<span\b[^>]*\bclass="[^"]*\bicon\b[^"]*"[^>]*\bdata-icon="[^"]+"[^>]*>[^<]*<\/span>/g;
 const ALLOWED_JS = /\bicon\(\s*(['"])[\w-]+\1\s*,\s*(['"])[^'"]*\2\s*\)/g;
 
 function walk(dir, ext) {
@@ -63,7 +63,10 @@ function blankComments(src, kind) {
     if (quote) {
       if (c === '\\') i += 2;
       else {
-        if (c === quote) quote = null;
+        // Seul un littéral gabarit peut franchir une fin de ligne : sinon la chaîne se referme,
+        // ce qui évite qu'une apostrophe dans une expression régulière (/'/g) ne désynchronise
+        // l'analyse et ne masque les commentaires suivants.
+        if (c === quote || (c === '\n' && quote !== '`')) quote = null;
         i++;
       }
       continue;
@@ -95,7 +98,6 @@ function scan(file) {
   const rel = relative(ROOT, file);
   const kind = rel.endsWith('.html') ? 'html' : rel.endsWith('.css') ? 'css' : 'js';
   let text = blankComments(readFileSync(file, 'utf8'), kind);
-  if (kind === 'html') text = blankAllowed(text, ALLOWED_HTML);
   if (kind === 'js') text = blankAllowed(text, ALLOWED_JS);
   const findings = [];
   text.split('\n').forEach((line, li) => {

@@ -10,6 +10,7 @@
   },
   "scripts": {
     "dev": "http-server -p 8765 -s .",
+    "serve:dist": "http-server -p 8765 -s dist",
     "lint": "eslint . && prettier --check . && npm run lint:emoji",
     "lint:emoji": "node scripts/lint-no-emoji.mjs",
     "format": "prettier --write .",
@@ -18,6 +19,9 @@
     "test": "npm run test:unit",
     "build:sw": "node scripts/build-sw.mjs",
     "check:sw": "node scripts/build-sw.mjs --check",
+    "build:dist": "rm -rf dist && mkdir dist && tar -cf - --exclude=./.git --exclude=./.github --exclude=./node_modules --exclude=./tests --exclude=./docs --exclude=./scripts --exclude=./coverage --exclude=./test-results --exclude=./playwright-report --exclude=./.lighthouseci --exclude=./dist --exclude=./package.json --exclude=./package-lock.json --exclude=./eslint.config.js --exclude=./playwright.config.js --exclude=./vitest.config.js --exclude=./lighthouserc.json --exclude=./.prettierrc --exclude=./.prettierignore --exclude=./.editorconfig --exclude=./.gitignore --exclude=./README.md --exclude=./CHANGELOG.md --exclude=./CONTRIBUTING.md --exclude=./SECURITY.md . | tar -xf - -C dist",
+    "audit:contrast": "node scripts/audit-contrast.mjs",
+    "audit:cvd": "node scripts/audit-cvd.mjs",
     "check": "npm run lint && npm run check:sw && npm run test:unit && npm run test:e2e",
     "lhci": "npx --yes @lhci/cli@0.15.1 autorun",
     "audit": "npm audit --omit=dev --audit-level=high"

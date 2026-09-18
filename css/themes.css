@@ -2,7 +2,8 @@
 
    Règles garanties par scripts/audit-contrast.mjs (0 échec exigé) :
    - les 10 fonds de cartes sont DÉRIVÉS : color-mix(in oklab, Tol-N var(--card-mix), var(--card-base)),
-     30 % sur fond sombre, 20 % sur fond clair (aucune valeur manuelle) ;
+     22 % sur fond sombre, 15 % sur fond clair (aucune valeur manuelle), plafonds fixés par la
+     mesure au pixel du fond composé (scripts/audit-contrast.mjs, décision D16) ;
    - --muted2 est dérivé du texte et du fond (66 % sombre / 78 % clair) ;
    - --gain / --loss / --warn : paire bleu/orange Tol, déclinée sombre/clair ;
    - --score-color est l'accent, sauf quand l'accent est trop sombre pour 4,5:1 sur les cartes
@@ -18,9 +19,9 @@
   --accent: #8a83ff;
   --accent2: #b5a6ff;
   --text: #f0f0ff;
-  --font-display: 'Inter', sans-serif;
-  --font-score: 'Inter', sans-serif;
-  --font-ui: 'Inter', sans-serif;
+  --font-display: 'Inter', 'Inter fallback', sans-serif;
+  --font-score: 'Inter', 'Inter fallback', sans-serif;
+  --font-ui: 'Inter', 'Inter fallback', sans-serif;
   --radius: 14px;
   --chip-bg: #1e1e2e;
   --chip-on: #88ccee;
@@ -45,9 +46,9 @@
   --accent: #ff33d6;
   --accent2: #d966ff;
   --text: #ffe0ff;
-  --font-display: 'Orbitron', monospace;
-  --font-score: 'Share Tech Mono', monospace;
-  --font-ui: 'Share Tech Mono', monospace;
+  --font-display: 'Orbitron', 'Orbitron fallback', monospace;
+  --font-score: 'Share Tech Mono', 'Share Tech Mono fallback', monospace;
+  --font-ui: 'Share Tech Mono', 'Share Tech Mono fallback', monospace;
   --radius: 6px;
   --chip-bg: #28003a;
   --chip-on: #ee6677;
@@ -72,9 +73,9 @@
   --accent: #ffdc00;
   --accent2: #ffa033;
   --text: #fff8e0;
-  --font-display: 'Press Start 2P', monospace;
-  --font-score: 'Press Start 2P', monospace;
-  --font-ui: 'Inter', sans-serif;
+  --font-display: 'Press Start 2P', 'Press Start 2P fallback', monospace;
+  --font-score: 'Press Start 2P', 'Press Start 2P fallback', monospace;
+  --font-ui: 'Inter', 'Inter fallback', sans-serif;
   --radius: 2px;
   --chip-bg: #1e1800;
   --chip-on: #ccbb44;
@@ -98,9 +99,9 @@
   --accent: #50c850;
   --accent2: #88dd44;
   --text: #e8ffe8;
-  --font-display: 'Inter', sans-serif;
-  --font-score: 'Share Tech Mono', monospace;
-  --font-ui: 'Inter', sans-serif;
+  --font-display: 'Inter', 'Inter fallback', sans-serif;
+  --font-score: 'Share Tech Mono', 'Share Tech Mono fallback', monospace;
+  --font-ui: 'Inter', 'Inter fallback', sans-serif;
   --radius: 16px;
   --chip-bg: #0d2010;
   --chip-on: #ccbb44;
@@ -124,9 +125,9 @@
   --accent: #ff7050;
   --accent2: #ffaa00;
   --text: #fff0e8;
-  --font-display: 'Inter', sans-serif;
-  --font-score: 'Share Tech Mono', monospace;
-  --font-ui: 'Inter', sans-serif;
+  --font-display: 'Inter', 'Inter fallback', sans-serif;
+  --font-score: 'Share Tech Mono', 'Share Tech Mono fallback', monospace;
+  --font-ui: 'Inter', 'Inter fallback', sans-serif;
   --radius: 12px;
   --chip-bg: #280d14;
   --chip-on: #ee7733;
@@ -151,9 +152,9 @@
   --accent: #33a6ff;
   --accent2: #33d6ff;
   --text: #e0f0ff;
-  --font-display: 'Inter', sans-serif;
-  --font-score: 'Share Tech Mono', monospace;
-  --font-ui: 'Inter', sans-serif;
+  --font-display: 'Inter', 'Inter fallback', sans-serif;
+  --font-score: 'Share Tech Mono', 'Share Tech Mono fallback', monospace;
+  --font-ui: 'Inter', 'Inter fallback', sans-serif;
   --radius: 20px;
   --chip-bg: #081828;
   --chip-on: #ee7733;
@@ -178,9 +179,9 @@
   --accent: #ffffff;
   --accent2: #bbbbbb;
   --text: #ffffff;
-  --font-display: 'Inter', sans-serif;
-  --font-score: 'Share Tech Mono', monospace;
-  --font-ui: 'Inter', sans-serif;
+  --font-display: 'Inter', 'Inter fallback', sans-serif;
+  --font-score: 'Share Tech Mono', 'Share Tech Mono fallback', monospace;
+  --font-ui: 'Inter', 'Inter fallback', sans-serif;
   --radius: 0px;
   --chip-bg: #202020;
   --chip-on: #ffffff;
@@ -203,9 +204,9 @@
   --accent: #ddb800;
   --accent2: #ffee44;
   --text: #fff8e0;
-  --font-display: 'Orbitron', monospace;
-  --font-score: 'Share Tech Mono', monospace;
-  --font-ui: 'Share Tech Mono', monospace;
+  --font-display: 'Orbitron', 'Orbitron fallback', monospace;
+  --font-score: 'Share Tech Mono', 'Share Tech Mono fallback', monospace;
+  --font-ui: 'Share Tech Mono', 'Share Tech Mono fallback', monospace;
   --radius: 4px;
   --chip-bg: #1e1800;
   --chip-on: #ccbb44;
@@ -230,9 +231,9 @@
   --accent2: #b0b0b5;
   --text: #f2f2f7;
   --muted-mix: 76%;
-  --font-display: 'Inter', sans-serif;
-  --font-score: 'Inter', sans-serif;
-  --font-ui: 'Inter', sans-serif;
+  --font-display: 'Inter', 'Inter fallback', sans-serif;
+  --font-score: 'Inter', 'Inter fallback', sans-serif;
+  --font-ui: 'Inter', 'Inter fallback', sans-serif;
   --radius: 10px;
   --chip-bg: #3a3a3c;
   --chip-on: #88ccee;
@@ -258,14 +259,14 @@
   --accent2: #ffe070;
   --text: #fff8e8;
   --muted-mix: 72%;
-  --font-display: 'Cinzel', Georgia, serif;
-  --font-score: 'Cinzel', Georgia, serif;
-  --font-ui: 'Inter', sans-serif;
+  --font-display: 'Cinzel', 'Cinzel fallback', Georgia, serif;
+  --font-score: 'Cinzel', 'Cinzel fallback', Georgia, serif;
+  --font-ui: 'Inter', 'Inter fallback', sans-serif;
   --radius: 8px;
   --chip-bg: #3d3020;
   --chip-on: #ccbb44;
   --chip-on-text: #000000;
-  --card-mix: 28%;
+  --card-mix: 20%;
   --bg-grad:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M16 2l14 14-14 14L2 16z' fill='none' stroke='%23f0c040' stroke-width='0.6' opacity='0.1'/%3E%3C/svg%3E"),
     radial-gradient(ellipse at 50% 0%, #3d3020 0%, #2e2418 70%);
@@ -284,7 +285,7 @@
   --gain: #003d63;
   --loss: #9a3c00;
   --warn: #7a4400;
-  --card-mix: 20%;
+  --card-mix: 15%;
   --muted-mix: 78%;
   --card-text: #111111;
   --card-sign: rgba(17, 17, 17, 0.6);
@@ -302,9 +303,9 @@
   --accent: #2f4fc4;
   --accent2: #2b47b8;
   --text: #111133;
-  --font-display: 'Inter', sans-serif;
-  --font-score: 'Inter', sans-serif;
-  --font-ui: 'Inter', sans-serif;
+  --font-display: 'Inter', 'Inter fallback', sans-serif;
+  --font-score: 'Inter', 'Inter fallback', sans-serif;
+  --font-ui: 'Inter', 'Inter fallback', sans-serif;
   --radius: 12px;
   --chip-bg: #c8d4f0;
   --chip-on: #4477aa;
@@ -328,14 +329,14 @@
   --accent: #000000;
   --accent2: #333333;
   --text: #111111;
-  --font-display: 'Inter', sans-serif;
-  --font-score: 'Inter', sans-serif;
-  --font-ui: 'Inter', sans-serif;
+  --font-display: 'Inter', 'Inter fallback', sans-serif;
+  --font-score: 'Inter', 'Inter fallback', sans-serif;
+  --font-ui: 'Inter', 'Inter fallback', sans-serif;
   --radius: 0px;
   --chip-bg: #d6d6d6;
   --chip-on: #4477aa;
   --chip-on-text: #ffffff;
-  --card-mix: 16%;
+  --card-mix: 13%;
   --score-color: var(--text);
   --bg-grad: linear-gradient(180deg, #ffffff 0%, #ececec 100%);
   --modal-bg: rgba(0, 0, 0, 0.55);
@@ -354,9 +355,9 @@
   --accent: #7a5500;
   --accent2: #6e4c00;
   --text: #2e2418;
-  --font-display: 'Cinzel', Georgia, serif;
-  --font-score: 'Cinzel', Georgia, serif;
-  --font-ui: 'Inter', sans-serif;
+  --font-display: 'Cinzel', 'Cinzel fallback', Georgia, serif;
+  --font-score: 'Cinzel', 'Cinzel fallback', Georgia, serif;
+  --font-ui: 'Inter', 'Inter fallback', sans-serif;
   --radius: 8px;
   --chip-bg: #ddd5c0;
   --chip-on: #4477aa;
@@ -389,8 +390,8 @@
   --accent2: light-dark(#2b47b8, #00bfff);
   --text: light-dark(#111133, #e0fff8);
   --muted: light-dark(
-    color-mix(in oklab, #111133 40%, #f0f4ff),
-    color-mix(in oklab, #e0fff8 40%, #020d12)
+    color-mix(in oklab, #111133 62%, #f0f4ff),
+    color-mix(in oklab, #e0fff8 62%, #020d12)
   );
   --muted2: light-dark(
     color-mix(in oklab, #111133 78%, #f0f4ff),
@@ -399,9 +400,9 @@
   --gain: light-dark(#003d63, #8fe0ff);
   --loss: light-dark(#9a3c00, #ff8844);
   --warn: light-dark(#7a4400, #ffb454);
-  --font-display: 'Inter', sans-serif;
-  --font-score: 'Inter', sans-serif;
-  --font-ui: 'Inter', sans-serif;
+  --font-display: 'Inter', 'Inter fallback', sans-serif;
+  --font-score: 'Inter', 'Inter fallback', sans-serif;
+  --font-ui: 'Inter', 'Inter fallback', sans-serif;
   --radius: 10px;
   --chip-bg: light-dark(#c8d4f0, #0d2535);
   --chip-on: light-dark(#4477aa, #66ccee);
@@ -409,44 +410,44 @@
   --card-text: light-dark(#111111, #ffffff);
   --card-sign: light-dark(rgba(17, 17, 17, 0.6), rgba(255, 255, 255, 0.72));
   --card-1: light-dark(
-    color-mix(in oklab, var(--tol-1) 20%, #f0f4ff),
-    color-mix(in oklab, var(--tol-1) 30%, #020d12)
+    color-mix(in oklab, var(--tol-1) 15%, #f0f4ff),
+    color-mix(in oklab, var(--tol-1) 22%, #020d12)
   );
   --card-2: light-dark(
-    color-mix(in oklab, var(--tol-2) 20%, #f0f4ff),
-    color-mix(in oklab, var(--tol-2) 30%, #020d12)
+    color-mix(in oklab, var(--tol-2) 15%, #f0f4ff),
+    color-mix(in oklab, var(--tol-2) 22%, #020d12)
   );
   --card-3: light-dark(
-    color-mix(in oklab, var(--tol-3) 20%, #f0f4ff),
-    color-mix(in oklab, var(--tol-3) 30%, #020d12)
+    color-mix(in oklab, var(--tol-3) 15%, #f0f4ff),
+    color-mix(in oklab, var(--tol-3) 22%, #020d12)
   );
   --card-4: light-dark(
-    color-mix(in oklab, var(--tol-4) 20%, #f0f4ff),
-    color-mix(in oklab, var(--tol-4) 30%, #020d12)
+    color-mix(in oklab, var(--tol-4) 15%, #f0f4ff),
+    color-mix(in oklab, var(--tol-4) 22%, #020d12)
   );
   --card-5: light-dark(
-    color-mix(in oklab, var(--tol-5) 20%, #f0f4ff),
-    color-mix(in oklab, var(--tol-5) 30%, #020d12)
+    color-mix(in oklab, var(--tol-5) 15%, #f0f4ff),
+    color-mix(in oklab, var(--tol-5) 22%, #020d12)
   );
   --card-6: light-dark(
-    color-mix(in oklab, var(--tol-6) 20%, #f0f4ff),
-    color-mix(in oklab, var(--tol-6) 30%, #020d12)
+    color-mix(in oklab, var(--tol-6) 15%, #f0f4ff),
+    color-mix(in oklab, var(--tol-6) 22%, #020d12)
   );
   --card-7: light-dark(
-    color-mix(in oklab, var(--tol-7) 20%, #f0f4ff),
-    color-mix(in oklab, var(--tol-7) 30%, #020d12)
+    color-mix(in oklab, var(--tol-7) 15%, #f0f4ff),
+    color-mix(in oklab, var(--tol-7) 22%, #020d12)
   );
   --card-8: light-dark(
-    color-mix(in oklab, var(--tol-8) 20%, #f0f4ff),
-    color-mix(in oklab, var(--tol-8) 30%, #020d12)
+    color-mix(in oklab, var(--tol-8) 15%, #f0f4ff),
+    color-mix(in oklab, var(--tol-8) 22%, #020d12)
   );
   --card-9: light-dark(
-    color-mix(in oklab, var(--tol-9) 20%, #f0f4ff),
-    color-mix(in oklab, var(--tol-9) 30%, #020d12)
+    color-mix(in oklab, var(--tol-9) 15%, #f0f4ff),
+    color-mix(in oklab, var(--tol-9) 22%, #020d12)
   );
   --card-10: light-dark(
-    color-mix(in oklab, var(--tol-10) 20%, #f0f4ff),
-    color-mix(in oklab, var(--tol-10) 30%, #020d12)
+    color-mix(in oklab, var(--tol-10) 15%, #f0f4ff),
+    color-mix(in oklab, var(--tol-10) 22%, #020d12)
   );
   --bg-grad: radial-gradient(
     ellipse at 50% 0%,
@@ -491,28 +492,6 @@
   background: var(--card-10);
 }
 
-/* Pont vers game.css (élément A) : couleurs de score/nom/signes pilotées par les jetons.
-   Le préfixe `html` donne la priorité sur les valeurs codées en dur de game.css sans !important ;
-   à retirer quand game.css consommera directement --score-color/--score-low/--score-crit. */
-html .score {
-  color: var(--score-color);
-}
-html .score.low {
-  color: var(--score-low);
-}
-html .score.crit {
-  color: var(--score-crit);
-}
-html .pplayer,
-html .elim-label {
-  color: var(--card-text);
-}
-html .tap-sign-minus,
-html .tap-sign-plus {
-  color: var(--card-sign);
-  opacity: 1;
-}
-
 /* Thèmes sans halo (accent sombre ou univers « papier ») : suppression des text-shadow lumineux,
    illisibles quand le texte est plus sombre que le fond. */
 [data-theme='ldm']
@@ -524,11 +503,9 @@ html .tap-sign-plus {
     .setup-label,
     .game-header-title,
     .delta-flash,
-    .tap-sign-minus,
-    .tap-sign-plus
+    .tap-sign
   ),
-[data-theme='ldm-day']
-  :is(.score, .pplayer, .logo-name, .setup-label, .tap-sign-minus, .tap-sign-plus),
+[data-theme='ldm-day'] :is(.score, .pplayer, .logo-name, .setup-label, .tap-sign),
 [data-theme='light'],
 [data-theme='mono-light'],
 [data-theme='ldm-day'] {
@@ -573,8 +550,7 @@ html .tap-sign-plus {
     .save-confirm,
     .elim-confirm-name,
     .simple-modal-title,
-    .tap-sign-minus,
-    .tap-sign-plus
+    .tap-sign
   ),
 [data-theme='ldm-day']
   :is(

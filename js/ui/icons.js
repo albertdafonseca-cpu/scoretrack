@@ -4,6 +4,14 @@
 //
 // Notation des tracés : chaîne SVG `d`, ou préfixe `circle:cx,cy,r`, `rect:x,y,w,h,rx`, `dot:cx,cy`
 // (point plein de rayon 1,25). Une entrée peut être un objet `{ d, sw }` pour un trait spécifique.
+//
+// Taille optique — une icône se juge à la quantité d'encre qu'elle pose, pas à sa grille. Mesurées
+// au pixel (scripts/audit-icons.mjs), les boîtes d'encre allaient de 14,3 u (`close`) à 23 u
+// (`warning`) : dans une même barre, la croix ne pesait que 70 % de la rotation. Chaque icône porte
+// donc un facteur `k` (et au besoin un décalage `dx`/`dy`) qui la ramène à ~20 u, appliqué comme
+// une transformation autour du centre de la grille. L'épaisseur du trait est divisée par ce même
+// facteur sur le groupe transformé : après mise à l'échelle, elle revaut exactement 2 unités, si
+// bien que toutes les icônes gardent le même trait quel que soit leur facteur.
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -25,6 +33,7 @@ const BRAND = {
 export const ICONS = {
   target: BRAND,
   gear: {
+    k: 0.9,
     d: [
       'circle:12,12,3',
       'circle:12,12,7',
@@ -33,6 +42,7 @@ export const ICONS = {
     ],
   },
   gamepad: {
+    k: 0.9,
     d: [
       'M7 7h10a5 5 0 0 1 5 5v1a4 4 0 0 1-7 2.6l-.6-.6H9.6l-.6.6A4 4 0 0 1 2 13v-1a5 5 0 0 1 5-5z',
       'M6 11h4M8 9v4',
@@ -49,6 +59,8 @@ export const ICONS = {
   },
   lock: { d: ['rect:4,11,16,10,2', 'M8 11V7a4 4 0 0 1 8 0v4'] },
   trash: {
+    k: 0.95,
+    dy: -0.5,
     d: [
       'M3 6h18',
       'M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2',
@@ -56,10 +68,16 @@ export const ICONS = {
       'M10 11v6M14 11v6',
     ],
   },
-  shuffle: { d: ['M16 3h5v5', 'M4 20L21 3', 'M21 16v5h-5', 'M15 15l6 6', 'M4 4l5 5'] },
-  rotate: { d: ['M21 12a9 9 0 1 1-3-6.7', 'M21 3v6h-6'] },
-  list: { d: ['M8 6h13M8 12h13M8 18h13', 'dot:3.5,6', 'dot:3.5,12', 'dot:3.5,18'] },
+  shuffle: {
+    k: 0.98,
+    dx: -0.5,
+    d: ['M16 3h5v5', 'M4 20L21 3', 'M21 16v5h-5', 'M15 15l6 6', 'M4 4l5 5'],
+  },
+  rotate: { k: 0.98, d: ['M21 12a9 9 0 1 1-3-6.7', 'M21 3v6h-6'] },
+  list: { k: 1.01, d: ['M8 6h13M8 12h13M8 18h13', 'dot:3.5,6', 'dot:3.5,12', 'dot:3.5,18'] },
   trophy: {
+    k: 1.0,
+    dy: -0.5,
     d: [
       'M8 21h8M12 17v4',
       'M7 4h10v6a5 5 0 0 1-10 0z',
@@ -68,6 +86,8 @@ export const ICONS = {
     ],
   },
   skull: {
+    k: 0.95,
+    dy: 0.5,
     d: [
       'M12 2a8 8 0 0 0-8 8c0 2.6 1.2 4.9 3 6.4V19a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2.6c1.8-1.5 3-3.8 3-6.4a8 8 0 0 0-8-8z',
       'circle:9,11,1.5',
@@ -76,21 +96,27 @@ export const ICONS = {
       'M11 16h2',
     ],
   },
-  check: { d: ['M4 12.5l5 5L20 7'] },
-  close: { d: ['M18 6L6 18', 'M6 6l12 12'] },
-  undo: { d: ['M9 14L4 9l5-5', 'M4 9h10.5a5.5 5.5 0 0 1 0 11H11'] },
-  redo: { d: ['M15 14l5-5-5-5', 'M20 9H9.5a5.5 5.5 0 0 0 0 11H13'] },
-  plus: { d: ['M12 5v14', 'M5 12h14'] },
-  minus: { d: ['M5 12h14'] },
-  back: { d: ['M19 12H5', 'M12 19l-7-7 7-7'] },
-  play: { d: ['M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z'] },
+  check: { k: 1.1, dy: -0.2, d: ['M4 12.5l5 5L20 7'] },
+  close: { k: 1.46, d: ['M18 6L6 18', 'M6 6l12 12'] },
+  undo: { k: 1.1, d: ['M9 14L4 9l5-5', 'M4 9h10.5a5.5 5.5 0 0 1 0 11H11'] },
+  redo: { k: 1.1, d: ['M15 14l5-5-5-5', 'M20 9H9.5a5.5 5.5 0 0 0 0 11H13'] },
+  plus: { k: 1.29, d: ['M12 5v14', 'M5 12h14'] },
+  minus: { k: 1.29, d: ['M5 12h14'] },
+  back: { k: 1.26, d: ['M19 12H5', 'M12 19l-7-7 7-7'] },
+  play: {
+    k: 1.06,
+    dx: -1.9,
+    d: ['M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z'],
+  },
   dice: { d: ['rect:3,3,18,18,3', 'dot:8,8', 'dot:16,8', 'dot:12,12', 'dot:8,16', 'dot:16,16'] },
   clock: { d: ['circle:12,12,9', 'M12 7v5l3 2'] },
-  edit: { d: ['M12 20h9', 'M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z'] },
+  edit: { k: 1.0, dy: 0.6, d: ['M12 20h9', 'M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z'] },
   download: { d: ['M12 3v12', 'M7 10l5 5 5-5', 'M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2'] },
-  upload: { d: ['M12 15V3', 'M7 8l5-5 5 5', 'M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2'] },
+  upload: { k: 0.98, d: ['M12 15V3', 'M7 8l5-5 5 5', 'M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2'] },
   info: { d: ['circle:12,12,9', 'M12 11v5', 'dot:12,8'] },
   warning: {
+    k: 0.86,
+    dy: 0.1,
     d: [
       'M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z',
       'M12 9v4',
@@ -98,6 +124,7 @@ export const ICONS = {
     ],
   },
   refresh: {
+    k: 0.97,
     d: [
       'M3 12a9 9 0 0 1 15.5-6.3L21 8',
       'M21 3v5h-5',
@@ -106,6 +133,7 @@ export const ICONS = {
     ],
   },
   share: {
+    k: 0.95,
     d: [
       'circle:18,5,2.5',
       'circle:6,12,2.5',
@@ -114,8 +142,15 @@ export const ICONS = {
       'M15.8 6.2L8.2 10.8',
     ],
   },
-  copy: { d: ['rect:9,9,12,12,2', 'M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'] },
+  copy: {
+    k: 0.95,
+    dx: 0.5,
+    dy: 0.5,
+    d: ['rect:9,9,12,12,2', 'M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'],
+  },
   users: {
+    k: 0.9,
+    dy: -0.2,
     d: [
       'circle:9,7,3.5',
       'M2 21v-1.5A4.5 4.5 0 0 1 6.5 15h5a4.5 4.5 0 0 1 4.5 4.5V21',
@@ -124,6 +159,8 @@ export const ICONS = {
     ],
   },
   palette: {
+    k: 0.95,
+    dx: -0.5,
     d: [
       'M12 3a9 9 0 0 0 0 18h1.5a2.5 2.5 0 0 0 1.8-4.2 1.5 1.5 0 0 1 1.1-2.6H18a4 4 0 0 0 4-4c0-4.4-4.5-7.2-10-7.2z',
       'dot:7.5,12',
@@ -140,6 +177,16 @@ export const ICON_NAMES = Object.keys(ICONS);
  * Décrit une entrée de tracé en élément SVG (nom + attributs), sans toucher au DOM :
  * partagé par icon() et par la génération du sprite.
  */
+/** Transformation d'harmonisation optique d'une icône, ou null si elle est déjà à la bonne taille. */
+export function opticalTransform(def) {
+  const k = def.k || 1;
+  const dx = def.dx || 0;
+  const dy = def.dy || 0;
+  if (k === 1 && !dx && !dy) return null;
+  // Mise à l'échelle autour du centre de la grille 24 × 24, puis recentrage optique.
+  return `translate(${12 + dx} ${12 + dy}) scale(${k}) translate(-12 -12)`;
+}
+
 export function shapeOf(entry) {
   const spec = typeof entry === 'string' ? { d: entry } : entry;
   const s = spec.d;
@@ -172,11 +219,19 @@ export function icon(name) {
   svg.setAttribute('aria-hidden', 'true');
   svg.setAttribute('focusable', 'false');
   svg.dataset.icon = name;
+  const transform = opticalTransform(def);
+  let parent = svg;
+  if (transform) {
+    parent = document.createElementNS(SVG_NS, 'g');
+    parent.setAttribute('transform', transform);
+    parent.setAttribute('stroke-width', String(+(2 / (def.k || 1)).toFixed(3)));
+    svg.appendChild(parent);
+  }
   for (const entry of def.d) {
     const { tag, attrs } = shapeOf(entry);
     const node = document.createElementNS(SVG_NS, tag);
-    for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
-    svg.appendChild(node);
+    for (const [key, v] of Object.entries(attrs)) node.setAttribute(key, v);
+    parent.appendChild(node);
   }
   return svg;
 }

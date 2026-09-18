@@ -42,8 +42,10 @@ elles sont régénérées à chaque évolution visuelle notable._
   protège le stockage local contre l'effacement automatique.
 - **Ordinateur / Chrome, Edge** : icône d'installation à droite de la barre d'adresse.
 
-Première ouverture en ligne obligatoire (téléchargement ≈ 650 Ko, polices comprises) ; ensuite
-l'application fonctionne sans réseau.
+Première ouverture en ligne obligatoire : le service worker télécharge l'application complète
+(**≈ 640 Ko** au 17 septembre 2026 — 61 fichiers, dont 238 Ko de polices auto-hébergées). Le chiffre
+exact est recalculé et borné à chaque exécution du job `paquet` de la CI. Ensuite l'application
+fonctionne sans réseau.
 
 ## Développement
 
@@ -90,8 +92,9 @@ docs/                 architecture, décisions, exploitation, sécurité, rappor
 ```
 
 Documentation : [Architecture](docs/ARCHITECTURE.md) · [Décisions](docs/DECISIONS.md) ·
-[Exploitation](docs/EXPLOITATION.md) · [Sécurité](docs/SECURITE.md) ·
-[Audit 2026-09](docs/AUDIT-2026-09.md) · [Changelog](CHANGELOG.md).
+[Exploitation](docs/EXPLOITATION.md) · [Sécurité](docs/SECURITE.md) · [Changelog](CHANGELOG.md).
+Le rapport [Audit 2026-09](docs/AUDIT-2026-09.md) est un **brouillon** : seul le constat initial y
+est définitif, les autres sections sont en cours de rédaction par l'auditeur.
 
 ## Déploiement
 
@@ -99,17 +102,20 @@ Le dépôt est servable **tel quel** depuis sa racine : aucun build.
 
 - **Recommandé** : GitHub → Settings → Pages → Source : **« GitHub Actions »**. Le workflow
   [`deploy-pages.yml`](.github/workflows/deploy-pages.yml) se déclenche à chaque push sur `master`
-  (ou manuellement) : il vérifie lint, précache et tests unitaires, empaquette le dépôt sans
-  `node_modules`, `tests`, `docs`, `scripts` ni fichiers de configuration dans `dist/`, puis publie.
-  Aucun secret n'est requis.
+  (ou manuellement) : il vérifie lint, précache et tests unitaires, construit `dist/` avec
+  `npm run build:dist` (le dépôt sans `node_modules`, `tests`, `docs`, `scripts` ni fichiers de
+  configuration), contrôle le contenu, puis publie. Aucun secret n'est requis : le déploiement
+  s'authentifie par jeton OIDC, et seul le job de publication reçoit les droits d'écriture.
 - **Alternative** : Source « Deploy from a branch » sur `master` / racine fonctionne aussi (D2) ;
   les fichiers d'outillage seront alors publiés avec l'application, sans effet sur son
-  fonctionnement.
+  fonctionnement. Le fichier `.nojekyll` est versionné à la racine pour que cette voie serve elle
+  aussi les fichiers tels quels.
 - Tout autre hébergeur statique convient (copier le contenu de `dist/` ou du dépôt). HTTPS est
   obligatoire pour le service worker et l'installation.
 
-La CI ([`ci.yml`](.github/workflows/ci.yml)) tourne sur chaque push et PR : lint, tests unitaires
-avec couverture, tests e2e avec traces en cas d'échec, Lighthouse avec budget, audit des dépendances.
+La CI ([`ci.yml`](.github/workflows/ci.yml)) tourne sur chaque PR (et sur `master`) : lint, tests
+unitaires avec couverture, tests e2e avec traces en cas d'échec, empaquetage et poids du précache,
+contraste et daltonisme sur les 14 thèmes, Lighthouse avec budget, audit des dépendances.
 
 ## Confidentialité
 

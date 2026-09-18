@@ -6,8 +6,6 @@ import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 
 const OUT = process.env.VISUAL_OUT || 'test-results/visual';
-/** Mode strict (CI finale) : polices système et glyphes hérités hors de css/tokens|themes deviennent bloquants. */
-const STRICT = Boolean(process.env.VISUAL_STRICT);
 const THEME_IDS = [
   'cyber',
   'dark',
@@ -23,6 +21,8 @@ const THEME_IDS = [
   'mono-light',
   'ldm',
   'ldm-day',
+  // Thème « auto » : suit la préférence claire/sombre du système (capturé ici en sombre).
+  'auto',
 ];
 const EMOJI = new RegExp('\\p{Extended_Pictographic}|\\uFE0F|\\u200D', 'u');
 
@@ -46,10 +46,7 @@ async function openApp(page) {
 
 /** Lance une partie à `n` joueurs en acceptant les deux variantes du parcours (démarrage rapide ou écran des noms). */
 async function startGame(page, n) {
-  await page
-    .locator('#players-grid .player-chip', { hasText: new RegExp(`^${n}$`) })
-    .first()
-    .click();
+  await page.locator(`#players-grid .player-chip[data-val="${n}"]`).first().click();
   await page.locator('#start-presets [data-val="40"]').click();
   const namesBtn = page.locator('#names-btn');
   if (await namesBtn.count()) await namesBtn.click();
@@ -88,7 +85,11 @@ const setTheme = (page, id) =>
 /** Familles de polices réellement utilisées par les éléments visibles (première famille de la pile). */
 const usedFamilies = () =>
   [...document.querySelectorAll('body *')]
-    .filter((el) => el.checkVisibility?.() && el.textContent.trim())
+    .filter(
+      (el) =>
+        el.checkVisibility?.() &&
+        [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()),
+    )
     .map((el) => getComputedStyle(el).fontFamily.split(',')[0].replace(/["']/g, '').trim())
     .filter((f, i, a) => a.indexOf(f) === i);
 
@@ -105,46 +106,49 @@ test('aucune requête externe et aucune ressource hors localhost', async ({ page
 
 test('les polices auto-hébergées sont chargées pour chaque thème (document.fonts)', async ({
   page,
-}, testInfo) => {
+}) => {
   await blockExternal(page);
   await openApp(page);
   for (const id of THEME_IDS) {
     await setTheme(page, id);
     const result = await page.evaluate(async () => {
       await document.fonts.ready;
-      const fams = [...document.querySelectorAll('body *')]
-        .filter((el) => el.checkVisibility?.() && el.textContent.trim())
-        .map((el) => getComputedStyle(el).fontFamily.split(',')[0].replace(/["']/g, '').trim())
-        .filter((f, i, a) => a.indexOf(f) === i);
+      // Seuls les éléments qui PEIGNENT un glyphe comptent : un conteneur sans nœud texte propre
+      // hérite d'une famille qu'aucun caractère n'utilise (faux positif « Arial »).
+      const painters = [...document.querySelectorAll('body *')].filter(
+        (el) =>
+          el.checkVisibility?.() &&
+          [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()),
+      );
       const faces = [...document.fonts];
-      return fams.map((f) => ({
-        family: f,
-        check: document.fonts.check(`16px "${f}"`),
+      const seen = new Map();
+      for (const el of painters) {
+        const f = getComputedStyle(el).fontFamily.split(',')[0].replace(/["']/g, '').trim();
+        if (!seen.has(f)) {
+          seen.set(f, `${el.tagName.toLowerCase()}.${[...el.classList].join('.')}`);
+        }
+      }
+      return [...seen].map(([family, sel]) => ({
+        family,
+        sel,
+        check: document.fonts.check(`16px "${family}"`),
         loaded: faces.some(
-          (face) => face.family.replace(/["']/g, '') === f && face.status === 'loaded',
+          (face) => face.family.replace(/["']/g, '') === family && face.status === 'loaded',
         ),
-        declared: faces.some((face) => face.family.replace(/["']/g, '') === f),
+        declared: faces.some((face) => face.family.replace(/["']/g, '') === family),
       }));
     });
     for (const r of result) {
-      if (!r.declared) {
-        // Police système (ex. bouton sans `font: inherit`) : feuille d'un autre élément → strict seulement.
-        testInfo.annotations.push({
-          type: 'police-de-secours',
-          description: `${id} : ${r.family}`,
-        });
-        if (STRICT)
-          expect(r.declared, `${id} : ${r.family} n'est pas une police auto-hébergée`).toBe(true);
-        continue;
-      }
+      expect(
+        r.declared,
+        `${id} : « ${r.family} » n'est pas une police auto-hébergée de css/fonts.css (élément ${r.sel})`,
+      ).toBe(true);
       expect(r.check && r.loaded, `${id} : ${r.family} non chargée`).toBe(true);
     }
   }
 });
 
-test('aucun emoji dans le DOM rendu, toutes les icônes sont des SVG', async ({
-  page,
-}, testInfo) => {
+test('aucun emoji dans le DOM rendu, toutes les icônes sont des SVG', async ({ page }) => {
   await blockExternal(page);
   await openApp(page);
   const check = async (screen) => {
@@ -154,14 +158,7 @@ test('aucun emoji dans le DOM rendu, toutes les icônes sont des SVG', async ({
       svgs: document.querySelectorAll('svg.icon[data-icon]').length,
     }));
     const found = [...new Set([...text].filter((c) => EMOJI.test(c)))];
-    if (found.length) {
-      testInfo.annotations.push({
-        type: 'emoji-residuel',
-        description: `${screen} : ${found.join(' ')}`,
-      });
-    }
-    // Les emojis hors <span class="icon"> appartiennent aux sections d'autres éléments (lint:emoji les liste).
-    if (STRICT) expect(found, `${screen} : emoji dans le DOM`).toEqual([]);
+    expect(found, `${screen} : emoji dans le DOM rendu`).toEqual([]);
     expect(spans, `${screen} : span.icon non hydraté`).toBe(0);
     expect(svgs).toBeGreaterThan(0);
   };
@@ -220,7 +217,7 @@ test('captures des 14 thèmes : écran de setup et écran de jeu à 4 joueurs', 
   });
   // Mesures informatives (les feuilles setup/game/modals appartiennent à d'autres éléments) :
   // le mode strict impose ≤ 2 familles et ≥ 11 px sur chaque écran.
-  if (STRICT) {
+  {
     for (const r of report) {
       expect(
         r.families.length,

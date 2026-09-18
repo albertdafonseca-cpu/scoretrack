@@ -23,7 +23,10 @@ consigne les préférences du propriétaire.
   bleu/orange (`--gain #0077BB`, `--loss #EE7733`), jamais vert/rouge seuls ; toute couleur doublée
   d'un glyphe, d'une icône, d'une forme, d'un texte ou d'une position.
 - Conséquences : `--green`/`--red` restent définis pour compatibilité mais ne portent plus de
-  sémantique ; script `scripts/audit-cvd.mjs` (simulation CVD) et `audit-contrast.mjs` en CI.
+  sémantique. `scripts/audit-contrast.mjs` (contraste AA sur les 14 thèmes) et
+  `scripts/audit-cvd.mjs` (simulation protanopie/deutéranopie/tritanopie) sont exécutés par le job
+  `design` de la CI sur le paquet `dist/` et font échouer la construction en cas de régression
+  (code 1 = seuil non tenu, code 2 = audit impossible) — D13.
 
 ## D2 — Zéro dépendance à l'exécution, zéro bundler
 
@@ -31,8 +34,10 @@ consigne les préférences du propriétaire.
 - Décision : modules ES natifs et CSS séparés, servis tels quels depuis la racine du dépôt ; npm
   uniquement pour lint, tests, génération.
 - Conséquences : « deploy from branch » fonctionne toujours ; le workflow Pages ne fait que
-  filtrer l'outillage ; `npm audit --omit=dev` audite un arbre vide ; pas de minification (le poids
-  total reste < 512 Ko, asserté par Lighthouse).
+  filtrer l'outillage ; `npm audit --omit=dev` audite un arbre vide ; pas de minification. Deux
+  poids distincts sont surveillés : le **chargement initial** de la page (audit Lighthouse
+  `total-byte-weight`, plafond 512 000 octets) et le **précache téléchargé à l'installation du
+  service worker** (job `paquet` de la CI, plafond `PRECACHE_MAX_BYTES` = 700 000 octets).
 
 ## D3 — `sw-st.js` et `manifest-st.json` gardent leur nom
 
@@ -67,10 +72,12 @@ consigne les préférences du propriétaire.
 - Contexte : un pinch-zoom accidentel en pleine partie est inacceptable ; WCAG 1.4.4 demande
   pourtant le zoom.
 - Décision : conserver `maximum-scale=1, user-scalable=no` ; en contrepartie tailles minimales de
-  texte (≥ 11 px CSS, chiffres lisibles à 1 m), `prefers-reduced-motion` respecté.
-- Conséquences : l'audit Lighthouse `meta-viewport` (poids 10/72) échoue **structurellement** ; la
-  catégorie accessibilité plafonne à 0,86. Le budget CI asserte donc chaque audit d'accessibilité
-  individuellement à 1 et désactive `meta-viewport` (ADR-15).
+  texte (voir D10 : plancher porté à 12 px), `prefers-reduced-motion` respecté.
+- Conséquences : l'audit Lighthouse `meta-viewport` (poids 10) échoue **structurellement**. Avec
+  21 audits d'accessibilité applicables sur cette page, la catégorie plafonne à **0,934** (mesuré :
+  0,93 sur 3 exécutions). Le budget CI asserte donc chaque audit d'accessibilité individuellement à
+  1, fixe le seuil de catégorie à 0,93 et désactive `meta-viewport` — seule dérogation admise
+  (D12, ADR-15).
 
 ## D8 — Niveau visé : meilleur compteur de score du marché
 
@@ -82,6 +89,53 @@ consigne les préférences du propriétaire.
 - Décision : pas de scores, captures ou mesures inventés dans les livrables ; ni le code, ni les
   commits, ni les docs ne mentionnent d'identifiant de modèle d'IA.
 
+## D10 — Plancher typographique à 12 px (remplace « ≥ 11 px »)
+
+- Contexte : le plancher de 11 px était incompatible avec l'audit `font-size` de Lighthouse (qui
+  exige 12 px dès que le zoom est désactivé) et, surtout, avec la lisibilité à 1 m visée par D8.
+- Décision (arbitrage de l'auditeur, 17 septembre 2026) : tous les textes rendus mesurent au moins
+  12 px (jeton `--fs-1`), sans exception — libellés de la barre d'action et mentions légales
+  comprises. Les jetons de l'échelle typographique sont décalés en conséquence.
+- Conséquences : l'assertion `font-size` = 1 du budget Lighthouse devient tenable et cesse de
+  contredire D7. Six sélecteurs de `css/setup.css` restent à corriger au moment de cette entrée.
+
+## D11 — Le CLS est un défaut, pas un budget à assouplir
+
+- Contexte : CLS de 0,330 mesuré sur l'écran d'accueil, causé par le chargement des polices
+  (`#setup-page > .setup-section` se déplace à l'arrivée des fontes).
+- Décision : le budget (performance ≥ 0,95, CLS ≤ 0,1) ne bouge pas ; le décalage se corrige par
+  `size-adjust`/`ascent-override` dans `css/fonts.css`, préchargement (`<link rel="preload">`) des
+  deux polices du premier rendu et réservation de la hauteur des blocs.
+- Conséquences : le job `lighthouse` reste rouge tant que la correction n'est pas faite ; c'est le
+  signal attendu, pas un réglage à contourner.
+
+## D12 — `meta-viewport` : seule dérogation Lighthouse admise
+
+- Décision : `user-scalable=no` est conservé (D7) et l'audit `meta-viewport` reste désactivé dans
+  `lighthouserc.json`, avec la justification écrite en ADR-15. Aucun autre audit n'est désactivé, et
+  `skipAudits` est vide.
+
+## D13 — Les audits de contraste et de daltonisme tournent réellement en CI
+
+- Contexte : `docs/DECISIONS.md` annonçait ces audits « en CI » alors qu'aucun workflow ne les
+  appelait. Une garantie documentée mais non exécutée est un mensonge de documentation.
+- Décision : job `design` de `ci.yml` — `npm run audit:contrast` et `npm run audit:cvd` sur `dist/`
+  servi localement, rapports en artefact, échec de la construction en cas de régression.
+
+## D14 — Rien d'annoncé ne reste non câblé
+
+- Décision : les raccourcis `./?action=new` et `./?action=resume` déclarés dans `manifest-st.json`
+  doivent être implémentés (lecture de `location.search` au démarrage) ou retirés du manifeste.
+- État à la date de cette entrée : déclarés, non câblés — à traiter par l'élément E.
+
+## D15 — Aucune documentation ne décrit un état futur au présent
+
+- Décision : chaque affirmation du README, du journal des décisions, du journal des modifications et
+  de l'architecture est vraie à l'instant du commit, chiffres compris (poids, tailles, scores). Ce
+  qui n'est pas livré est nommé comme tel, daté, et attribué à un élément.
+- Conséquences : les mesures citées dans la documentation portent leur date et la commande qui les
+  produit ; un chiffre invérifiable est retiré plutôt qu'arrondi.
+
 ## ADR-10 — CSP déclarée en `<meta>` (pas d'en-têtes sur Pages)
 
 - Contexte : GitHub Pages n'autorise aucun en-tête HTTP personnalisé.
@@ -89,6 +143,10 @@ consigne les préférences du propriétaire.
   inline ; `style-src 'unsafe-inline'` toléré (styles calculés).
 - Conséquences : plus aucun `onclick` inline (table `ACTIONS`) ; `frame-ancestors`/`report-to`
   inapplicables (voir SECURITE § 2.2) ; l'audit Lighthouse `csp-xss` reste informatif.
+- Écart ouvert au 17 septembre 2026 : `base-uri` et `form-action` ne retombent pas sur
+  `default-src`, ils sont donc absents de la politique actuelle. La ligne complète attendue figure
+  dans `docs/SECURITE.md` § 2.2 ; `index.html` appartient aux éléments C/A, la correction leur
+  revient.
 
 ## ADR-11 — Découpage en modules `core / ui / platform / fx`
 
@@ -103,6 +161,9 @@ consigne les préférences du propriétaire.
   `check:sw` en CI et dans `npm run check`.
 - Conséquences : `npm run build:sw` est **obligatoire** après tout ajout/modification de fichier
   servi ; le nom de cache change à chaque livraison, ce qui déclenche la mise à jour.
+- Le job `paquet` de la CI vérifie en plus que chaque entrée du précache existe bien dans `dist/`
+  et que le poids total reste sous `PRECACHE_MAX_BYTES` : c'est ce poids-là, et non
+  `total-byte-weight`, que l'utilisateur télécharge à la première visite.
 
 ## ADR-13 — Mise à jour PWA explicite (waiting + bannière)
 
@@ -119,25 +180,40 @@ consigne les préférences du propriétaire.
   `navigator.storage.persist()` demandé.
 - Conséquences : quatre clés annexes ; runbook « récupérer ses données » (EXPLOITATION § 4).
 
-## ADR-15 — Budget Lighthouse et exception documentée
+## ADR-15 — Budget Lighthouse, mesuré sur le paquet publié
 
-- Décision : `lighthouserc.json` à la racine, collecte mobile ×3 sur `http-server` local
-  (port 8799), agrégation médiane ; budget : performance ≥ 0,95, best-practices ≥ 0,95, SEO ≥ 0,9,
-  accessibilité ≥ 0,86 **et** chaque audit d'accessibilité à 1 sauf `meta-viewport` (D7) ;
-  `font-size` = 1, `errors-in-console` = 1, CLS ≤ 0,1, poids total ≤ 512 Ko.
+- Décision : `lighthouserc.json` à la racine ; collecte mobile ×3 avec agrégation médiane sur
+  **`dist/`** (le paquet réellement publié, construit par `npm run build:dist`), servi par
+  `http-server` sur le port 8799.
+- Budget : performance ≥ 0,95, best-practices ≥ 0,95, SEO ≥ 0,9, accessibilité ≥ 0,93 **et** chaque
+  audit d'accessibilité asserté à 1 individuellement ; `font-size` = 1 (impose le plancher de 12 px,
+  D10), `errors-in-console` = 1, CLS ≤ 0,1 (D11), `total-byte-weight` ≤ 512 000 octets.
+- Dérogation unique : `meta-viewport` désactivé (D7/D12), justifié ci-dessus. Aucun `skipAudits` :
+  sur `localhost`, `is-on-https` et `uses-http2` sont déjà à 1, et `uses-text-compression` n'est pas
+  pondéré (GitHub Pages compresse à la livraison).
 - Lighthouse ≥ 12 n'a plus de catégorie « PWA » ni d'audit `installable-manifest` :
-  l'installabilité est garantie par le test e2e `pwa.spec.js` (manifest valide, SW actif, hors
-  ligne), pas par LHCI.
-- `uses-text-compression`, `is-on-https`, `redirects-http`, `uses-http2` sont ignorés : ils
-  dépendent de l'hébergeur (Pages compresse et sert en HTTPS/HTTP2), pas du dépôt.
-- `@lhci/cli` appelé par `npx` avec version épinglée plutôt qu'ajouté aux devDependencies
-  (≈ 300 paquets transitifs pour un outil de mesure).
+  l'installabilité est garantie par `tests/e2e/pwa.spec.js` (manifeste, service worker, hors ligne),
+  pas par LHCI.
+- `@lhci/cli` est appelé par `npx` avec une version épinglée (`0.15.1`) plutôt qu'ajouté aux
+  devDependencies (≈ 300 paquets transitifs pour un outil de mesure). Conséquence assumée : cette
+  dépendance-là n'est pas couverte par l'intégrité du `package-lock.json`.
+- État au 17 septembre 2026 : le job `lighthouse` est **rouge**. Mesuré sur `dist/` : performance
+  0,83 (attendu ≥ 0,95), CLS 0,330 (attendu ≤ 0,1), `font-size` 0 (six sélecteurs à 11 px dans
+  `css/setup.css`). Accessibilité 0,93, best-practices 0,96, SEO 1,00 sont tenus. Ces trois échecs
+  sont des défauts réels de l'application (D10, D11), pas un budget mal réglé : le budget n'est pas
+  relâché pour faire passer la CI.
 
 ## ADR-16 — Déploiement Pages par GitHub Actions
 
 - Décision : `deploy-pages.yml` (push sur `master` + manuel) empaquette le dépôt sans outillage
-  dans `dist/` (`tar` avec liste d'exclusion explicite), `configure-pages` → `upload-pages-artifact`
-  → `deploy-pages`, environnement `github-pages`, permissions minimales, aucun secret.
+  dans `dist/` via `npm run build:dist` (`tar` avec liste d'exclusion explicite) —
+  **la même commande** que la CI construit, mesure avec Lighthouse et contrôle dans le job
+  `paquet`, pour que ce qui est mesuré soit ce qui est publié. Puis `configure-pages` →
+  `upload-pages-artifact` → `deploy-pages`. Permissions minimales : le workflow est en
+  `contents: read`, et seul le job `deploy` reçoit `pages: write` et `id-token: write`.
+  Environnement `github-pages`, aucun secret.
+- `.nojekyll` est **versionné à la racine** (et donc copié dans `dist/`) : il protège aussi la voie
+  « deploy from branch », où aucun workflow ne passe.
 - Conséquences : la source Pages doit être réglée sur « GitHub Actions » (à faire par le
   propriétaire) ; « Deploy from a branch » à la racine reste possible (D2) mais publierait aussi
   `package.json`, `tests/`, `docs/`.
@@ -155,6 +231,19 @@ consigne les préférences du propriétaire.
     PolyForm Noncommercial.
 - Décision : **en attente**. Tant qu'elle n'est pas prise, README affiche « Licence : à définir »
   et `package.json` garde `UNLICENSED`.
+
+## ADR-20 — Actions GitHub épinglées par tag majeur (et non par SHA)
+
+- Contexte : un tag majeur (`actions/checkout@v4`) est mutable ; un compte d'action compromis peut
+  réécrire le tag et exécuter du code arbitraire sur le runner. L'épinglage par SHA supprime ce
+  risque.
+- Décision : rester sur les tags majeurs **pour l'instant**, parce que les SHA ne peuvent pas être
+  obtenus honnêtement depuis l'environnement d'audit (api.github.com inaccessible derrière le
+  mandataire) et qu'un SHA inventé est interdit (D9).
+- Conséquences : à convertir en `owner/action@<sha> # vX.Y.Z` lors du premier passage sur une
+  machine ayant accès à GitHub ; Dependabot (ADR-18) met à jour les deux formes.
+- Portée du risque : ces actions ne touchent ni secret ni code publié en dehors du déploiement ;
+  `permissions: contents: read` limite ce qu'un runner compromis pourrait faire.
 
 ## ADR-18 — Dependabot hebdomadaire, groupé
 

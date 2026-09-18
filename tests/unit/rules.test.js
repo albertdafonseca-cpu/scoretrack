@@ -128,16 +128,32 @@ describe('findWinner', () => {
     expect(findWinner([p(3)], { maxPoints: Infinity })).toBeNull();
     expect(findWinner([p(0, true)], {})).toBeNull();
   });
+  it('sans startPoints, AUCUNE victoire par plafond (repli sûr du contrat)', () => {
+    // Appel conforme à CONTRACTS.md, préréglage Loi du Milieu au lancement : 40/40/40, max 40.
+    const ldm = [p(40), p(40), p(40)];
+    expect(findWinner(ldm, { maxPoints: 40, allowNeg: false })).toBeNull();
+    expect(findWinner(ldm, { maxPoints: 40 })).toBeNull();
+    expect(findWinner(ldm, { maxPoints: 40, startPoints: undefined })).toBeNull();
+    expect(findWinner(ldm, { maxPoints: 40, startPoints: 'x' })).toBeNull();
+    expect(findWinner(ldm, { maxPoints: 40, startPoints: Infinity })).toBeNull();
+    expect(findWinner([p(500), p(10)], { maxPoints: 500, allowNeg: true })).toBeNull();
+    // Le même appel avec le point de départ réel décide correctement.
+    expect(findWinner([p(500), p(10)], { maxPoints: 500, startPoints: 0 })).toEqual({
+      index: 0,
+      reason: 'max-reached',
+    });
+  });
+
   it("'max-reached' quand un joueur atteint un plafond fini supérieur au départ", () => {
     expect(findWinner([p(499), p(500)], { maxPoints: 500, startPoints: 0 })).toMatchObject({
       index: 1,
       reason: 'max-reached',
     });
-    expect(findWinner([p(501)], { maxPoints: 500 })).toMatchObject({
+    expect(findWinner([p(501)], { maxPoints: 500, startPoints: 0 })).toMatchObject({
       index: 0,
       reason: 'max-reached',
     });
-    expect(findWinner([p(499), p(250)], { maxPoints: 500 })).toBeNull();
+    expect(findWinner([p(499), p(250)], { maxPoints: 500, startPoints: 0 })).toBeNull();
   });
   it('pas de victoire par plafond quand max = départ (butée, ex. Loi du Milieu) ou max < départ', () => {
     const players = [p(40), p(40), p(40)];
@@ -145,25 +161,25 @@ describe('findWinner', () => {
     expect(findWinner(players, { maxPoints: 30, startPoints: 40 })).toBeNull();
   });
   it('pas de victoire par plafond sans plafond fini', () => {
-    expect(findWinner([p(9999999), p(1)], { maxPoints: Infinity })).toBeNull();
-    expect(findWinner([p(9999999), p(1)], { maxPoints: null })).toBeNull();
+    expect(findWinner([p(9999999), p(1)], { maxPoints: Infinity, startPoints: 0 })).toBeNull();
+    expect(findWinner([p(9999999), p(1)], { maxPoints: null, startPoints: 0 })).toBeNull();
     expect(findWinner([p(9999999), p(1)])).toBeNull();
   });
   it('ignore un joueur éliminé même au-dessus du plafond', () => {
-    expect(findWinner([p(600, true), p(10), p(20)], { maxPoints: 500 })).toBeNull();
+    expect(findWinner([p(600, true), p(10), p(20)], { maxPoints: 500, startPoints: 0 })).toBeNull();
   });
   it('départage : plus haut score, puis plus petit indice', () => {
-    expect(findWinner([p(500), p(510), p(510)], { maxPoints: 500 })).toMatchObject({
+    expect(findWinner([p(500), p(510), p(510)], { maxPoints: 500, startPoints: 0 })).toMatchObject({
       index: 1,
       reason: 'max-reached',
     });
-    expect(findWinner([p(500), p(500)], { maxPoints: 500 })).toMatchObject({
+    expect(findWinner([p(500), p(500)], { maxPoints: 500, startPoints: 0 })).toMatchObject({
       index: 0,
       reason: 'max-reached',
     });
   });
   it("'last-alive' prime sur 'max-reached'", () => {
-    expect(findWinner([p(600), p(700, true)], { maxPoints: 500 })).toMatchObject({
+    expect(findWinner([p(600), p(700, true)], { maxPoints: 500, startPoints: 0 })).toMatchObject({
       index: 0,
       reason: 'last-alive',
     });
@@ -184,7 +200,6 @@ describe('ranking', () => {
       [0, 3, 20],
       [3, 4, 25],
     ]);
-    expect(rows[0].player).toBe(rows[0].player);
     expect(rows[0].score).toBe(30);
     expect(rows[0].eliminated).toBe(false);
   });

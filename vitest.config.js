@@ -10,7 +10,7 @@ export default defineConfig({
     coverage: {
       enabled: true,
       provider: 'v8',
-      include: ['js/core/**/*.js'],
+      include: ['js/core/**/*.js', 'js/store.js'],
       reporter: ['text-summary', 'html', 'lcov'],
       reportsDirectory: 'coverage',
       thresholds: { lines: 95, statements: 95, functions: 95, branches: 90 },

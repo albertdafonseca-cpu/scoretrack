@@ -11,8 +11,8 @@ test('à froid : le CTA est actif et le premier score change en 2 clics', async 
   // 1.3 — valeurs sensées préappliquées, CTA actif, aperçu textuel
   await expect(page.locator('#go-btn')).toBeEnabled();
   await expect(page.locator('#setup-summary')).toHaveText('4 joueurs · départ 0 · sans limite');
-  await expect(page.locator('#preset-custom')).toBeVisible();
-  await expect(page.locator('#players-grid [aria-pressed="true"]')).toHaveText('4');
+  await expect(page.locator('#preset-note')).toBeVisible();
+  await expect(page.locator('#players-grid [aria-checked="true"]')).toHaveText('4');
   await shot('etape-0-accueil');
 
   // 1.1 — compter les clics jusqu'au premier changement de score
@@ -59,10 +59,16 @@ test('parcours nommé, puis reprise en 1 clic avec aperçu (noms, scores, date)'
   await expect(page.locator('#names-page')).toBeVisible();
   const inputs = page.locator('.name-input');
   await expect(inputs).toHaveCount(4);
-  // Longueur indépendante de l'écran : 18 caractères
-  await expect(inputs.first()).toHaveAttribute('maxlength', '18');
+  // La limite de saisie vient de nameMaxLength (source unique) et se voit dans le compteur
+  const expected = await page.evaluate(async () => {
+    const { nameMaxLength } = await import('/js/core/layout.js');
+    return nameMaxLength(4, window.innerWidth, window.innerHeight);
+  });
+  await expect(inputs.first()).toHaveAttribute('maxlength', String(expected));
   await inputs.first().fill('Wxxxxxxxxxxxxxxxxxxxxxxx');
-  expect((await inputs.first().inputValue()).length).toBe(18);
+  expect((await inputs.first().inputValue()).length).toBe(expected);
+  await expect(page.locator('#name-count-0')).toHaveText(`${expected}/${expected}`);
+  await expect(page.locator('#name-count-0')).toHaveClass(/is-full/);
 
   const names = ['Alice', 'Bob', 'Chloé', 'David'];
   for (let i = 0; i < 4; i++) await inputs.nth(i).fill(names[i]);
@@ -95,8 +101,8 @@ test('préréglages : sélection, ligne « Personnalisé » à la déviation, no
   await openApp(page);
   const skyjo = page.locator('#presets-grid .preset-card', { hasText: 'Skyjo' });
   await skyjo.click();
-  await expect(skyjo).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('#preset-custom')).toBeHidden();
+  await expect(skyjo).toHaveAttribute('aria-checked', 'true');
+  await expect(page.locator('#preset-note')).toBeHidden();
   await expect(page.locator('#setup-summary')).toHaveText(
     '4 joueurs · départ 0 · sans limite · négatifs',
   );
@@ -104,8 +110,8 @@ test('préréglages : sélection, ligne « Personnalisé » à la déviation, no
 
   // Déviation → le préréglage se relâche, « Personnalisé » apparaît
   await page.locator('#players-grid .player-chip', { hasText: /^5$/ }).click();
-  await expect(skyjo).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.locator('#preset-custom')).toBeVisible();
+  await expect(skyjo).toHaveAttribute('aria-checked', 'false');
+  await expect(page.locator('#preset-note')).toBeVisible();
   await expect(page.locator('#setup-summary')).toHaveText(
     '5 joueurs · départ 0 · sans limite · négatifs',
   );
@@ -150,6 +156,7 @@ test('erreurs de saisie : maximum inférieur au départ, valeurs hors bornes', a
   await expect(error).toBeVisible();
   await expect(error).toContainText('au moins égal aux points de départ (40)');
   await expect(maxInput).toHaveAttribute('aria-invalid', 'true');
+  // La description n'est rattachée que tant que le message existe
   await expect(maxInput).toHaveAttribute('aria-describedby', 'max-error');
   await expect(page.locator('#go-btn')).toBeDisabled();
   await expect(page.locator('#names-btn')).toBeDisabled();
@@ -159,6 +166,7 @@ test('erreurs de saisie : maximum inférieur au départ, valeurs hors bornes', a
   await maxInput.fill('60');
   await expect(error).toBeHidden();
   await expect(maxInput).toHaveAttribute('aria-invalid', 'false');
+  await expect(maxInput).not.toHaveAttribute('aria-describedby', /.*/);
   await expect(page.locator('#go-btn')).toBeEnabled();
   await expect(page.locator('#setup-summary')).toHaveText('4 joueurs · départ 40 · max 60');
 
@@ -183,4 +191,120 @@ test('erreurs de saisie : maximum inférieur au départ, valeurs hors bornes', a
   await page.locator('#points-custom').fill('');
   await expect(page.locator('#start-error')).toBeHidden();
   await expect(page.locator('#setup-summary')).toHaveText('4 joueurs · départ 0 · sans limite');
+});
+
+test('les préréglages du HTML correspondent exactement à GAME_PRESETS', async ({ page }) => {
+  await openApp(page);
+  const { dom, source } = await page.evaluate(async () => {
+    const mod = await import('/js/core/constants.js');
+    return {
+      dom: [...document.querySelectorAll('#presets-grid .preset-card')].map((c) => ({
+        name: c.dataset.preset,
+        detail: c.querySelector('.preset-card-detail').textContent.trim(),
+      })),
+      source: mod.GAME_PRESETS.map((p) => ({ name: p.name, detail: p.detail })),
+    };
+  });
+  expect(dom).toEqual(source);
+  // Les douze puces de joueurs sont elles aussi dans le HTML (aucun décalage au chargement).
+  await expect(page.locator('#players-grid .player-chip')).toHaveCount(12);
+});
+
+test('raccourcis du manifeste : ?action=new et ?action=resume (D14)', async ({ page }) => {
+  await openApp(page);
+  // Une partie en cours, puis retour à l'accueil par rechargement
+  await page.locator('#go-btn').click();
+  await expect(page.locator('#game-screen')).toBeVisible();
+
+  await page.goto('/?action=resume');
+  await expect(page.locator('#game-screen')).toBeVisible();
+  await expect(page.locator('.pcard')).toHaveCount(4);
+  expect(new URL(page.url()).search).toBe('');
+
+  await page.goto('/?action=new');
+  await expect(page.locator('#setup-page')).toBeVisible();
+  await expect(page.locator('#restore-banner')).toBeHidden();
+  await expect(page.locator('#go-btn')).toBeEnabled();
+  expect(new URL(page.url()).search).toBe('');
+
+  // Sans sauvegarde, « reprendre » retombe proprement sur l'accueil
+  await page.evaluate(() => localStorage.removeItem('scoretrack_save'));
+  await page.goto('/?action=resume');
+  await expect(page.locator('#setup-page')).toBeVisible();
+  await expect(page.locator('#game-screen')).toBeHidden();
+});
+
+test('actions destructrices : deux temps sur la bannière et sur un prénom mémorisé', async ({
+  page,
+}) => {
+  await openApp(page);
+  await page.locator('#go-btn').click();
+  await page.reload();
+  const discard = page.locator('#discard-btn');
+  await expect(discard).toBeVisible();
+  await discard.click();
+  await expect(discard).toContainText('Confirmer');
+  await expect(page.locator('#restore-banner')).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('scoretrack_save'))).not.toBeNull();
+  await discard.click();
+  await expect(page.locator('#restore-banner')).toBeHidden();
+  expect(await page.evaluate(() => localStorage.getItem('scoretrack_save'))).toBeNull();
+
+  await page.evaluate(() =>
+    localStorage.setItem('scoretrack_profiles', JSON.stringify({ v: 1, names: ['Alice'] })),
+  );
+  await page.locator('#names-btn').click();
+  const del = page.locator('.profile-chip-del').first();
+  await del.click();
+  await expect(page.locator('.profile-chip')).toHaveCount(1);
+  await expect(del).toHaveAttribute('aria-label', /Confirmer/);
+  await del.click();
+  await expect(page.locator('.profile-chip')).toHaveCount(0);
+});
+
+test('états vides : les actions sans objet sont désactivées', async ({ page }) => {
+  await openApp(page);
+  await page.locator('#names-btn').click();
+  await expect(page.locator('#shuffle-btn')).toBeDisabled();
+  await expect(page.locator('#memorize-btn')).toBeDisabled();
+  await expect(page.locator('#clear-profiles-btn')).toBeDisabled();
+  await expect(page.locator('#clear-names-btn')).toBeDisabled();
+  await expect(page.locator('#profiles-help')).toBeVisible();
+
+  await page.locator('.name-input').first().fill('Alice');
+  await expect(page.locator('#memorize-btn')).toBeEnabled();
+  await expect(page.locator('#clear-names-btn')).toBeEnabled();
+  await expect(page.locator('#shuffle-btn')).toBeDisabled();
+  await page.locator('.name-input').nth(1).fill('Bob');
+  await expect(page.locator('#shuffle-btn')).toBeEnabled();
+
+  await page.locator('#memorize-btn').click();
+  await expect(page.locator('#clear-profiles-btn')).toBeEnabled();
+  await expect(page.locator('#profiles-help')).toBeHidden();
+});
+
+test('la limite de saisie suit la plus petite carte de la disposition (nameMaxLength)', async ({
+  page,
+}) => {
+  await openApp(page);
+  await page.locator('#players-grid .player-chip[data-val="12"]').click();
+  await page.locator('#names-btn').click();
+  const expected = await page.evaluate(async () => {
+    const { nameMaxLength } = await import('/js/core/layout.js');
+    return nameMaxLength(12, window.innerWidth, window.innerHeight);
+  });
+  await expect(page.locator('.name-input').first()).toHaveAttribute('maxlength', String(expected));
+  const hint = page.locator('#names-limit');
+  if (expected < 18) {
+    await expect(hint).toBeVisible();
+    await expect(hint).toContainText(`${expected} caractères`);
+  } else {
+    await expect(hint).toBeHidden();
+  }
+  // Un prénom accepté à la saisie tient sur la carte : aucun rognage silencieux en jeu
+  await page.locator('.name-input').first().fill('W'.repeat(24));
+  const typed = await page.locator('.name-input').first().inputValue();
+  expect(typed.length).toBe(expected);
+  await page.locator('#names-go-btn').click();
+  await expect(page.locator('#card-0 .pplayer')).toHaveText(typed);
 });

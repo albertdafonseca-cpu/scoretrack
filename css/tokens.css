@@ -18,8 +18,10 @@
 :root {
   color-scheme: dark;
 
-  /* ── Typographie : échelle ×1,2 arrondie au pixel, plancher 11 px (D7) ── */
-  --fs-1: 11px;
+  /* ── Typographie : échelle ×1,2 arrondie au pixel, plancher 12 px (D10) ──
+     D10 porte le plancher de 11 à 12 px : aucun texte rendu ne descend sous --fs-1, libellés de
+     la barre d'action et mentions légales compris. Gardé par tests/unit/themes.test.js. */
+  --fs-1: 12px;
   --fs-2: 13px;
   --fs-3: 15px;
   --fs-4: 18px;
@@ -69,7 +71,12 @@
   --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.35);
   --shadow-3: 0 12px 32px rgba(0, 0, 0, 0.45);
 
-  /* ── Palette Paul Tol « bright » (12 couleurs joueurs, = COLORS de js/core/constants.js) ── */
+  /* ── Palette Paul Tol (12 couleurs joueurs, = COLORS de js/core/constants.js) ──
+     --tol-9 était #0077BB : trop proche de --tol-1 #4477AA (ΔE2000 4,4 en vision normale, 2,0 en
+     tritanopie — le minimum de toute la palette). Remplacé par l'indigo Tol « muted » #332288 :
+     la paire 1/9 passe à 27,5 en vision normale et ne descend jamais sous 20,1 sous simulation,
+     et le minimum global de la palette monte de 2,0 à 3,2. (Le teal #44AA99 envisagé au tour 1
+     était une erreur de ma part : il est DÉJÀ --tol-11, l'utiliser créerait un doublon exact.) */
   --tol-1: #4477aa;
   --tol-2: #ee6677;
   --tol-3: #ccbb44;
@@ -78,7 +85,7 @@
   --tol-6: #66ccee;
   --tol-7: #bbbbbb;
   --tol-8: #ee7733;
-  --tol-9: #0077bb;
+  --tol-9: #332288;
   --tol-10: #ee3377;
   --tol-11: #44aa99;
   --tol-12: #ddcc77;
@@ -96,8 +103,11 @@
   --green: var(--gain);
   --red: var(--loss);
 
-  /* ── Cartes joueurs : Tol mélangé au fond du thème en OKLab (voir themes.css) ── */
-  --card-mix: 30%;
+  /* ── Cartes joueurs : Tol mélangé au fond du thème en OKLab (voir themes.css) ──
+     Le taux est plafonné à 22 % sur fond sombre : au-delà, la carte devient trop claire et le
+     score n'atteint plus 4,5:1 une fois le fond COMPOSÉ (carte + demi-zones teintées + voile
+     d'état + texture) mesuré au pixel. Valeur fixée par scripts/audit-contrast.mjs. */
+  --card-mix: 22%;
   --card-base: var(--bg);
   --card-1: color-mix(in oklab, var(--tol-1) var(--card-mix), var(--card-base));
   --card-2: color-mix(in oklab, var(--tol-2) var(--card-mix), var(--card-base));
@@ -125,11 +135,14 @@
   --accent2: #00bfff;
   --text: #e0fff8;
   --muted-mix: 66%;
-  --muted: color-mix(in oklab, var(--text) 40%, var(--bg));
+  /* --muted sert de trait aux objets graphiques discrets (courbe plate du récapitulatif) :
+     il est donc tenu au seuil « composants » de 3:1 sur --bg, --bg2 et --surface (WCAG 1.4.11),
+     et non traité comme purement décoratif. Vérifié par scripts/audit-contrast.mjs. */
+  --muted: color-mix(in oklab, var(--text) 62%, var(--bg));
   --muted2: color-mix(in oklab, var(--text) var(--muted-mix), var(--bg));
-  --font-display: 'Orbitron', monospace;
-  --font-score: 'Share Tech Mono', monospace;
-  --font-ui: 'Share Tech Mono', monospace;
+  --font-display: 'Orbitron', 'Orbitron fallback', monospace;
+  --font-score: 'Share Tech Mono', 'Share Tech Mono fallback', monospace;
+  --font-ui: 'Share Tech Mono', 'Share Tech Mono fallback', monospace;
   --btn-font: var(--font-display);
   --score-font: var(--font-score);
   --radius: 6px;

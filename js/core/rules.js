@@ -68,32 +68,41 @@ export function needsElimination(player, { allowNeg = false } = {}) {
 /**
  * Détermine le vainqueur.
  *   - 'last-alive'   : au moins 2 joueurs et un seul non éliminé (jamais à 1 joueur seul) ;
- *   - 'max-reached'  : un joueur non éliminé atteint `maxPoints`, plafond fini et strictement
- *                      supérieur à `startPoints` (le plus haut score l'emporte, puis le plus petit
- *                      indice en cas d'égalité) ;
+ *   - 'max-reached'  : un joueur non éliminé atteint un plafond FINI qui est un OBJECTIF, c'est-à-dire
+ *                      strictement supérieur au score de départ (le plus haut score l'emporte, puis
+ *                      le plus petit indice en cas d'égalité) ;
  *   - null sinon.
- * `allowNeg` est accepté pour l'homogénéité de `config` mais ne change pas la décision.
- * Transition : le résultat porte aussi les champs du joueur (`playerName`, `score`, `eliminated`)
- * tant que l'interface actuelle lit `w.playerName` / `w.score` ; ne pas s'y fier (utiliser `index`).
+ *
+ * `config` est l'objet de configuration de la partie (`store.config`) : `{ startPoints, maxPoints,
+ * allowNeg }`. `startPoints` est DÉTERMINANT et fait partie du contrat : il distingue un plafond
+ * « objectif » (Uno : départ 0, max 500 → atteindre 500 fait gagner) d'un plafond « butée »
+ * (Loi du Milieu : départ 40, max 40 → le plafond empêche seulement de monter, la victoire vient de
+ * l'élimination). Repli SÛR quand il est absent ou non fini : le plafond est traité comme une butée,
+ * donc aucune victoire par plafond — un appel incomplet ne peut jamais fabriquer un faux vainqueur
+ * au lancement d'une partie. `allowNeg` est accepté pour l'homogénéité de `config` mais ne change
+ * pas la décision.
  * @param {Array<{score:number,eliminated:boolean}>} players
- * @param {{maxPoints?:number|null,allowNeg?:boolean,startPoints?:number}} [config]
- * @returns {{index:number, reason:'last-alive'|'max-reached'}|null}
+ * @param {{maxPoints?:number|null,startPoints?:number,allowNeg?:boolean}} [config]
+ * @returns {{index:number, reason:'last-alive'|'max-reached'}|null} indice du vainqueur dans
+ *   `players` (l'appelant lit le joueur lui-même) et raison de la victoire
  */
-export function findWinner(players, { maxPoints = Infinity, startPoints = 0 } = {}) {
+export function findWinner(players, config = {}) {
   if (!Array.isArray(players) || players.length === 0) return null;
+  const maxPoints = config.maxPoints === undefined ? Infinity : config.maxPoints;
+  // Sans point de départ connu, le plafond est une butée : `maxPoints > startPoints` sera faux.
+  const startPoints = Number.isFinite(config.startPoints) ? config.startPoints : maxPoints;
   const alive = [];
   players.forEach((p, index) => {
     if (!p.eliminated) alive.push(index);
   });
-  const result = (index, reason) => ({ ...players[index], index, reason });
-  if (players.length >= 2 && alive.length === 1) return result(alive[0], 'last-alive');
+  if (players.length >= 2 && alive.length === 1) return { index: alive[0], reason: 'last-alive' };
   if (Number.isFinite(maxPoints) && maxPoints > startPoints) {
     let best = -1;
     alive.forEach((i) => {
       const s = players[i].score;
       if (s >= maxPoints && (best < 0 || s > players[best].score)) best = i;
     });
-    if (best >= 0) return result(best, 'max-reached');
+    if (best >= 0) return { index: best, reason: 'max-reached' };
   }
   return null;
 }

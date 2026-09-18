@@ -4,7 +4,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { COLORS, DEFAULT_THEME, THEMES } from '../../js/core/constants.js';
-import { ICONS, ICON_NAMES, shapeOf } from '../../js/ui/icons.js';
+import { ICONS, ICON_NAMES, opticalTransform, shapeOf } from '../../js/ui/icons.js';
 
 const read = (p) => readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
 const tokensCss = read('css/tokens.css');
@@ -95,10 +95,10 @@ const byTheme = themeTokens();
 const family = (v) => v.split(',')[0].replace(/["']/g, '').trim();
 
 describe('tokens.css', () => {
-  it('définit une échelle typographique --fs-1…8 croissante avec un plancher de 11 px', () => {
+  it('définit une échelle typographique --fs-1…8 croissante avec un plancher de 12 px (D10)', () => {
     const sizes = Array.from({ length: 8 }, (_, i) => parseFloat(rootTokens[`fs-${i + 1}`]));
     expect(sizes.every((s) => Number.isFinite(s))).toBe(true);
-    expect(sizes[0]).toBeGreaterThanOrEqual(11);
+    expect(sizes[0]).toBeGreaterThanOrEqual(12);
     for (let i = 1; i < sizes.length; i++) expect(sizes[i]).toBeGreaterThan(sizes[i - 1]);
   });
 
@@ -188,6 +188,28 @@ describe('icônes', () => {
         for (const [k, v] of Object.entries(attrs))
           expect(sprite, `${name} : ${k}="${v}"`).toContain(`${k}="${v}"`);
       }
+    }
+  });
+
+  it('le sprite porte les mêmes transformations de taille optique', () => {
+    const sprite = read('assets/icons/sprite.svg');
+    for (const [name, def] of Object.entries(ICONS)) {
+      const t = opticalTransform(def);
+      if (!t) continue;
+      expect(sprite, `${name} : transformation absente du sprite`).toContain(t);
+      expect(sprite, `${name} : épaisseur compensée absente`).toContain(
+        `stroke-width="${+(2 / def.k).toFixed(3)}"`,
+      );
+    }
+  });
+
+  it('la taille optique reste dans une bande resserrée (facteurs déclarés)', () => {
+    // Mesure au pixel (scripts/audit-icons.mjs) : bande 18,0–20,3 u après harmonisation.
+    // Ici on garde la contrainte vérifiable sans navigateur : aucun facteur aberrant.
+    for (const [name, def] of Object.entries(ICONS)) {
+      const k = def.k || 1;
+      expect(k, `${name} : facteur de taille optique`).toBeGreaterThanOrEqual(0.8);
+      expect(k, `${name} : facteur de taille optique`).toBeLessThanOrEqual(1.5);
     }
   });
 

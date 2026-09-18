@@ -4,18 +4,22 @@
 import { KEYS } from '../core/save-schema.js';
 import { STORAGE_EVENT, readJSON } from './storage.js';
 
-/** Motifs (ms) : un nombre = vibration simple, un tableau = alternance vibration/pause. */
+/**
+ * Motifs (ms) : un nombre = vibration simple, un tableau = alternance vibration/pause.
+ * Les deux butées sont distinctes au toucher : deux coups longs en bas (plancher, élimination
+ * imminente), trois coups brefs en haut (plafond de points atteint).
+ */
 export const PATTERNS = Object.freeze({
   tap: 10,
   floor: [30, 20, 30],
-  ceiling: [30, 20, 30],
+  ceiling: [20, 30, 20, 30, 20],
   elim: [50, 30, 80],
   win: [40, 60, 40, 60, 120],
   undo: [15, 30, 15],
   longpress: 20,
 });
 
-/** @deprecated Motif « limite atteinte » : utiliser `haptic('floor')` / `haptic('ceiling')`. */
+/** @deprecated Motif « limite basse atteinte » : utiliser `haptic('floor')` / `haptic('ceiling')`. */
 export const PATTERN_BLOCKED = PATTERNS.floor;
 /** @deprecated Motif « élimination » : utiliser `haptic('elim')`. */
 export const PATTERN_ELIM = PATTERNS.elim;

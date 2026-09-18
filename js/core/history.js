@@ -1,30 +1,43 @@
 // Journal des actions de la partie — logique pure, sans DOM.
 //
-// v2 : un journal chronologique `log = { entries, cursor }` où chaque entrée décrit UNE modification
-// atomique de l'état (un tap, une saisie au pavé, une rotation des sièges, une élimination, un
-// renommage). L'annulation et le rétablissement se font par inversion de l'entrée (jamais par
-// instantané) : `undo(log)` recule le curseur d'une ACTION (un groupe de taps rapprochés = une
-// action) et renvoie l'entrée inversée que l'interface applique avec `applyEntry(game, entry)`.
-// Les entrées situées après le curseur sont rétablissables (`redo`) jusqu'à la prochaine `record`,
-// qui les tronque.
+// `log = { entries, cursor, floor }` : un journal chronologique où chaque entrée décrit UNE
+// modification atomique de l'état (un tap, une saisie au pavé, une rotation des sièges, une
+// élimination, un renommage). L'annulation et le rétablissement se font par inversion de l'entrée
+// (jamais par instantané) : `undo(log)` recule le curseur d'une ACTION (un groupe de taps
+// rapprochés = une action) et renvoie l'action inversée que l'interface applique avec
+// `applyEntry(game, action)`. Les entrées situées après le curseur sont rétablissables (`redo`)
+// jusqu'au prochain `record`, qui les tronque.
 //
 // Entrée : `{ id, t, playerIdx, delta, from, to, via, groupId }`
-//   - `via` ∈ 'tap' | 'keypad' | 'rotate' | 'elim' | 'unelim' | 'rename'
-//   - tap/keypad : `from`/`to` = score avant/après, `delta = to - from`
-//   - rotate     : `playerIdx = -1`, `from`/`to` = seatOrder avant/après, `delta = 0`
-//   - elim/unelim: `from`/`to` = drapeau `eliminated` avant/après, `delta = 0`
-//   - rename     : `from`/`to` = prénom avant/après, `delta = 0`
-//   - `closed` (optionnel) : aucun tap ultérieur ne peut rejoindre ce groupe
-//   - `approx` (optionnel) : horodatage reconstitué lors d'une migration (heure de la sauvegarde)
-// Une entrée inversée porte de plus `inverse: true` ; l'interface n'a besoin que de `to`.
+//   - `id` : entier strictement croissant dans `entries` (invariant garanti par `record` et par la
+//     normalisation de `parseLog` à la lecture d'une sauvegarde) ;
+//   - `via` ∈ 'tap' | 'keypad' | 'rotate' | 'elim' | 'unelim' | 'rename' ;
+//   - tap/keypad : `from`/`to` = score avant/après, `delta = to - from` (toujours recalculé) ;
+//   - rotate     : `playerIdx = -1`, `from`/`to` = seatOrder avant/après, `delta = 0` ;
+//   - elim/unelim: `from`/`to` = drapeau `eliminated` avant/après, `delta = 0` ;
+//   - rename     : `from`/`to` = prénom avant/après, `delta = 0` ;
+//   - `closed` (optionnel) : aucun tap ultérieur ne peut rejoindre ce groupe ;
+//   - `approx` (optionnel) : horodatage reconstitué lors d'une migration (heure de la sauvegarde).
+// Une action (groupe fusionné) porte en plus `ids`, `count`, `tEnd` ; une entrée inversée porte
+// `inverse: true` — l'interface n'a besoin que de `to`.
 //
-// La section « API v1 » (groupes + pile d'instantanés) reste exportée pour l'interface actuelle
-// et sera retirée quand plus aucun module UI ne l'importera.
+// `cursor` : nombre d'entrées appliquées à l'état courant (0 = aucune).
+// `floor`  : plancher d'annulation (0 par défaut). Les entrées sous `floor` sont de l'HISTORIQUE en
+//   lecture seule : elles restent affichables mais ne peuvent pas être annulées. `parseGame` y
+//   recourt quand l'état enregistré ne reflète pas de façon certaine le journal (sauvegarde
+//   incohérente ou altérée) : mieux vaut une annulation indisponible qu'un score téléporté.
+//
+// Toutes les fonctions normalisent d'abord le journal (curseur et plancher ramenés dans les bornes,
+// journal non conforme = TypeError) : aucune entrée trouée, aucune lecture hors limites.
 
 /** Délai (ms) pendant lequel des taps successifs sur un même joueur forment une seule action. */
 export const GROUP_DELAY = 1500;
-/** Profondeur maximale de la pile d'annulation v1 (instantanés). @deprecated */
-export const UNDO_LIMIT = 40;
+/**
+ * Nombre maximal d'entrées conservées (≈ 94 octets/entrée, soit ≈ 190 Kio, moins de 4 % d'un quota
+ * localStorage de 5 Mio). Au-delà, `record` oublie les actions les plus anciennes, groupe par
+ * groupe : une partie très longue ne peut pas saturer le stockage en pleine partie.
+ */
+export const MAX_LOG_ENTRIES = 2000;
 /** Moyens d'action reconnus. */
 export const VIAS = Object.freeze(['tap', 'keypad', 'rotate', 'elim', 'unelim', 'rename']);
 /** Moyens qui modifient un score (les seuls comptés dans les bilans). */
@@ -35,17 +48,17 @@ const INVERSE_VIA = Object.freeze({ elim: 'unelim', unelim: 'elim' });
 const isInt = Number.isInteger;
 const isNum = Number.isFinite;
 
-// ── Journal v2 ──────────────────────────────────────────────────────
+// ── Journal ─────────────────────────────────────────────────────────
 
 /**
  * Crée un journal vide.
- * @returns {{ entries: object[], cursor: number }}
+ * @returns {{ entries: object[], cursor: number, floor: number }}
  */
 export function createLog() {
-  return { entries: [], cursor: 0 };
+  return { entries: [], cursor: 0, floor: 0 };
 }
 
-/** Vrai si `log` a la forme minimale d'un journal. */
+/** Vrai si `log` a exactement la forme d'un journal (curseur et plancher cohérents). */
 export function isLog(log) {
   return (
     log !== null &&
@@ -53,18 +66,35 @@ export function isLog(log) {
     Array.isArray(log.entries) &&
     isInt(log.cursor) &&
     log.cursor >= 0 &&
-    log.cursor <= log.entries.length
+    log.cursor <= log.entries.length &&
+    (log.floor === undefined || (isInt(log.floor) && log.floor >= 0 && log.floor <= log.cursor))
   );
+}
+
+/**
+ * Ramène `cursor` et `floor` dans leurs bornes (journal venu d'une sauvegarde, d'un `setGame` ou
+ * d'un appelant distrait) ; lève si `entries` n'est pas un tableau. Renvoie le journal, muté.
+ */
+function normalize(log) {
+  if (log === null || typeof log !== 'object' || !Array.isArray(log.entries)) {
+    throw new TypeError('history: journal invalide (entries manquant)');
+  }
+  const n = log.entries.length;
+  const cursor = isInt(log.cursor) ? log.cursor : n;
+  log.cursor = Math.max(0, Math.min(n, cursor));
+  const floor = isInt(log.floor) ? log.floor : 0;
+  log.floor = Math.max(0, Math.min(log.cursor, floor));
+  return log;
 }
 
 /** Lève une erreur descriptive si `entry` n'est pas une entrée valide pour son `via`. */
 function validate(entry) {
   if (entry === null || typeof entry !== 'object') throw new TypeError('history: entrée invalide');
   const { via, playerIdx, from, to } = entry;
-  if (!VIAS.includes(via)) throw new RangeError(`history: via inconnu « ${via} »`);
+  if (!VIAS.includes(via)) throw new TypeError(`history: via inconnu « ${via} »`);
   if (via === 'rotate') {
     if (!Array.isArray(from) || !Array.isArray(to) || from.length !== to.length) {
-      throw new TypeError('history: rotate exige from/to = ordres de sièges');
+      throw new TypeError('history: rotate exige from/to = ordres de sièges de même longueur');
     }
     return;
   }
@@ -94,16 +124,32 @@ function joinsGroup(prev, next, t) {
   );
 }
 
+/** Oublie les plus vieux groupes quand le journal dépasse MAX_LOG_ENTRIES. */
+function trim(log) {
+  const excess = log.entries.length - MAX_LOG_ENTRIES;
+  if (excess <= 0) return;
+  let cut = excess;
+  while (cut < log.entries.length && log.entries[cut].groupId === log.entries[cut - 1].groupId) {
+    cut++;
+  }
+  log.entries.splice(0, cut);
+  log.cursor = Math.max(0, log.cursor - cut);
+  log.floor = Math.max(0, Math.min(log.cursor, log.floor - cut));
+}
+
 /**
  * Enregistre une entrée à la position du curseur (les entrées rétablissables sont tronquées).
- * Complète `id`, `t` (Date.now() par défaut) et `groupId` : un tap rejoint le groupe du tap
+ * Complète `id` (dernier + 1), `t` (Date.now() par défaut), `delta` (toujours recalculé depuis
+ * `from`/`to` : la valeur fournie est ignorée) et `groupId` : un tap rejoint le groupe du tap
  * précédent du même joueur s'il survient dans les GROUP_DELAY ms et que ce groupe n'est pas clos.
  * @param {{entries:object[],cursor:number}} log
- * @param {{playerIdx?:number,delta?:number,from:any,to:any,via:string,t?:number,groupId?:number}} entry
+ * @param {{playerIdx?:number,from:any,to:any,via:string,t?:number,groupId?:number}} entry
  * @returns {object} l'entrée telle que stockée
+ * @throws {TypeError|RangeError} entrée ou journal invalide (aucune modification dans ce cas)
  */
 export function record(log, entry) {
   validate(entry);
+  normalize(log);
   log.entries.length = log.cursor;
   const prev = log.entries[log.cursor - 1];
   const t = isNum(entry.t) ? entry.t : Date.now();
@@ -125,6 +171,7 @@ export function record(log, entry) {
   }
   log.entries.push(stored);
   log.cursor = log.entries.length;
+  trim(log);
   return stored;
 }
 
@@ -161,6 +208,7 @@ export function recordRename(log, playerIdx, from, to, t) {
  * @returns {boolean} true si un groupe a été clos
  */
 export function closeGroup(log, playerIdx) {
+  normalize(log);
   const last = log.entries[log.cursor - 1];
   if (!last || last.via !== 'tap' || last.closed === true) return false;
   if (playerIdx !== undefined && last.playerIdx !== playerIdx) return false;
@@ -185,7 +233,7 @@ export function invert(entry) {
 
 /**
  * Applique une entrée (directe ou inversée) à un état `game = { players, seatOrder }` : seul `to`
- * est utilisé. Renvoie `game` (muté). Les indices hors limites sont ignorés sans erreur.
+ * est utilisé. Renvoie `game` (muté). Une entrée visant un joueur absent est ignorée sans erreur.
  */
 export function applyEntry(game, entry) {
   if (entry.via === 'rotate') {
@@ -237,13 +285,15 @@ function mergeAction(entries) {
   };
 }
 
-/** Vrai si une action est annulable. */
+/** Vrai si une action est annulable (le plancher `floor` borne l'annulation par le bas). */
 export function canUndo(log) {
-  return log.cursor > 0;
+  normalize(log);
+  return log.cursor > log.floor;
 }
 
 /** Vrai si une action est rétablissable. */
 export function canRedo(log) {
+  normalize(log);
   return log.cursor < log.entries.length;
 }
 
@@ -253,15 +303,13 @@ export function canRedo(log) {
  */
 export function undo(log) {
   if (!canUndo(log)) return null;
-  const start = groupStart(log.entries, log.cursor - 1);
+  const start = Math.max(log.floor, groupStart(log.entries, log.cursor - 1));
   const action = mergeAction(log.entries.slice(start, log.cursor));
   log.cursor = start;
   return invert(action);
 }
 
-/**
- * Rétablit l'action suivante : avance le curseur et renvoie l'action à appliquer, ou null.
- */
+/** Rétablit l'action suivante : avance le curseur et renvoie l'action à appliquer, ou null. */
 export function redo(log) {
   if (!canRedo(log)) return null;
   const end = groupEnd(log.entries, log.cursor);
@@ -273,17 +321,19 @@ export function redo(log) {
 /**
  * Place le curseur juste après l'action contenant l'entrée `entryId` (0 = avant toute action)
  * et renvoie, dans l'ordre d'application, les entrées à appliquer pour y parvenir : inversées
- * si l'on recule, directes si l'on avance. Renvoie null si l'identifiant est inconnu.
- * Les actions dépassées restent rétablissables.
+ * si l'on recule, directes si l'on avance. Renvoie null si l'identifiant est inconnu ou si la
+ * cible passe sous le plancher `floor`. Les actions dépassées restent rétablissables.
  * @returns {object[]|null}
  */
 export function jumpTo(log, entryId) {
+  normalize(log);
   let target = 0;
   if (entryId !== 0 && entryId !== null && entryId !== undefined) {
     const i = log.entries.findIndex((e) => e.id === entryId);
     if (i < 0) return null;
     target = groupEnd(log.entries, i);
   }
+  if (target < log.floor) return null;
   const from = log.cursor;
   log.cursor = target;
   if (target < from) return log.entries.slice(target, from).reverse().map(invert);
@@ -292,16 +342,21 @@ export function jumpTo(log, entryId) {
 
 /**
  * Actions numérotées, dans l'ordre chronologique (toutes, y compris celles annulées : `undone`).
- * @returns {Array<{n:number,id:number,ids:number[],groupId:number,playerIdx:number,via:string,t:number,tEnd:number,delta:number,from:any,to:any,count:number,undone:boolean}>}
+ * `locked` marque les actions sous le plancher d'annulation (historique en lecture seule).
+ * @returns {Array<{n:number,id:number,ids:number[],groupId:number,playerIdx:number,via:string,
+ *   t:number,tEnd:number,delta:number,from:any,to:any,count:number,approx:boolean,
+ *   undone:boolean,locked:boolean}>}
  */
 export function groups(log) {
+  normalize(log);
   const out = [];
-  const { entries, cursor } = log;
+  const { entries, cursor, floor } = log;
   for (let i = 0; i < entries.length;) {
     const end = groupEnd(entries, i);
     const action = mergeAction(entries.slice(i, end));
     action.n = out.length + 1;
     action.undone = i >= cursor;
+    action.locked = end <= floor;
     out.push(action);
     i = end;
   }
@@ -310,26 +365,29 @@ export function groups(log) {
 
 /**
  * Chronologie entrée par entrée, chacune complétée du numéro d'action `n` et de `undone`.
+ * Linéaire : les entrées sont parcourues une seule fois, groupe par groupe.
  * @returns {object[]}
  */
 export function timeline(log) {
+  normalize(log);
+  const { entries, cursor } = log;
   const out = [];
-  groups(log).forEach((action) => {
-    action.ids.forEach((id) => {
-      const entry = log.entries.find((e) => e.id === id);
-      out.push({ ...entry, n: action.n, undone: action.undone });
-    });
-  });
+  let n = 0;
+  for (let i = 0; i < entries.length;) {
+    const end = groupEnd(entries, i);
+    n++;
+    for (let k = i; k < end; k++) out.push({ ...entries[k], n, undone: k >= cursor });
+    i = end;
+  }
   return out;
 }
 
 /**
  * Bilan d'un joueur : ses actions de score en vigueur (non annulées), leur total et la courbe
  * `points = [{ t, score }]` (score initial puis score après chaque action ; vide sans action).
- * Accepte aussi un historique v1 (tableau de groupes) : voir la section dépréciée.
+ * @returns {{actions:object[], total:number, points:Array<{t:number,score:number}>}}
  */
 export function playerRecap(log, playerIdx) {
-  if (Array.isArray(log)) return playerRecapV1(log, playerIdx);
   const actions = groups(log).filter(
     (a) => !a.undone && a.playerIdx === playerIdx && SCORE_VIAS.includes(a.via),
   );
@@ -339,13 +397,31 @@ export function playerRecap(log, playerIdx) {
   return { actions, total, points };
 }
 
-// ── Passerelles v1 ↔ v2 (migration des sauvegardes) ─────────────────
+/**
+ * Scores et sièges impliqués par les entrées appliquées d'un journal, pour vérifier qu'il est
+ * cohérent avec l'état enregistré (`parseGame`). Renvoie `{ scores: Map(playerIdx → score), seats }` ;
+ * `seats` = dernier ordre de sièges appliqué, ou null si aucune rotation.
+ */
+export function appliedState(log) {
+  normalize(log);
+  const scores = new Map();
+  let seats = null;
+  for (let i = 0; i < log.cursor; i++) {
+    const e = log.entries[i];
+    if (SCORE_VIAS.includes(e.via)) scores.set(e.playerIdx, e.to);
+    else if (e.via === 'rotate') seats = e.to;
+  }
+  return { scores, seats };
+}
+
+// ── Migration des sauvegardes v0/v1 ─────────────────────────────────
 
 /**
- * Construit un journal v2 à partir d'un historique v1 (groupes `{ playerIdx, entries:[{delta}],
+ * Construit un journal à partir d'un historique v0/v1 (groupes `{ playerIdx, entries:[{delta}],
  * rank }`, du plus récent au plus ancien) et des scores ACTUELS des joueurs : les scores
  * intermédiaires sont reconstitués à rebours. Les entrées reçoivent l'horodatage `t` (heure de la
- * sauvegarde) et `approx: true` ; |delta| = 1 ⇒ 'tap', sinon 'keypad'.
+ * sauvegarde) et `approx: true` ; |delta| = 1 ⇒ 'tap', sinon 'keypad'. Le dernier groupe est clos
+ * (un groupe resté ouvert dans l'ancienne sauvegarde ne doit pas absorber le premier tap suivant).
  */
 export function logFromGroups(history, players, t = 0) {
   const log = createLog();
@@ -383,115 +459,4 @@ export function logFromGroups(history, players, t = 0) {
   log.cursor = log.entries.length;
   closeGroup(log);
   return log;
-}
-
-/**
- * Projette un journal v2 en historique v1 (`{ history, actionCounter }`) : actions de score en
- * vigueur, du plus récent au plus ancien, rangs séquentiels, groupes fermés.
- */
-export function groupsFromLog(log, players) {
-  const actions = groups(log).filter((a) => !a.undone && SCORE_VIAS.includes(a.via));
-  const history = actions.map((a, i) => ({
-    playerIdx: a.playerIdx,
-    who: players[a.playerIdx] ? players[a.playerIdx].playerName : '',
-    entries: a.ids.map((id) => ({ delta: log.entries.find((e) => e.id === id).delta })),
-    open: false,
-    rank: i + 1,
-  }));
-  history.reverse();
-  return { history, actionCounter: actions.length };
-}
-
-// ── API v1 (groupes + instantanés) — dépréciée ──────────────────────
-// `game` = { players, seatOrder, history, actionCounter } ; les fonctions mutent `game` en place.
-
-/** Somme des deltas d'un groupe v1. @deprecated utiliser `groups(log)` (champ `delta`). */
-export function groupSum(group) {
-  return group.entries.reduce((s, e) => s + e.delta, 0);
-}
-
-/** Groupe v1 encore ouvert pour ce joueur, ou undefined. @deprecated */
-export function findOpenGroup(history, playerIdx) {
-  return history.find((h) => h.playerIdx === playerIdx && h.open);
-}
-
-/** Ferme le groupe v1 ouvert d'un joueur ; true si un groupe a été fermé. @deprecated `closeGroup` */
-export function closeOpenGroup(history, playerIdx) {
-  const group = findOpenGroup(history, playerIdx);
-  if (!group) return false;
-  group.open = false;
-  return true;
-}
-
-/** Ferme tous les groupes v1. @deprecated */
-export function closeAllGroups(history) {
-  history.forEach((h) => {
-    h.open = false;
-  });
-}
-
-/**
- * Ajoute un delta au groupe v1 ouvert du joueur (ou en crée un nouveau, en tête).
- * Renvoie { group, sum }. @deprecated utiliser `record`/`recordScore`
- */
-export function addGroupedDelta(game, playerIdx, delta) {
-  let group = findOpenGroup(game.history, playerIdx);
-  if (!group) {
-    game.actionCounter++;
-    group = {
-      playerIdx,
-      who: game.players[playerIdx].playerName,
-      entries: [],
-      open: true,
-      rank: game.actionCounter,
-    };
-    game.history.unshift(group);
-  }
-  group.entries.push({ delta });
-  return { group, sum: groupSum(group) };
-}
-
-/** Ajoute une action manuelle v1 (groupe distinct, fermé). @deprecated utiliser `recordScore(…, 'keypad')` */
-export function addManualDelta(game, playerIdx, delta) {
-  game.actionCounter++;
-  const group = {
-    playerIdx,
-    who: game.players[playerIdx].playerName,
-    entries: [{ delta }],
-    open: false,
-    rank: game.actionCounter,
-  };
-  game.history.unshift(group);
-  return group;
-}
-
-/** Bilan v1 : groupes d'un joueur triés par rang, avec le total. @deprecated */
-function playerRecapV1(history, playerIdx) {
-  const list = history.filter((h) => h.playerIdx === playerIdx).sort((a, b) => a.rank - b.rank);
-  const total = list.reduce((s, g) => s + groupSum(g), 0);
-  return { groups: list, total };
-}
-
-/** Instantané sérialisé de l'état (players, history, seatOrder, actionCounter, log). @deprecated */
-export function snapshot(game) {
-  return JSON.stringify({
-    players: game.players,
-    history: game.history,
-    seatOrder: game.seatOrder,
-    actionCounter: game.actionCounter,
-    log: game.log,
-  });
-}
-
-/** Empile un instantané ; la pile est bornée à UNDO_LIMIT. @deprecated utiliser `undo(log)` */
-export function pushUndo(undoStack, game) {
-  undoStack.push(snapshot(game));
-  if (undoStack.length > UNDO_LIMIT) undoStack.shift();
-  return undoStack;
-}
-
-/** Dépile et renvoie l'état précédent (objet), ou null si la pile est vide. @deprecated */
-export function popUndo(undoStack) {
-  if (!undoStack.length) return null;
-  return JSON.parse(undoStack.pop());
 }

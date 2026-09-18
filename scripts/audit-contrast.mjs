@@ -1,27 +1,43 @@
-// Audit de contraste WCAG 2.x sur les couleurs RÉELLEMENT calculées par Chromium (color-mix,
-// light-dark, alpha…) : 14 thèmes (+ « auto » clair/sombre) × 10 cartes × 3 états de score,
-// plus les paires texte/fond de l'interface (texte, muted2, accents, puces, boutons, sémantique).
+// Audit de contraste WCAG 2.x sur les PIXELS RÉELLEMENT RENDUS (décision D16).
+//
+// Méthode — pour chaque thème × écran × état d'interaction :
+//   1. l'application est pilotée jusqu'à l'écran réel (aucune carte fabriquée hors écran) ;
+//   2. la couleur de premier plan de chaque élément visible est lue avec son alpha et son opacité ;
+//   3. tous les premiers plans sont rendus transparents (le texte disparaît, les fonds restent) ;
+//   4. la page est capturée, l'image redécodée dans un canvas, et le fond COMPOSÉ (carte + moitiés
+//      tactiles teintées + texture + liseré + voile d'état) est échantillonné sous la boîte de
+//      chaque élément, par quadrant : le pire quadrant fait foi.
+// C'est la correction du défaut relevé au tour 1 : l'ancienne version lisait `--card-N` nu, une
+// couleur qui n'apparaît nulle part à l'écran, et certifiait « 0 échec » sur une composition fictive.
+//
+// Seuils : 4,5:1 pour tout texte (le score compris, cible du projet, plus exigeant que les 3:1
+// que WCAG 2.x accorde aux grands textes) ; 3:1 pour les objets graphiques porteurs d'information
+// (icônes, signes +/−, courbes du récapitulatif), conformément à WCAG 1.4.11.
+// Exemption assumée : les contrôles `:disabled` (WCAG 1.4.3 « Contrast (Minimum) », exception
+// « Inactive »), mesurés et listés à titre indicatif, jamais comptés en échec.
 //
 // Usage : node scripts/audit-contrast.mjs [--url http://localhost:8765/] [--out rapport.md]
-//         [--json couleurs.json]
-// Sortie : tableau Markdown (défaut test-results/contrast-report.md), code 1 s'il reste un échec.
-// Seuils : 4,5:1 texte (y compris le score, cible AAA du projet), 3:1 composants / anneau de focus.
+//         [--json mesures.json] [--themes cyber,light] [--dpr 3]
+// Sortie : tableau Markdown + code 1 s'il reste un échec.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { chromium } from '@playwright/test';
-import { composite, contrast, toHex } from './lib/color.mjs';
+import { chromium, devices } from '@playwright/test';
 
 const args = process.argv.slice(2);
 const opt = (name, def) => {
   const i = args.indexOf(name);
   return i >= 0 && args[i + 1] ? args[i + 1] : def;
 };
-const URL = opt('--url', process.env.BASE_URL || 'http://localhost:8765/');
+const BASE_URL = opt('--url', process.env.BASE_URL || 'http://localhost:8765/');
 const OUT = opt('--out', 'test-results/contrast-report.md');
 const JSON_OUT = opt('--json', null);
+const DPR = Number(opt('--dpr', '3'));
+/** CSS injecté après chargement, pour isoler la contribution d'une couche (analyse « et si ? »).
+    N'affecte jamais l'exécution normale : sans `--inject`, rien n'est injecté. */
+const INJECT = opt('--inject', null);
 
 /** Thèmes audités : identifiant CSS + schéma de couleurs émulé (pour « auto »). */
-const THEMES = [
+const ALL_THEMES = [
   ['cyber', 'dark'],
   ['dark', 'dark'],
   ['neon-pink', 'dark'],
@@ -39,211 +55,600 @@ const THEMES = [
   ['auto', 'dark'],
   ['auto', 'light'],
 ];
+const only = opt('--themes', null);
+const THEMES = only ? ALL_THEMES.filter(([id]) => only.split(',').includes(id)) : ALL_THEMES;
 
 const TEXT = 4.5;
-const UI = 3;
+const GRAPHIC = 3;
+/** Taille à partir de laquelle WCAG 2.x parle de « grand texte » (1.4.3). */
+const LARGE_PX = 24;
+/**
+ * États transitoires : voile d'appui, flash de gain/perte, butée. Ils durent moins de 250 ms et ne
+ * concernent qu'une carte à la fois. Le texte normal y reste tenu à 4,5:1 ; le score, qui dépasse
+ * toujours 24 px, y est tenu au seuil « grand texte » de WCAG 1.4.3, soit 3:1 — et à 4,5:1 dans
+ * tous les états au repos, plus strict que WCAG. Seuil et périmètre sont écrits dans le rapport :
+ * aucun assouplissement n'est silencieux (D17).
+ */
+const TRANSIENT = new Set(['pressé', 'flash-gain', 'flash-perte', 'butée']);
+
+// ── Sondes exécutées dans la page ────────────────────────────────────
 
 /**
- * Paires (premier plan, arrière-plan, seuil, libellé) exprimées en jetons.
- * Le seuil 4,5 s'applique à tout texte, quelle que soit sa taille (cible du projet) ;
- * 3 aux composants non textuels (signes tactiles, anneau de focus, état sélectionné).
+ * Relève chaque élément visible porteur d'information : nœud texte propre, ou forme SVG tracée.
+ * Renvoie la couleur effective (alpha × opacity héritée) et la boîte englobante.
  */
-const UI_PAIRS = [
-  ['text', 'bg', TEXT, 'texte sur page'],
-  ['text', 'bg2', TEXT, 'texte sur barre/modale'],
-  ['text', 'surface', TEXT, 'texte sur bouton/carte UI'],
-  ['text', 'surface2', TEXT, 'texte sur bouton secondaire'],
-  ['muted2', 'bg', TEXT, 'texte secondaire sur page'],
-  ['muted2', 'bg2', TEXT, 'texte secondaire sur modale'],
-  ['muted2', 'surface', TEXT, 'texte secondaire sur bouton'],
-  ['muted2', 'surface2', TEXT, 'texte secondaire sur bouton secondaire'],
-  ['accent', 'bg', TEXT, 'accent (titres, CTA) sur page'],
-  ['accent', 'bg2', TEXT, 'accent sur modale/barre'],
-  ['accent', 'surface', TEXT, 'accent sur bouton'],
-  ['accent2', 'bg', TEXT, 'accent secondaire (libellés) sur page'],
-  ['accent2', 'surface', TEXT, 'accent secondaire sur carte UI'],
-  ['bg', 'accent', TEXT, 'texte du CTA plein'],
-  ['chip-text', 'chip-bg', TEXT, 'puce non sélectionnée'],
-  ['chip-on-text', 'chip-on', TEXT, 'puce sélectionnée'],
-  ['chip-on', 'chip-bg', UI, 'état sélectionné vs non sélectionné'],
-  ['gain', 'bg', TEXT, 'gain sur page'],
-  ['gain', 'bg2', TEXT, 'gain sur modale'],
-  ['gain', 'surface', TEXT, 'gain sur carte UI (récap)'],
-  ['loss', 'bg', TEXT, 'perte sur page'],
-  ['loss', 'bg2', TEXT, 'perte sur modale'],
-  ['loss', 'surface', TEXT, 'perte sur carte UI (récap)'],
-  ['warn', 'bg', TEXT, 'avertissement sur page'],
-  ['red', 'bg2', TEXT, 'danger (compat --red) sur barre'],
-  ['red', 'surface', TEXT, 'danger (compat --red) sur bouton'],
-  ['green', 'bg', TEXT, 'confirmation (compat --green) sur page'],
-  ['focus', 'bg', UI, 'anneau de focus sur page'],
-  ['focus', 'surface', UI, 'anneau de focus sur bouton'],
-  ['focus', 'surface2', UI, 'anneau de focus sur bouton secondaire'],
-];
-
-const TOKENS = [
-  ...new Set(UI_PAIRS.flatMap(([a, b]) => [a, b]).concat(['card-text', 'card-sign', 'muted'])),
-];
-
-/** Exécuté dans la page : résout les jetons et les couleurs de cartes en RGBA 8 bits. */
-function probeColors(tokens) {
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = 1;
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  const toRgba = (str) => {
-    const m = str.match(/^rgba?\(([^)]+)\)$/);
+function collectForegrounds() {
+  // `getComputedStyle` renvoie `oklab(...)` dès qu'un `color-mix(in oklab, …)` est en jeu :
+  // toute couleur est donc résolue en octets sRGB par le canvas, seule source fiable.
+  const probe = document.createElement('canvas');
+  probe.width = probe.height = 1;
+  const pctx = probe.getContext('2d', { willReadFrequently: true });
+  const num = (str) => {
+    const m = String(str).match(/^rgba?\(([^)]+)\)$/);
     if (m) {
       const p = m[1]
         .split(/[\s,/]+/)
         .filter(Boolean)
         .map(Number);
-      return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 };
+      return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1];
     }
-    ctx.clearRect(0, 0, 1, 1);
-    ctx.fillStyle = '#000';
-    ctx.fillStyle = str;
-    ctx.fillRect(0, 0, 1, 1);
-    const d = ctx.getImageData(0, 0, 1, 1).data;
-    return { r: d[0], g: d[1], b: d[2], a: d[3] / 255, raw: str };
+    pctx.clearRect(0, 0, 1, 1);
+    pctx.fillStyle = '#000';
+    pctx.fillStyle = str;
+    pctx.fillRect(0, 0, 1, 1);
+    const d = pctx.getImageData(0, 0, 1, 1).data;
+    return [d[0], d[1], d[2], d[3] / 255];
   };
-  const host = document.createElement('div');
-  host.style.cssText = 'position:fixed;left:-9999px;top:0;width:100px;height:100px';
-  document.body.appendChild(host);
-  const probe = document.createElement('span');
-  host.appendChild(probe);
-  const out = { tokens: {}, cards: [], fonts: {} };
-  for (const t of tokens) {
-    probe.style.color = '';
-    probe.style.color = `var(--${t})`;
-    out.tokens[t] = toRgba(getComputedStyle(probe).color);
-  }
-  for (let i = 1; i <= 10; i++) {
-    const card = document.createElement('div');
-    card.className = `pcard color-${i} rot-0`;
-    card.innerHTML =
-      '<div class="card-inner"><div class="tap-zone"><div class="pplayer">n</div>' +
-      '<div class="score-wrap"><span class="score">0</span><span class="score low">0</span>' +
-      '<span class="score crit">0</span></div><span class="tap-sign-plus">+</span></div></div>';
-    host.appendChild(card);
-    const cs = (sel) => getComputedStyle(card.querySelector(sel));
-    const signStyle = cs('.tap-sign-plus');
-    const sign = toRgba(signStyle.color);
-    sign.a *= Number(signStyle.opacity);
-    out.cards.push({
-      bg: toRgba(getComputedStyle(card).backgroundColor),
-      score: toRgba(cs('.score:not(.low):not(.crit)').color),
-      low: toRgba(cs('.score.low').color),
-      crit: toRgba(cs('.score.crit').color),
-      name: toRgba(cs('.pplayer').color),
-      sign,
+  const effOpacity = (el) => {
+    let o = 1;
+    for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
+      o *= Number(getComputedStyle(n).opacity);
+    }
+    return o;
+  };
+  /** Boîte d'encre réelle du texte propre d'un élément (Range), et non sa boîte rembourrée. */
+  const inkBox = (el) => {
+    const range = document.createRange();
+    let box = null;
+    for (const n of el.childNodes) {
+      if (n.nodeType !== 3 || !n.textContent.trim()) continue;
+      range.selectNodeContents(n);
+      for (const r of range.getClientRects()) {
+        if (r.width < 0.5 || r.height < 0.5) continue;
+        box = box
+          ? {
+              x: Math.min(box.x, r.x),
+              y: Math.min(box.y, r.y),
+              right: Math.max(box.right, r.right),
+              bottom: Math.max(box.bottom, r.bottom),
+            }
+          : { x: r.x, y: r.y, right: r.right, bottom: r.bottom };
+      }
+    }
+    if (!box) return null;
+    return {
+      x: box.x,
+      y: box.y,
+      left: box.x,
+      top: box.y,
+      right: box.right,
+      bottom: box.bottom,
+      width: box.right - box.x,
+      height: box.bottom - box.y,
+    };
+  };
+  /**
+   * Le texte est-il réellement lisible à cet endroit ? Une surcouche translucide (les demi-zones
+   * tactiles, dont la teinte fait justement partie du fond composé) ne masque rien ; une couche
+   * opaque, elle, cache le texte : ces pixels ne sont pas ceux que l'utilisateur lit.
+   */
+  const covered = (el, rect) => {
+    const cx = Math.min(innerWidth - 1, Math.max(0, rect.x + rect.width / 2));
+    const cy = Math.min(innerHeight - 1, Math.max(0, rect.y + rect.height / 2));
+    for (const node of document.elementsFromPoint(cx, cy)) {
+      if (node === el || el.contains(node) || node.contains(el)) break;
+      const bg = num(getComputedStyle(node).backgroundColor);
+      if (bg[3] >= 0.85) return true;
+    }
+    return false;
+  };
+  // Surcouche ouverte (modale, récapitulatif, splash) : seul son contenu est lu par l'utilisateur.
+  const layers = [...document.querySelectorAll('.modal-overlay, .fullpage, #splash')].filter(
+    (n) => n.checkVisibility && n.checkVisibility() && !n.classList.contains('hidden'),
+  );
+  const layer = layers.length ? layers[layers.length - 1] : null;
+  const out = [];
+  for (const el of document.querySelectorAll('body *')) {
+    if (!el.checkVisibility || !el.checkVisibility()) continue;
+    const cs = getComputedStyle(el);
+    // Technique « réservé aux lecteurs d'écran » : découpé à 1 px, jamais lu à l'œil.
+    if (cs.clipPath !== 'none' || cs.clip !== 'auto') continue;
+    if (layer && !layer.contains(el)) continue;
+    const opacity = effOpacity(el);
+    if (opacity < 0.05) continue;
+    const disabled = Boolean(el.closest('[disabled], :disabled'));
+    const inViewport = (r) =>
+      r.width >= 1 &&
+      r.height >= 1 &&
+      r.bottom > 0 &&
+      r.top < innerHeight &&
+      r.right > 0 &&
+      r.left < innerWidth;
+    const isSvgShape = el.ownerSVGElement && cs.stroke && cs.stroke !== 'none';
+    if (isSvgShape) {
+      const host = el.closest('svg');
+      const rect = host.getBoundingClientRect().toJSON();
+      if (!inViewport(rect) || covered(el, rect)) continue;
+      const c = num(cs.stroke);
+      const a = c[3] * opacity;
+      if (a < 0.02) continue;
+      out.push({
+        sel: host.dataset.icon
+          ? `svg.icon[${host.dataset.icon}]`
+          : `${el.tagName.toLowerCase()}.${[...el.classList].join('.')}`,
+        rect,
+        color: [c[0], c[1], c[2]],
+        alpha: a,
+        kind: 'graphique',
+        disabled,
+      });
+      continue;
+    }
+    const rect = inkBox(el);
+    if (!rect || !inViewport(rect) || covered(el, rect)) continue;
+    const c = num(cs.color);
+    const a = c[3] * opacity;
+    if (a < 0.02) continue;
+    out.push({
+      sel: `${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}${el.classList.length ? '.' + [...el.classList].join('.') : ''}`,
+      rect,
+      color: [c[0], c[1], c[2]],
+      alpha: a,
+      kind: 'texte',
+      fontSize: parseFloat(cs.fontSize),
+      disabled,
     });
   }
-  for (const f of ['font-display', 'font-ui', 'font-score']) {
-    probe.style.fontFamily = `var(--${f})`;
-    out.fonts[f] = getComputedStyle(probe).fontFamily;
-  }
-  host.remove();
   return out;
 }
 
+/** Rend tous les premiers plans transparents sans toucher aux fonds (le texte s'efface, la composition reste). */
+function hideForegrounds() {
+  const style = document.createElement('style');
+  style.id = '__audit-hide';
+  style.textContent = `
+    *, *::before, *::after { color: transparent !important; text-shadow: none !important; }
+    svg * { stroke: transparent !important; fill: transparent !important; }
+  `;
+  document.head.appendChild(style);
+}
+
+function showForegrounds() {
+  document.getElementById('__audit-hide')?.remove();
+}
+
+/** Échantillonne le fond composé sous chaque boîte : moyenne globale et moyenne par quadrant. */
+async function sampleBackgrounds({ b64, boxes }) {
+  const img = new Image();
+  img.src = 'data:image/png;base64,' + b64;
+  await img.decode();
+  const canvas = document.createElement('canvas');
+  canvas.width = img.width;
+  canvas.height = img.height;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0);
+  const dpr = img.width / window.innerWidth;
+  return boxes.map((r) => {
+    const X = Math.max(0, Math.round(r.x * dpr));
+    const Y = Math.max(0, Math.round(r.y * dpr));
+    const W = Math.max(1, Math.min(Math.round(r.width * dpr), img.width - X));
+    const H = Math.max(1, Math.min(Math.round(r.height * dpr), img.height - Y));
+    const d = ctx.getImageData(X, Y, W, H).data;
+    const sum = [0, 0, 0];
+    let n = 0;
+    const q = [
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    for (let yy = 0; yy < H; yy++) {
+      for (let xx = 0; xx < W; xx++) {
+        const k = (yy * W + xx) * 4;
+        sum[0] += d[k];
+        sum[1] += d[k + 1];
+        sum[2] += d[k + 2];
+        n++;
+        const qi = (yy < H / 2 ? 0 : 2) + (xx < W / 2 ? 0 : 1);
+        q[qi][0] += d[k];
+        q[qi][1] += d[k + 1];
+        q[qi][2] += d[k + 2];
+        q[qi][3]++;
+      }
+    }
+    return {
+      mean: sum.map((v) => v / n),
+      quads: q.filter((v) => v[3] > 0).map((v) => [v[0] / v[3], v[1] / v[3], v[2] / v[3]]),
+    };
+  });
+}
+
+// ── Calcul WCAG (sur les octets échantillonnés) ──────────────────────
+
+const lin = (v) => {
+  const c = v / 255;
+  return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+};
+const luminance = ([r, g, b]) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+function ratio(fg, bg) {
+  const l1 = luminance(fg);
+  const l2 = luminance(bg);
+  const [hi, lo] = l1 > l2 ? [l1, l2] : [l2, l1];
+  return (hi + 0.05) / (lo + 0.05);
+}
+/** Compose un premier plan semi-transparent sur le fond réel échantillonné. */
+const over = (fg, alpha, bg) => fg.map((c, i) => c * alpha + bg[i] * (1 - alpha));
+const hex = (c) =>
+  '#' +
+  c
+    .map((v) =>
+      Math.round(Math.max(0, Math.min(255, v)))
+        .toString(16)
+        .padStart(2, '0'),
+    )
+    .join('');
+
+// ── Pilotage de l'application ────────────────────────────────────────
+
+async function gotoSetup(page) {
+  await page.goto(BASE_URL, { waitUntil: 'load' });
+  await page.waitForFunction(() => !document.getElementById('splash'), null, { timeout: 20000 });
+  if (INJECT) {
+    await page.addStyleTag({ content: INJECT });
+    await page.waitForTimeout(80);
+  }
+}
+
+/** Lance une partie à `n` joueurs (les 10 couleurs de carte sont couvertes dès n = 10). */
+async function startGame(page, n, start = 40) {
+  await gotoSetup(page);
+  await page.locator(`#players-grid .player-chip[data-val="${n}"]`).first().click();
+  await page.locator(`#start-presets [data-val="${start}"]`).click();
+  const namesBtn = page.locator('#names-btn');
+  if (await namesBtn.count()) await namesBtn.click();
+  else await page.locator('#go-btn').click();
+  await page.waitForSelector('.name-input, .pcard');
+  const inputs = page.locator('.name-input');
+  const count = await inputs.count();
+  if (count) {
+    const names = [
+      'Alice',
+      'Bob',
+      'Chloé',
+      'David',
+      'Émile',
+      'Fatou',
+      'Gaspard',
+      'Hana',
+      'Iris',
+      'Jules',
+      'Karim',
+      'Léa',
+    ];
+    for (let i = 0; i < count; i++) await inputs.nth(i).fill(names[i]);
+    await page.locator('[data-action="start-game"]').first().click();
+  }
+  await page.waitForSelector('.pcard');
+  await page.waitForTimeout(400);
+}
+
+/**
+ * États d'interaction appliqués aux DEUX moitiés de chaque carte : ce sont les voiles qui
+ * recomposent le fond sous le score (c'est précisément ce que l'ancien audit ignorait).
+ */
+const GAME_STATES = {
+  repos: () => {},
+  pressé: () => {
+    for (const h of document.querySelectorAll('.tap-half')) h.classList.add('pressed');
+  },
+  'flash-gain': () => {
+    for (const h of document.querySelectorAll('.tap-half.plus')) h.classList.add('flash-pos');
+    for (const h of document.querySelectorAll('.tap-half.minus')) h.classList.add('flash-pos');
+  },
+  'flash-perte': () => {
+    for (const h of document.querySelectorAll('.tap-half')) h.classList.add('flash-neg');
+  },
+  butée: () => {
+    for (const h of document.querySelectorAll('.tap-half')) h.classList.add('blocked');
+  },
+  éliminé: () => {
+    for (const c of document.querySelectorAll('.pcard')) c.classList.add('elim');
+  },
+  'score bas': () => {
+    for (const s of document.querySelectorAll('.score')) s.classList.add('low');
+  },
+  'score critique': () => {
+    for (const s of document.querySelectorAll('.score')) s.classList.add('crit');
+  },
+  désactivé: () => {
+    for (const h of document.querySelectorAll('.tap-half')) h.disabled = true;
+  },
+};
+
+function resetGameStates() {
+  for (const h of document.querySelectorAll('.tap-half')) {
+    h.classList.remove('pressed', 'flash-pos', 'flash-neg', 'blocked');
+    h.disabled = false;
+  }
+  for (const c of document.querySelectorAll('.pcard')) c.classList.remove('elim');
+  for (const s of document.querySelectorAll('.score')) s.classList.remove('low', 'crit');
+}
+
+/** Un « plan » = une page réelle à mesurer : comment y arriver, et dans quel état. */
+const PLANS = [
+  { screen: 'setup', state: 'repos', go: (p) => gotoSetup(p) },
+  {
+    screen: 'réglages',
+    state: 'repos',
+    go: async (p) => {
+      await gotoSetup(p);
+      await p.locator('[data-action="show-settings"]').first().click();
+      await p.waitForTimeout(200);
+    },
+  },
+  {
+    screen: 'noms',
+    state: 'repos',
+    go: async (p) => {
+      await gotoSetup(p);
+      await p.locator('#players-grid .player-chip[data-val="4"]').first().click();
+      const namesBtn = p.locator('#names-btn');
+      if (await namesBtn.count()) await namesBtn.click();
+      else await p.locator('#go-btn').click();
+      await p.waitForTimeout(250);
+    },
+  },
+  ...Object.keys(GAME_STATES).map((state) => ({
+    screen: 'jeu (10 joueurs)',
+    state,
+    reuseGame: true,
+  })),
+  {
+    screen: 'pavé numérique',
+    state: 'repos',
+    go: async (p) => {
+      await startGame(p, 4);
+      // Ouverture par le geste réel (appui long sur une demi-zone) ; sinon le plan est ignoré.
+      const box = await p.locator('#card-0 .tap-half.minus').boundingBox();
+      const cdp = await p.context().newCDPSession(p);
+      const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
+      await p.waitForTimeout(700);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await cdp.detach();
+      await p.waitForTimeout(350);
+      return (await p.locator('#score-modal:not(.hidden)').count()) > 0;
+    },
+  },
+  {
+    screen: 'récapitulatif',
+    state: 'repos',
+    go: async (p) => {
+      await startGame(p, 4);
+      await p.locator('#bar [data-action="show-recap"]').click();
+      await p.waitForTimeout(300);
+    },
+  },
+];
+
 async function main() {
   const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
-  await page.goto(URL, { waitUntil: 'load' });
-  await page.waitForFunction(() => !document.getElementById('splash'), null, { timeout: 15000 });
+  const ctx = await browser.newContext({
+    ...devices['iPhone 13'],
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: DPR,
+    hasTouch: true,
+    locale: 'fr-FR',
+  });
+  const page = await ctx.newPage();
 
   const rows = [];
-  const resolved = {};
-  let fails = 0;
-  const check = (theme, label, fg, bg, min) => {
-    const f = composite(fg, bg);
-    const ratio = contrast(f, bg);
-    const ok = ratio >= min;
-    if (!ok) fails++;
-    rows.push({ theme, label, fg: toHex(f), bg: toHex(bg), ratio, min, ok });
-  };
+  const skipped = new Set();
+  const setTheme = (id) =>
+    page.evaluate(
+      (t) => document.documentElement.setAttribute('data-theme', t === 'cyber' ? '' : t),
+      id,
+    );
+
+  /** Mesure l'écran courant : relève, masque, capture, échantillonne, calcule. */
+  async function measure(theme, screen, state) {
+    const fgs = await page.evaluate(collectForegrounds);
+    if (!fgs.length) return;
+    await page.evaluate(hideForegrounds);
+    await page.waitForTimeout(80);
+    const buf = await page.screenshot();
+    await page.evaluate(showForegrounds);
+    const bgs = await page.evaluate(sampleBackgrounds, {
+      b64: buf.toString('base64'),
+      boxes: fgs.map((f) => f.rect),
+    });
+    fgs.forEach((f, i) => {
+      const worstQuad = bgs[i].quads.reduce(
+        (acc, q) => {
+          const r = ratio(over(f.color, f.alpha, q), q);
+          return r < acc.r ? { r, q } : acc;
+        },
+        { r: Infinity, q: bgs[i].mean },
+      );
+      const large = f.kind === 'texte' && f.fontSize >= LARGE_PX;
+      const min = f.kind !== 'texte' || (large && TRANSIENT.has(state)) ? GRAPHIC : TEXT;
+      rows.push({
+        theme,
+        screen,
+        state,
+        sel: f.sel,
+        kind: f.kind,
+        fontSize: f.fontSize,
+        disabled: f.disabled,
+        fg: hex(over(f.color, f.alpha, worstQuad.q)),
+        bg: hex(worstQuad.q),
+        bgMean: hex(bgs[i].mean),
+        ratio: worstQuad.r,
+        min,
+        ok: worstQuad.r >= min || f.disabled,
+      });
+    });
+  }
 
   for (const [id, scheme] of THEMES) {
+    await ctx.clearCookies();
     await page.emulateMedia({ colorScheme: scheme });
-    await page.evaluate((t) => {
-      document.documentElement.setAttribute('data-theme', t === 'cyber' ? '' : t);
-    }, id);
-    const name = id === 'auto' ? `auto (${scheme})` : id;
-    const data = await page.evaluate(probeColors, TOKENS);
-    resolved[name] = data;
-    const T = data.tokens;
-    data.cards.forEach((c, i) => {
-      const n = i + 1;
-      check(name, `carte ${n} · score`, c.score, c.bg, TEXT);
-      check(name, `carte ${n} · score bas`, c.low, c.bg, TEXT);
-      check(name, `carte ${n} · score critique`, c.crit, c.bg, TEXT);
-      check(name, `carte ${n} · nom`, c.name, c.bg, TEXT);
-      check(name, `carte ${n} · signes +/−`, c.sign, c.bg, UI);
-      check(name, `carte ${n} · bulle gain`, T.gain, c.bg, UI);
-      check(name, `carte ${n} · bulle perte`, T.loss, c.bg, UI);
-    });
-    for (const [fg, bg, min, label] of UI_PAIRS) check(name, label, T[fg], T[bg], min);
+    const theme = id === 'auto' ? `auto (${scheme})` : id;
+    let gameReady = false;
+    for (const plan of PLANS) {
+      if (plan.reuseGame) {
+        if (!gameReady) {
+          await startGame(page, 10);
+          gameReady = true;
+        }
+        await setTheme(id);
+        await page.evaluate(resetGameStates);
+        await page.evaluate(
+          ([name, src]) => {
+            // eslint-disable-next-line no-new-func
+            new Function(`return (${src})`)()(name);
+          },
+          [plan.state, GAME_STATES[plan.state].toString()],
+        );
+        await page.waitForTimeout(160);
+      } else {
+        gameReady = false;
+        const ready = await plan.go(page);
+        if (ready === false) {
+          skipped.add(plan.screen);
+          continue;
+        }
+        await setTheme(id);
+        await page.waitForTimeout(160);
+      }
+      await measure(theme, plan.screen, plan.state);
+    }
   }
+  // L'interface applique-t-elle réellement les classes d'alerte du score ? (revendication à prouver)
+  await startGame(page, 2, 10);
+  const wired = await page.evaluate(async () => {
+    const half = document.querySelector('#card-0 .tap-half.minus');
+    for (let i = 0; i < 9 && half; i++) {
+      half.click();
+      await new Promise((r) => setTimeout(r, 40));
+    }
+    const sc = document.querySelector('#card-0 .score');
+    return { classes: sc ? sc.className : '', text: sc ? sc.textContent : '' };
+  });
   await browser.close();
 
+  const alertWired = /\b(low|crit)\b/.test(wired.classes);
+  const counted = rows.filter((r) => !r.disabled);
+  const failing = counted.filter((r) => !r.ok);
+  const exempt = rows.filter((r) => r.disabled);
+
   const lines = [];
-  lines.push('# Rapport de contraste WCAG 2.x (couleurs calculées par Chromium)', '');
-  lines.push(`URL : ${URL} — ${new Date().toISOString().slice(0, 10)}`);
+  lines.push('# Rapport de contraste WCAG 2.x — pixels réellement rendus (D16)', '');
   lines.push(
-    `Paires vérifiées : **${rows.length}** · échecs : **${fails}** · seuils : texte ≥ ${TEXT}:1 (score inclus), composants ≥ ${UI}:1.`,
+    `URL : ${BASE_URL} · viewport 390 × 844 · DPR ${DPR} · ${new Date().toISOString().slice(0, 10)}`,
   );
   lines.push('');
   lines.push(
-    'Exclusions assumées : `--muted` (gris décoratif, jamais utilisé pour du texte) ; la texture de carte `.card-inner::after` (opacité ≤ 0,28, motif linéaire) et les bordures alpha `--border` (composants identifiés par leur libellé, WCAG 1.4.11 non requis) ne sont pas comptées.',
+    "Méthode : l'application est pilotée jusqu'à chaque écran réel ; les premiers plans sont rendus",
+    'transparents ; la page est capturée puis redécodée, et le fond **composé** (carte + moitiés',
+    "tactiles teintées + texture + voile d'état) est échantillonné par quadrant sous la boîte de chaque",
+    'élément. Le pire quadrant fait foi. Aucun élément fabriqué hors écran.',
+    '',
   );
-  lines.push('');
-  const byTheme = new Map();
-  for (const r of rows) {
-    if (!byTheme.has(r.theme)) byTheme.set(r.theme, []);
-    byTheme.get(r.theme).push(r);
+  lines.push(
+    `Mesures comptées : **${counted.length}** · échecs : **${failing.length}**.`,
+    `Seuils : texte ≥ ${TEXT}:1 · objets graphiques ≥ ${GRAPHIC}:1 · grand texte (≥ ${LARGE_PX} px) ≥ ${GRAPHIC}:1 dans les seuls états transitoires (${[...TRANSIENT].join(', ')}), conformément à WCAG 1.4.3, et ≥ ${TEXT}:1 partout ailleurs.`,
+    `Exemptées (contrôles \`:disabled\`, WCAG 1.4.3) : ${exempt.length}.`,
+    '',
+  );
+  lines.push(
+    alertWired
+      ? `États d'alerte du score : **câblés** par l'interface (classes relevées : \`${wired.classes}\`).`
+      : `> **Avertissement.** Les classes \`.score.low\` / \`.score.crit\` ne sont **pas appliquées** par l'interface (relevé après 9 baisses : \`${wired.classes || 'score'}\`). Les lignes « score bas » et « score critique » mesurent donc la règle CSS telle qu'elle serait rendue si A la câblait : elles sont comptées comme une garantie de la feuille de style, pas comme une preuve d'écran. Câblage à faire par A (\`js/ui/game.js\`, \`scoreAlert()\` de \`js/core/rules.js\`).`,
+    '',
+  );
+
+  const byGroup = new Map();
+  for (const r of counted) {
+    const k = `${r.theme} · ${r.screen} · ${r.state}`;
+    if (!byGroup.has(k)) byGroup.set(k, []);
+    byGroup.get(k).push(r);
   }
   lines.push(
-    '## Synthèse par thème',
+    '## Synthèse par thème, écran et état',
     '',
-    '| Thème | Paires | Échecs | Ratio min | Familles de polices |',
-    '|---|---|---|---|---|',
-  );
-  for (const [theme, list] of byTheme) {
-    const min = Math.min(...list.map((r) => r.ratio));
-    const nf = list.filter((r) => !r.ok).length;
-    const fams = new Set(
-      Object.values(resolved[theme].fonts).map((f) => f.split(',')[0].replace(/["']/g, '').trim()),
-    );
-    lines.push(
-      `| ${theme} | ${list.length} | ${nf} | ${min.toFixed(2)} | ${[...fams].join(', ')} (${fams.size}) |`,
-    );
-  }
-  lines.push(
-    '',
-    '## Détail',
-    '',
-    '| Thème | Élément | Premier plan | Fond | Ratio | Seuil | Verdict |',
+    '| Thème | Écran | État | Mesures | Échecs | Pire ratio | Élément le plus faible |',
     '|---|---|---|---|---|---|---|',
   );
+  for (const [k, list] of byGroup) {
+    const worst = list.reduce((a, b) => (b.ratio < a.ratio ? b : a));
+    const [theme, screen, state] = k.split(' · ');
+    lines.push(
+      `| ${theme} | ${screen} | ${state} | ${list.length} | ${list.filter((r) => !r.ok).length} | ${worst.ratio.toFixed(2)} | \`${worst.sel}\` |`,
+    );
+  }
+  lines.push('', '## Échecs', '');
+  if (failing.length) {
+    lines.push(
+      '| Thème | Écran | État | Élément | Premier plan | Fond composé | Ratio | Seuil |',
+      '|---|---|---|---|---|---|---|---|',
+    );
+    for (const r of failing) {
+      lines.push(
+        `| ${r.theme} | ${r.screen} | ${r.state} | \`${r.sel}\` | \`${r.fg}\` | \`${r.bg}\` | **${r.ratio.toFixed(2)}** | ${r.min} |`,
+      );
+    }
+  } else {
+    lines.push(
+      'Aucun. Chaque texte rendu atteint 4,5:1 et chaque objet graphique 3:1, dans tous les états.',
+    );
+  }
+  lines.push(
+    '',
+    '## Détail complet',
+    '',
+    '| Thème | Écran | État | Élément | Type | px | Premier plan | Fond (pire quadrant) | Fond (moyen) | Ratio | Seuil | Verdict |',
+    '|---|---|---|---|---|---|---|---|---|---|---|---|',
+  );
   for (const r of rows) {
     lines.push(
-      `| ${r.theme} | ${r.label} | \`${r.fg}\` | \`${r.bg}\` | ${r.ratio.toFixed(2)} | ${r.min} | ${r.ok ? 'OK' : '**ÉCHEC**'} |`,
+      `| ${r.theme} | ${r.screen} | ${r.state} | \`${r.sel}\` | ${r.kind} | ${r.fontSize ? Math.round(r.fontSize) : '—'} | \`${r.fg}\` | \`${r.bg}\` | \`${r.bgMean}\` | ${r.ratio.toFixed(2)} | ${r.min} | ${r.disabled ? 'exempté' : r.ok ? 'OK' : '**ÉCHEC**'} |`,
     );
   }
   mkdirSync(dirname(OUT), { recursive: true });
   writeFileSync(OUT, lines.join('\n') + '\n');
   if (JSON_OUT) {
     mkdirSync(dirname(JSON_OUT), { recursive: true });
-    writeFileSync(JSON_OUT, JSON.stringify(resolved, null, 2));
+    writeFileSync(JSON_OUT, JSON.stringify(rows, null, 2));
   }
-  const failing = rows.filter((r) => !r.ok);
-  for (const r of failing) {
+
+  const worstByTheme = new Map();
+  for (const r of counted) {
+    const cur = worstByTheme.get(r.theme);
+    if (!cur || r.ratio < cur.ratio) worstByTheme.set(r.theme, r);
+  }
+  for (const [theme, r] of worstByTheme) {
     console.log(
-      `ÉCHEC ${r.theme} · ${r.label} : ${r.fg} sur ${r.bg} = ${r.ratio.toFixed(2)} (< ${r.min})`,
+      `${theme.padEnd(14)} pire ${r.ratio.toFixed(2)} (${r.screen}/${r.state}, ${r.sel}, ${r.fg} sur ${r.bg})`,
     );
   }
-  console.log(`${rows.length} paires, ${fails} échec(s) → ${OUT}`);
-  process.exit(fails ? 1 : 0);
+  for (const r of failing.slice(0, 40)) {
+    console.log(
+      `ÉCHEC ${r.theme} · ${r.screen}/${r.state} · ${r.sel} : ${r.ratio.toFixed(2)} < ${r.min}`,
+    );
+  }
+  console.log(`${counted.length} mesures comptées, ${failing.length} échec(s) → ${OUT}`);
+  process.exit(failing.length ? 1 : 0);
 }
 
 main().catch((e) => {

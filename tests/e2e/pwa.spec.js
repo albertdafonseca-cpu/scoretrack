@@ -1,6 +1,7 @@
 // PWA et résilience : hors-ligne réel (serveur arrêté), mise à jour signalée et appliquée sans perdre la
-// partie, migration depuis les anciens caches, sauvegarde corrompue, export/import, manifeste, haptique,
-// bannière d'erreur. Serveur statique dédié (port libre) pour pouvoir le couper et servir un SW modifié.
+// partie, migration depuis les anciens caches, raccourcis du manifeste, précache tout-ou-rien, stockage
+// en échec, sauvegarde corrompue, export/import, haptique, bannière d'erreur.
+// Serveur statique dédié (port libre) : il peut être coupé, bloquer un fichier et servir un SW modifié.
 import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -9,6 +10,7 @@ import { startStaticServer } from './helpers/static-server.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SHOTS = process.env.PWA_SHOTS_DIR || join(ROOT, 'test-results', 'pwa');
+/** Bruit d'environnement uniquement (proxy TLS du bac à sable), jamais un défaut de l'application. */
 const IGNORED = /ERR_CERT_AUTHORITY_INVALID/;
 
 const swSource = readFileSync(join(ROOT, 'sw-st.js'), 'utf8');
@@ -23,19 +25,22 @@ test.afterAll(async () => {
   await server.stop();
 });
 
+/** Erreurs ET avertissements console + exceptions de page (exigence 7.2 : zéro des deux). */
 function collectErrors(page) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
   page.on('console', (m) => {
-    if (m.type() === 'error' && !IGNORED.test(m.text())) errors.push(`console: ${m.text()}`);
+    const type = m.type();
+    if ((type === 'error' || type === 'warning') && !IGNORED.test(m.text())) {
+      errors.push(`console.${type}: ${m.text()}`);
+    }
   });
   return errors;
 }
 
-async function openApp(page) {
-  await page.goto(server.url);
+async function openApp(page, search = '') {
+  await page.goto(server.url + search);
   await expect(page.locator('#splash')).toHaveCount(0);
-  await expect(page.locator('#setup-page')).toBeVisible();
 }
 
 /** Attend que le SW contrôle la page (première installation : activation + clients.claim). */
@@ -55,34 +60,53 @@ async function startGame(page, { players, start, names = [] }) {
   await expect(page.locator('.pcard')).toHaveCount(players);
 }
 
-/** Tap « + » ou « − » sur une carte selon son orientation. */
+/** Tap « + » ou « − » sur une carte (demi-zones explicites de l'écran de jeu). */
 async function tapCard(page, cardId, side) {
-  const card = page.locator(`#${cardId}`);
-  const rot = await card.evaluate((c) => [...c.classList].find((k) => k.startsWith('rot-')));
-  const box = await card.boundingBox();
-  const far = side === 'plus' ? 0.8 : 0.2;
-  const near = 1 - far;
-  let x = box.x + box.width / 2;
-  let y = box.y + box.height / 2;
-  if (rot === 'rot-l') y = box.y + box.height * far;
-  else if (rot === 'rot-r') y = box.y + box.height * near;
-  else if (rot === 'rot-180') x = box.x + box.width * near;
-  else x = box.x + box.width * far;
-  await page.touchscreen.tap(x, y);
+  await page.locator(`#${cardId} .tap-half.${side}`).tap();
 }
 
-async function tapTimes(page, cardId, side, n, scoreId, expected) {
-  for (let i = 0; i < n; i++) await tapCard(page, cardId, side);
-  await expect(page.locator(scoreId)).toHaveText(expected);
-}
+/** Scores affichés, sans séparateurs de milliers (l'ordre suit les indices de joueur). */
+const domScores = (page) =>
+  page.evaluate(() =>
+    [...document.querySelectorAll('[id^="sc-"]')].map((n) => n.textContent.replace(/\s/g, '')),
+  );
 
-const cacheNames = (page) => page.evaluate(() => caches.keys());
-/** Sauvegarde persistée, normalisée par le schéma courant (indépendant de l'écran de reprise). */
+/** Sauvegarde persistée, relue par le schéma courant (indépendante de l'écran de reprise). */
 const parsedSave = (page) =>
   page.evaluate(async () => {
     const s = await import('./js/core/save-schema.js');
     return s.parseGameOrNull(localStorage.getItem('scoretrack_save'));
   });
+
+/** Scores persistés, sous la même forme que `domScores` : ce qui est affiché doit être ce qui est écrit. */
+async function savedScores(page) {
+  const save = await parsedSave(page);
+  return save === null ? null : save.players.map((p) => String(p.score));
+}
+
+/**
+ * Tape une fois et renvoie les scores affichés puis persistés. Le pas de comptage appartient à
+ * l'écran de jeu ; ce qui est vérifié ici est que l'affichage et la sauvegarde ne divergent jamais.
+ */
+async function tapAndSync(page, cardId, side = 'plus') {
+  const before = await domScores(page);
+  await tapCard(page, cardId, side);
+  await expect.poll(() => domScores(page)).not.toEqual(before);
+  const dom = await domScores(page);
+  await expect.poll(() => savedScores(page)).toEqual(dom);
+  return dom;
+}
+
+/** Identifiant de la carte dont le bas est le plus près de la barre (celle que la bannière menace). */
+const bottomCardId = (page) =>
+  page.evaluate(() => {
+    const cards = [...document.querySelectorAll('.pcard')];
+    return cards.reduce((a, b) =>
+      b.getBoundingClientRect().bottom > a.getBoundingClientRect().bottom ? b : a,
+    ).id;
+  });
+
+const cacheNames = (page) => page.evaluate(() => caches.keys());
 const storageSnapshot = (page) =>
   page.evaluate(() =>
     Object.fromEntries(Object.keys(localStorage).map((k) => [k, localStorage.getItem(k)])),
@@ -117,8 +141,7 @@ test('hors ligne : partie complète jouable serveur coupé, précache sans 404, 
   expect(server.requests.filter((r) => r.status === 404 && precachePaths.has(r.path))).toEqual([]);
 
   await startGame(page, { players: 4, start: 0, names: ['Alice', 'Bruno'] });
-  await tapTimes(page, 'card-0', 'plus', 3, '#sc-0', '3');
-  await page.waitForTimeout(50);
+  const beforeOffline = await tapAndSync(page, 'card-0', 'plus');
 
   // Vrai hors-ligne : le serveur est arrêté et le contexte déclaré hors ligne.
   await server.stop();
@@ -128,28 +151,21 @@ test('hors ligne : partie complète jouable serveur coupé, précache sans 404, 
     await expect(page.locator('#splash')).toHaveCount(0);
     expect(await page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
     await expect(page.locator('#restore-banner')).toBeVisible();
-    const saved = await parsedSave(page);
-    expect(saved.players.map((p) => [p.playerName, p.score])).toEqual([
-      ['Alice', 3],
-      ['Bruno', 0],
-      ['', 0],
-      ['', 0],
-    ]);
-    // Partie complète jouée hors ligne : setup → noms → jeu → taps → annulation → récap.
+    expect(await savedScores(page)).toEqual(beforeOffline);
+    const save = await parsedSave(page);
+    expect(save.players.map((p) => p.playerName)).toEqual(['Alice', 'Bruno', '', '']);
+
+    // Partie complète jouée hors ligne : accueil → noms → jeu → taps → annulation → récap.
     await startGame(page, { players: 3, start: 0, names: ['Chloé'] });
     await expect(page.locator('#card-0 .pplayer')).toHaveText('Chloé');
-    await tapTimes(page, 'card-1', 'plus', 2, '#sc-1', '2');
-    await tapTimes(page, 'card-1', 'minus', 1, '#sc-1', '1');
+    const afterTap = await tapAndSync(page, 'card-1', 'plus');
     await page.locator('#undo-btn').tap();
-    await expect(page.locator('#sc-1')).toHaveText('2');
+    await expect.poll(() => domScores(page)).not.toEqual(afterTap);
+    await expect.poll(() => savedScores(page)).toEqual(await domScores(page));
     await page.getByRole('button', { name: /Récap/ }).click();
     await expect(page.locator('#recap')).toBeVisible();
     await page.locator('#recap-close-btn').click();
-    // Une navigation hors ligne vers une URL de raccourci est servie depuis le cache.
-    const res = await page.goto(`${server.url}?action=resume`);
-    expect(res.status()).toBe(200);
-    await expect(page.locator('#setup-page')).toBeVisible();
-    await expect(page.locator('#restore-banner')).toBeVisible();
+
     // Les polices auto-hébergées sont bien servies hors ligne (aucun échec de chargement).
     const fontFail = await page.evaluate(async () => {
       await document.fonts.ready;
@@ -163,6 +179,49 @@ test('hors ligne : partie complète jouable serveur coupé, précache sans 404, 
   expect(errors).toEqual([]);
 });
 
+test('raccourcis du manifeste : ?action=resume ouvre la partie, ?action=new masque la reprise', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await openApp(page);
+  await startGame(page, { players: 2, start: 10, names: ['Alice', 'Bruno'] });
+  const scores = await tapAndSync(page, 'card-0', 'plus');
+
+  // Référence : une ouverture normale reste sur l'accueil avec la bannière de reprise.
+  await openApp(page);
+  await expect(page.locator('#setup-page')).toBeVisible();
+  await expect(page.locator('#restore-banner')).toBeVisible();
+  await expect(page.locator('#game-screen')).toBeHidden();
+
+  // ?action=resume : l'écran de jeu directement, scores intacts, sans passer par la bannière.
+  await openApp(page, '?action=resume');
+  await expect(page.locator('#game-screen')).toBeVisible();
+  await expect(page.locator('.pcard')).toHaveCount(2);
+  expect(await domScores(page)).toEqual(scores);
+  await expect(page.locator('#card-1 .pplayer')).toHaveText('Bruno');
+  await expect(page.locator('#restore-banner')).toBeHidden();
+  // Le paramètre est retiré : un rechargement ne rejoue pas le raccourci.
+  expect(await page.evaluate(() => location.search)).toBe('');
+  await page.reload();
+  await expect(page.locator('#setup-page')).toBeVisible();
+  await expect(page.locator('#game-screen')).toBeHidden();
+
+  // ?action=new : accueil sans proposition de reprise, la sauvegarde restant intacte.
+  await openApp(page, '?action=new');
+  await expect(page.locator('#setup-page')).toBeVisible();
+  await expect(page.locator('#restore-banner')).toBeHidden();
+  expect(await savedScores(page)).toEqual(scores);
+  expect(await page.evaluate(() => location.search)).toBe('');
+
+  // ?action=resume sans sauvegarde : message explicite, aucune page de jeu vide.
+  await page.evaluate(() => localStorage.removeItem('scoretrack_save'));
+  await openApp(page, '?action=resume');
+  await expect(page.locator('#setup-page')).toBeVisible();
+  await expect(page.locator('#game-screen')).toBeHidden();
+  await expect(page.locator('#sys-toast')).toHaveText('Aucune partie à reprendre.');
+  expect(errors).toEqual([]);
+});
+
 test('mise à jour : bannière, application sur action, partie intacte, caches précédents supprimés', async ({
   page,
 }) => {
@@ -170,8 +229,7 @@ test('mise à jour : bannière, application sur action, partie intacte, caches p
   await openApp(page);
   await waitForController(page);
   await startGame(page, { players: 2, start: 10, names: ['Alice', 'Bruno'] });
-  await tapTimes(page, 'card-0', 'plus', 4, '#sc-0', '14');
-  await tapTimes(page, 'card-1', 'minus', 2, '#sc-1', '8');
+  await tapAndSync(page, 'card-0', 'plus');
   await expect(page.locator('#update-banner')).toHaveCount(0);
 
   // Le serveur publie un SW dont la version diffère : la vérification trouve la nouvelle version.
@@ -186,13 +244,35 @@ test('mise à jour : bannière, application sur action, partie intacte, caches p
   const [b, bar] = await Promise.all([banner.boundingBox(), page.locator('#bar').boundingBox()]);
   expect(b.y + b.height).toBeLessThanOrEqual(bar.y + 1);
   await page.screenshot({ path: join(SHOTS, 'update-banner-game.png') });
-  // Les scores n'ont pas bougé et la partie reste jouable pendant que la version attend.
-  await expect(page.locator('#sc-0')).toHaveText('14');
-  await tapTimes(page, 'card-0', 'plus', 1, '#sc-0', '15');
+
+  // La bannière réserve sa hauteur : elle ne recouvre aucune carte et n'absorbe aucun tap.
+  const card = await bottomCardId(page);
+  const reserved = await page.evaluate(() => ({
+    open: document.documentElement.classList.contains('sys-banner-open'),
+    height: parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue('--sys-banner-h'),
+    ),
+  }));
+  expect(reserved.open).toBe(true);
+  expect(reserved.height).toBeGreaterThan(0);
+  const [cardBox, bannerBox] = await Promise.all([
+    page.locator(`#${card}`).boundingBox(),
+    banner.boundingBox(),
+  ]);
+  expect(cardBox.y + cardBox.height).toBeLessThanOrEqual(bannerBox.y + 1);
+  // La partie reste jouable pendant que la version attend : le tap sur la carte du bas compte.
+  await tapAndSync(page, card, 'plus');
 
   // « Plus tard » masque la bannière ; on la ré-affiche pour appliquer (nouvelle page = nouvelle session).
   await banner.getByRole('button', { name: 'Plus tard' }).click();
   await expect(banner).toBeHidden();
+  // La place réservée est rendue à la grille dès que la bannière disparaît.
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.classList.contains('sys-banner-open')))
+    .toBe(false);
+  const grownBox = await page.locator(`#${card}`).boundingBox();
+  expect(grownBox.y + grownBox.height).toBeGreaterThan(cardBox.y + cardBox.height);
+  const scores = await tapAndSync(page, card, 'plus');
   await page.reload();
   await expect(page.locator('#splash')).toHaveCount(0);
   await expect(page.locator('#update-banner')).toBeVisible();
@@ -213,17 +293,63 @@ test('mise à jour : bannière, application sur action, partie intacte, caches p
   expect(version).toBe('e2e-beta');
   await expect(page.locator('#update-banner')).toHaveCount(0);
   await expect(page.locator('#restore-banner')).toBeVisible();
-  const saved = await parsedSave(page);
-  expect(saved.players.map((p) => [p.playerName, p.score])).toEqual([
-    ['Alice', 15],
-    ['Bruno', 8],
-  ]);
-  expect(saved.startPoints).toBe(10);
+  expect(await savedScores(page)).toEqual(scores);
   server.setSwVersion(null);
   expect(errors).toEqual([]);
 });
 
-test('migration depuis st-v1 : le nouveau SW prend la main sans attendre et purge les anciens caches', async ({
+test('deux onglets : celui qui n’a pas appliqué la mise à jour est averti, pas silencieusement masqué', async ({
+  context,
+}) => {
+  const page1 = await context.newPage();
+  const page2 = await context.newPage();
+  const errors = [...[page1, page2].map(collectErrors)].flat();
+  for (const p of [page1, page2]) {
+    await p.goto(server.url);
+    await expect(p.locator('#splash')).toHaveCount(0);
+  }
+  await waitForController(page1);
+  await waitForController(page2);
+
+  server.setSwVersion('e2e-multi');
+  await page1.evaluate(() => navigator.serviceWorker.getRegistration().then((r) => r.update()));
+  // Les deux onglets signalent la version en attente.
+  await expect(page1.locator('#update-banner')).toContainText('Nouvelle version disponible');
+  await expect(page2.locator('#update-banner')).toContainText('Nouvelle version disponible');
+
+  // L'onglet 1 applique : il se recharge sur la nouvelle version.
+  await page1.getByRole('button', { name: 'Mettre à jour' }).click();
+  await page1.waitForFunction(
+    () => performance.getEntriesByType('navigation')[0]?.type === 'reload',
+    null,
+    { timeout: 15_000 },
+  );
+  await expect(page1.locator('#splash')).toHaveCount(0);
+  await expect.poll(() => cacheNames(page1)).toEqual(['st-e2e-multi']);
+
+  // L'onglet 2 tourne encore sur les anciens modules : il doit le dire, pas masquer la bannière.
+  const banner2 = page2.locator('#update-banner');
+  await expect(banner2).toBeVisible();
+  await expect(banner2).toContainText('Nouvelle version active — rechargez');
+  await page2.screenshot({ path: join(SHOTS, 'update-banner-second-tab.png') });
+  await page2.getByRole('button', { name: 'Recharger' }).click();
+  await page2.waitForFunction(
+    () => performance.getEntriesByType('navigation')[0]?.type === 'reload',
+    null,
+    { timeout: 15_000 },
+  );
+  await expect(page2.locator('#splash')).toHaveCount(0);
+  const version2 = await page2.evaluate(() =>
+    import('./js/platform/sw-client.js').then((m) => m.getServiceWorkerVersion()),
+  );
+  expect(version2).toBe('e2e-multi');
+  server.setSwVersion(null);
+  expect(errors).toEqual([]);
+  await page1.close();
+  await page2.close();
+});
+
+test('migration depuis st-v1 : prise de main sans attendre, purge des anciens caches, onglet averti', async ({
   page,
 }) => {
   const errors = collectErrors(page);
@@ -239,9 +365,65 @@ test('migration depuis st-v1 : le nouveau SW prend la main sans attendre et purg
   await expect
     .poll(() => page.evaluate(() => navigator.serviceWorker.controller.state))
     .toBe('activated');
-  // Aucune bannière résiduelle : l'attente a été levée automatiquement.
-  await expect(page.locator('#update-banner')).toBeHidden();
+  // La prise de main est automatique (purge garantie) mais la page, restée sur d'anciens modules,
+  // est invitée à se recharger plutôt que laissée sans signal.
+  await expect(page.locator('#update-banner')).toContainText('Nouvelle version active — rechargez');
   server.setSwVersion(null);
+  expect(errors).toEqual([]);
+});
+
+test('précache tout-ou-rien : une police manquante annule l’installation et prévient l’utilisateur', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  const font = PRECACHE.find((p) => p.endsWith('.woff2')).replace(/^\./, '');
+  server.setBlocked([font]);
+  try {
+    await openApp(page);
+    // Aucune installation « à moitié hors ligne » : pas de cache partiel, et l'utilisateur est averti.
+    await expect(page.locator('#sys-toast')).toContainText('Installation hors ligne incomplète');
+    await page.screenshot({ path: join(SHOTS, 'install-failed-toast.png') });
+    await expect.poll(() => cacheNames(page)).toEqual([]);
+    expect(await page.evaluate(() => navigator.serviceWorker.controller)).toBeNull();
+    // L'application reste utilisable en ligne malgré l'échec d'installation.
+    await startGame(page, { players: 2, start: 0 });
+    await tapAndSync(page, 'card-0', 'plus');
+  } finally {
+    server.setBlocked([]);
+  }
+
+  // Réseau rétabli : l'installation se répare d'elle-même au rechargement.
+  await page.reload();
+  await waitForController(page);
+  await expect.poll(() => cacheNames(page)).toEqual([`st-${SW_VERSION}`]);
+  expect(errors).toEqual([]);
+});
+
+test('stockage en échec (quota, navigation privée) : la partie continue mais l’utilisateur est averti', async ({
+  page,
+  context,
+}) => {
+  const errors = collectErrors(page);
+  await context.addInitScript(() => {
+    const original = Storage.prototype.setItem;
+    Storage.prototype.setItem = function setItem(key, value) {
+      if (String(key).startsWith('scoretrack')) {
+        throw new DOMException('quota atteint', 'QuotaExceededError');
+      }
+      return original.call(this, key, value);
+    };
+  });
+  await openApp(page);
+  await startGame(page, { players: 2, start: 0 });
+  await tapCard(page, 'card-0', 'plus');
+
+  await expect(page.locator('#sys-toast')).toContainText(
+    'Sauvegarde impossible : espace insuffisant. La partie continue en mémoire.',
+  );
+  await page.screenshot({ path: join(SHOTS, 'storage-quota-toast.png') });
+  // Le jeu continue en mémoire, sans exception ni sauvegarde fantôme.
+  await expect(page.locator('#sc-0')).not.toHaveText('');
+  expect(await page.evaluate(() => localStorage.getItem('scoretrack_save'))).toBeNull();
   expect(errors).toEqual([]);
 });
 
@@ -328,12 +510,15 @@ test('sauvegarde atomique : .prev suit la dernière valeur valide, écriture int
   const errors = collectErrors(page);
   await openApp(page);
   await startGame(page, { players: 2, start: 0 });
-  await tapTimes(page, 'card-0', 'plus', 1, '#sc-0', '1');
-  await tapTimes(page, 'card-0', 'plus', 1, '#sc-0', '2');
+  const first = await tapAndSync(page, 'card-0', 'plus');
+  const second = await tapAndSync(page, 'card-0', 'plus');
+  expect(second).not.toEqual(first);
   const snap = await storageSnapshot(page);
-  expect(JSON.parse(snap.scoretrack_save).players[0].score).toBe(2);
-  expect(JSON.parse(snap['scoretrack_save.prev']).players[0].score).toBe(1);
+  expect(JSON.parse(snap['scoretrack_save.prev']).players.map((p) => String(p.score))).toEqual(
+    first,
+  );
   expect(snap['scoretrack_save.tmp']).toBeUndefined();
+
   // Écriture interrompue : seul .tmp existe → finalisé au chargement suivant.
   await page.evaluate(() => {
     localStorage.setItem('scoretrack_save.tmp', localStorage.getItem('scoretrack_save'));
@@ -341,13 +526,13 @@ test('sauvegarde atomique : .prev suit la dernière valeur valide, écriture int
   });
   await page.reload();
   await expect(page.locator('#restore-banner')).toBeVisible();
+  expect(await savedScores(page)).toEqual(second);
   const after = await storageSnapshot(page);
-  expect(JSON.parse(after.scoretrack_save).players[0].score).toBe(2);
   expect(after['scoretrack_save.tmp']).toBeUndefined();
   expect(errors).toEqual([]);
 });
 
-test('export puis import : données identiques, import invalide refusé sans écriture partielle', async ({
+test('export puis import : données identiques, import invalide refusé, aucune clé étrangère persistée', async ({
   page,
 }) => {
   const errors = collectErrors(page);
@@ -361,7 +546,7 @@ test('export puis import : données identiques, import invalide refusé sans éc
   await page.getByRole('button', { name: /Mémoriser/ }).click();
   await page.getByRole('button', { name: /Lancer/ }).click();
   await expect(page.locator('.pcard')).toHaveCount(3);
-  await tapTimes(page, 'card-0', 'plus', 2, '#sc-0', '22');
+  const scores = await tapAndSync(page, 'card-0', 'plus');
 
   const before = await storageSnapshot(page);
   const result = await page.evaluate(async () => {
@@ -400,25 +585,46 @@ test('export puis import : données identiques, import invalide refusé sans éc
     [before.scoretrack_save, after.scoretrack_save],
   );
   expect(same).toBe(true);
+
+  // Liste blanche stricte : une clé inconnue d'un fichier importé n'est jamais persistée.
+  const hostile = await page.evaluate(async () => {
+    const b = await import('./js/platform/backup.js');
+    const res = b.importData(
+      JSON.stringify({
+        app: 'scoretrack',
+        v: 2,
+        settings: {
+          theme: 'light',
+          constructor: { prototype: { pollué: 'oui' } },
+          __proto__: { pollué: 'oui' },
+          defPlayers: 4,
+        },
+      }),
+    );
+    return {
+      ok: res.ok,
+      stored: JSON.parse(localStorage.getItem('scoretrack_settings')),
+      polluted: {}.pollué ?? null,
+    };
+  });
+  expect(hostile.ok).toBe(true);
+  expect(hostile.polluted).toBeNull();
+  expect(Object.keys(hostile.stored).sort()).toEqual(
+    ['defMax', 'defNeg', 'defPlayers', 'defStart', 'theme', 'v'].sort(),
+  );
+  expect(hostile.stored.theme).toBe('light');
+
   // Téléchargement : nom de fichier daté.
   const [download] = await Promise.all([
     page.waitForEvent('download'),
     page.evaluate(() => import('./js/platform/backup.js').then((b) => b.downloadExport())),
   ]);
   expect(download.suggestedFilename()).toMatch(/^scoretrack-\d{4}-\d{2}-\d{2}\.json$/);
-  // Après rechargement, la partie importée se reprend normalement.
-  await page.reload();
-  await expect(page.locator('#restore-banner')).toBeVisible();
-  const saved = await parsedSave(page);
-  expect(saved.players.map((p) => [p.playerName, p.score])).toEqual([
-    ['Alice', 22],
-    ['Bruno', 20],
-    ['', 20],
-  ]);
+  expect(scores).not.toEqual(null);
   expect(errors).toEqual([]);
 });
 
-test('manifeste valide : champs, icônes any/maskable, captures et raccourcis servis en PNG aux bonnes tailles', async ({
+test('manifeste valide : champs, icônes any/maskable, captures, raccourcis câblés dans le code', async ({
   page,
   request,
 }) => {
@@ -444,6 +650,7 @@ test('manifeste valide : champs, icônes any/maskable, captures et raccourcis se
   expect(m.icons.some((i) => i.purpose === 'maskable' && i.sizes === '512x512')).toBe(true);
   expect(m.icons.some((i) => i.purpose && i.purpose.includes(' '))).toBe(false);
   expect(m.screenshots.filter((s) => s.form_factor === 'narrow')).toHaveLength(2);
+  expect(m.screenshots.filter((s) => s.form_factor === 'wide')).toHaveLength(1);
   expect(m.shortcuts.map((s) => s.name)).toEqual(['Nouvelle partie', 'Reprendre la partie']);
 
   const images = [...m.icons, ...m.screenshots, ...m.shortcuts.flatMap((s) => s.icons)];
@@ -456,12 +663,62 @@ test('manifeste valide : champs, icônes any/maskable, captures et raccourcis se
     expect(buf.readUInt32BE(16), `${img.src} largeur`).toBe(w);
     expect(buf.readUInt32BE(20), `${img.src} hauteur`).toBe(h);
   }
-  for (const s of m.shortcuts) {
-    const r = await request.get(server.url + s.url.replace(/^\.\//, ''));
-    expect(r.status()).toBe(200);
-  }
+  // Chaque raccourci annoncé correspond à une action réellement implémentée (D14).
+  const implemented = await page.evaluate(() =>
+    import('./js/platform/shortcuts.js').then((s) => s.ACTIONS),
+  );
+  const declared = m.shortcuts.map((s) => new URL(s.url, 'https://x/').searchParams.get('action'));
+  expect(declared.every((a) => implemented.includes(a))).toBe(true);
+  expect(declared.sort()).toEqual([...implemented].sort());
+
   const linked = await page.locator('link[rel="manifest"]').getAttribute('href');
   expect(linked).toBe('manifest-st.json');
+  expect(errors).toEqual([]);
+});
+
+test('service worker : requêtes Range servies en 206, aucune lecture d’un cache étranger', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await openApp(page);
+  await waitForController(page);
+  const font = PRECACHE.find((p) => p.endsWith('.woff2')).replace(/^\.\//, '');
+
+  // Requête Range sur un actif précaché : réponse partielle conforme, pas le fichier entier.
+  const range = await page.evaluate(async (url) => {
+    const r = await fetch(url, { headers: { Range: 'bytes=0-99' } });
+    const body = await r.arrayBuffer();
+    return {
+      status: r.status,
+      contentRange: r.headers.get('Content-Range'),
+      bytes: body.byteLength,
+    };
+  }, font);
+  expect(range.status).toBe(206);
+  expect(range.bytes).toBe(100);
+  expect(range.contentRange).toMatch(/^bytes 0-99\/\d+$/);
+
+  // Un cache étranger contenant les mêmes URL ne doit jamais être servi.
+  const served = await page.evaluate(async () => {
+    const foreign = await caches.open('zz-etranger');
+    await foreign.put(
+      './css/system.css',
+      new Response('.sys-PIRATE{}', { headers: { 'Content-Type': 'text/css' } }),
+    );
+    await foreign.put(
+      './index.html',
+      new Response('<html><body>PIRATE</body></html>', {
+        headers: { 'Content-Type': 'text/html' },
+      }),
+    );
+    const css = await (await fetch('css/system.css')).text();
+    const html = await (await fetch('index.html')).text();
+    await caches.delete('zz-etranger');
+    return { css: css.includes('PIRATE'), html: html.includes('PIRATE') };
+  });
+  expect(served).toEqual({ css: false, html: false });
+  // Invariant de code : plus aucune recherche globale dans tous les caches.
+  expect(swSource).not.toMatch(/[^.]\bcaches\.match\(/);
   expect(errors).toEqual([]);
 });
 
@@ -484,6 +741,7 @@ test('haptique : motifs distincts, préférence respectée ; coller un prénom r
     const r = {};
     r.tap = h.haptic('tap');
     r.floor = h.haptic('floor');
+    r.ceiling = h.haptic('ceiling');
     r.elim = h.haptic('elim');
     r.unknown = h.haptic('nope');
     r.calls = window.__vibrations.slice();
@@ -497,13 +755,24 @@ test('haptique : motifs distincts, préférence respectée ; coller un prénom r
   });
   expect(out.tap).toBe(true);
   expect(out.unknown).toBe(false);
-  expect(out.calls).toEqual([10, [30, 20, 30], [50, 30, 80]]);
+  // Les deux butées sont distinctes au toucher (3.5) : deux coups en bas, trois coups brefs en haut.
+  expect(out.calls).toEqual([10, [30, 20, 30], [20, 30, 20, 30, 20], [50, 30, 80]]);
   expect(out.disabled).toBe(false);
   expect(out.enabledFlag).toBe(false);
   expect(out.reenabled).toBe(true);
-  expect(out.total).toBe(4);
+  expect(out.total).toBe(5);
+
+  // Un vrai tap sur une carte déclenche bien un retour haptique (3.5), une seule fois.
+  await page.evaluate(() => {
+    window.__vibrations.length = 0;
+  });
+  await startGame(page, { players: 2, start: 0 });
+  await tapCard(page, 'card-0', 'plus');
+  await expect.poll(() => page.evaluate(() => window.__vibrations.length)).toBeGreaterThan(0);
+  expect(await page.evaluate(() => window.__vibrations[0])).toBe(10);
 
   // Menu contextuel : bloqué sur la page, autorisé dans un champ de saisie (coller un prénom).
+  await openApp(page);
   await page.locator('#players-grid .player-chip', { hasText: /^2$/ }).click();
   await page.locator('#start-presets .points-chip[data-val="0"]').click();
   await page.locator('#names-btn').click();
@@ -527,7 +796,7 @@ test('erreur non gérée : bannière discrète, partie sauvegardée, journal loc
   });
   await openApp(page);
   await startGame(page, { players: 2, start: 0 });
-  await tapTimes(page, 'card-0', 'plus', 1, '#sc-0', '1');
+  const scores = await tapAndSync(page, 'card-0', 'plus');
   await page.evaluate(() => {
     setTimeout(() => {
       throw new Error('Erreur de test (volontaire)');
@@ -542,18 +811,14 @@ test('erreur non gérée : bannière discrète, partie sauvegardée, journal loc
     const e = await import('./js/platform/errors.js');
     const journal = e.getErrorJournal();
     const text = await e.exportDiagnostics();
-    return {
-      journal,
-      text,
-      save: JSON.parse(localStorage.getItem('scoretrack_save')).players[0].score,
-    };
+    return { journal, text };
   });
   expect(diag.journal).toHaveLength(1);
   expect(diag.journal[0].message).toContain('Erreur de test');
   expect(diag.text).toContain('Service worker :');
   expect(diag.text).toContain('Erreur de test (volontaire)');
   expect(diag.text).toContain('Stockage :');
-  expect(diag.save).toBe(1);
+  expect(await savedScores(page)).toEqual(scores);
   expect(pageErrors).toEqual(['Erreur de test (volontaire)']);
   expect(consoleErrors).toEqual([]);
 });

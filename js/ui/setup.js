@@ -6,7 +6,7 @@ import { KEYS, parseGame } from '../core/save-schema.js';
 import { readJSON } from '../platform/storage.js';
 import { store } from '../store.js';
 import { announce, rovingGroup, syncRovingTabs } from './a11y.js';
-import { byId, el, qsa, show, hide } from './dom.js';
+import { byId, qsa, show, hide } from './dom.js';
 import { lastNamesFor, persistSettings } from './settings.js';
 
 const { config } = store;
@@ -69,9 +69,10 @@ export function summaryText() {
   return parts.join(' · ');
 }
 
-function setPressed(node, on) {
+/** État visuel + ARIA d'un contrôle. `attr` vaut 'aria-checked' (radio) ou 'aria-pressed' (bascule). */
+function setSelected(node, on, attr = 'aria-checked') {
   node.classList.toggle('on', on);
-  node.setAttribute('aria-pressed', on ? 'true' : 'false');
+  node.setAttribute(attr, on ? 'true' : 'false');
 }
 
 /** Resynchronise tout l'affichage à partir de `config` (source unique de vérité). */
@@ -80,10 +81,10 @@ function refresh() {
   if (activePreset && !presetMatches(activePreset)) activePreset = null;
 
   qsa('#players-grid .player-chip').forEach((c) =>
-    setPressed(c, Number(c.dataset.val) === config.numPlayers),
+    setSelected(c, Number(c.dataset.val) === config.numPlayers),
   );
   qsa('#start-presets .points-chip').forEach((c) =>
-    setPressed(c, !startInvalid && Number(c.dataset.val) === config.startPoints),
+    setSelected(c, !startInvalid && Number(c.dataset.val) === config.startPoints),
   );
 
   // Maximum : les puces inférieures au départ sont désactivées ; une puce pressée devenue
@@ -94,15 +95,14 @@ function refresh() {
     c.disabled = disabled;
     c.classList.toggle('disabled', disabled);
     if (disabled && config.maxPoints === v) config.maxPoints = Infinity;
-    setPressed(c, !maxInvalid && config.maxPoints === v);
+    setSelected(c, !maxInvalid && config.maxPoints === v, 'aria-pressed');
   });
 
   qsa('#presets-grid .preset-card').forEach((c) =>
-    setPressed(c, activePreset !== null && c.dataset.preset === activePreset.name),
+    setSelected(c, activePreset !== null && c.dataset.preset === activePreset.name),
   );
-  const custom = byId('preset-custom');
-  custom.hidden = activePreset !== null;
-  setPressed(custom, activePreset === null);
+  // Ligne d'état « Personnalisé » : simple information, jamais un contrôle.
+  byId('preset-note').hidden = activePreset !== null;
 
   const neg = byId('neg-toggle');
   neg.classList.toggle('on', config.allowNeg);
@@ -117,7 +117,6 @@ function refresh() {
   [
     ['players-grid', '.player-chip'],
     ['start-presets', '.points-chip'],
-    ['max-presets', '.points-chip'],
     ['presets-grid', '.preset-card'],
   ].forEach(([id, sel]) => syncRovingTabs(byId(id), sel));
 }
@@ -142,6 +141,9 @@ function setFieldError(input, errorId, message) {
   err.hidden = !invalid;
   input.setAttribute('aria-invalid', invalid ? 'true' : 'false');
   input.classList.toggle('is-invalid', invalid);
+  // La description n'est rattachée au champ que lorsqu'elle dit quelque chose.
+  if (invalid) input.setAttribute('aria-describedby', errorId);
+  else input.removeAttribute('aria-describedby');
 }
 
 /** Le champ « autre maximum » doit rester ≥ départ ; le message suit les changements de départ. */
@@ -282,13 +284,16 @@ export function savePreviewText(players, limit = 6) {
 /** Affiche (avec aperçu : noms, scores, date relative) ou masque la bannière de reprise. */
 export function setRestoreBannerVisible(visible) {
   const banner = byId('restore-banner');
+  const page = byId('setup-page');
   if (!visible) {
     hide(banner);
+    page.classList.remove('has-restore');
     return;
   }
   const parsed = parseGame(readJSON(KEYS.save, null));
   if (!parsed.ok) {
     hide(banner);
+    page.classList.remove('has-restore');
     return;
   }
   byId('restore-preview').textContent = savePreviewText(parsed.game.players);
@@ -298,52 +303,38 @@ export function setRestoreBannerVisible(visible) {
   if (ts) when.setAttribute('datetime', new Date(ts).toISOString());
   else when.removeAttribute('datetime');
   show(banner);
+  page.classList.add('has-restore');
 }
 
 // ── Construction ────────────────────────────────────────────────────
 
-function renderPresets() {
-  const g = byId('presets-grid');
-  const custom = byId('preset-custom');
-  g.replaceChildren(
-    ...GAME_PRESETS.map((p) => {
-      const c = el(
-        'button',
-        {
-          type: 'button',
-          className: 'preset-card',
-          dataset: { preset: p.name },
-          'aria-pressed': 'false',
-        },
-        el('span', { className: 'preset-card-name', text: p.name }),
-        el('span', { className: 'preset-card-detail', text: p.detail }),
-      );
-      c.addEventListener('click', () => applyPreset(p));
-      return c;
-    }),
-    custom,
-  );
-  // La carte « Personnalisé » ramène vers les réglages détaillés.
-  custom.addEventListener('click', () => {
-    byId('players-grid').querySelector('[tabindex="0"]')?.focus();
+/**
+ * Les cartes de préréglage et les puces de joueurs sont écrites dans index.html : les construire
+ * au chargement décalait la mise en page de 0,29 (D11 rectifié). On se contente de les câbler,
+ * et toute carte sans préréglage correspondant est retirée (source de vérité : GAME_PRESETS).
+ */
+function wirePresets() {
+  qsa('#presets-grid .preset-card').forEach((card) => {
+    const preset = GAME_PRESETS.find((p) => p.name === card.dataset.preset);
+    if (!preset) {
+      card.remove();
+      return;
+    }
+    card.querySelector('.preset-card-detail').textContent = preset.detail;
+    card.addEventListener('click', () => applyPreset(preset));
   });
 }
 
-function renderPlayerChips() {
-  const g = byId('players-grid');
-  g.replaceChildren();
-  for (let i = 1; i <= 12; i++) {
-    const b = el('button', {
-      type: 'button',
-      className: 'player-chip',
-      dataset: { val: String(i) },
-      'aria-pressed': 'false',
-      'aria-label': `${i} joueur${i > 1 ? 's' : ''}`,
-      text: String(i),
-    });
-    b.addEventListener('click', () => selectPlayer(i));
-    g.appendChild(b);
-  }
+function wirePlayerChips() {
+  qsa('#players-grid .player-chip').forEach((chip) => {
+    const n = Number(chip.dataset.val);
+    // Les attributs ARIA sont posés ici : une écriture d'attribut ne décale aucune mise en page,
+    // alors que créer les douze puces au chargement la décalait (D11 rectifié).
+    chip.setAttribute('role', 'radio');
+    chip.setAttribute('aria-checked', 'false');
+    chip.setAttribute('aria-label', `${n} joueur${n > 1 ? 's' : ''}`);
+    chip.addEventListener('click', () => selectPlayer(n));
+  });
 }
 
 function wirePointsControls() {
@@ -382,11 +373,10 @@ function wirePointsControls() {
 
 /** Construit les contrôles dynamiques du setup et câble leurs écouteurs. */
 export function initSetup() {
-  renderPresets();
-  renderPlayerChips();
+  wirePresets();
+  wirePlayerChips();
   wirePointsControls();
-  rovingGroup(byId('players-grid'), '.player-chip');
-  rovingGroup(byId('start-presets'), '.points-chip');
-  rovingGroup(byId('max-presets'), '.points-chip');
-  rovingGroup(byId('presets-grid'), '.preset-card');
+  rovingGroup(byId('players-grid'), '.player-chip', { activate: true });
+  rovingGroup(byId('start-presets'), '.points-chip', { activate: true });
+  rovingGroup(byId('presets-grid'), '.preset-card', { activate: true });
 }

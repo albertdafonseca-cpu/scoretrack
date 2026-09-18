@@ -12,6 +12,32 @@ export const SAVE_CORRUPT_KEY = `${KEYS.save}.corrupt`;
 /** Événement window émis après chaque écriture/suppression : `detail = { key }`. */
 export const STORAGE_EVENT = 'scoretrack:storage';
 
+const failureListeners = new Set();
+/** Clés déjà signalées comme non écrites (une alerte par clé et par session, pas un flot de messages). */
+const reportedFailures = new Set();
+
+/**
+ * Abonne `cb({ key, reason: 'quota'|'unavailable'|'error' })` à l'échec d'une écriture persistante :
+ * la partie continue en mémoire, mais l'utilisateur doit l'apprendre. Renvoie la fonction de désabonnement.
+ */
+export function onStorageFailure(cb) {
+  failureListeners.add(cb);
+  return () => failureListeners.delete(cb);
+}
+
+function notifyFailure(key, reason) {
+  const seen = `${key}:${reason}`;
+  if (reportedFailures.has(seen)) return;
+  reportedFailures.add(seen);
+  failureListeners.forEach((cb) => {
+    try {
+      cb({ key, reason });
+    } catch {
+      /* un observateur défaillant ne doit pas masquer l'échec d'écriture */
+    }
+  });
+}
+
 const hasWindow = typeof window !== 'undefined';
 
 function ls() {
@@ -52,12 +78,17 @@ function getRaw(key) {
 
 function setRaw(key, raw) {
   const s = ls();
-  if (!s) return false;
+  if (!s) {
+    notifyFailure(key, 'unavailable');
+    return false;
+  }
   try {
     s.setItem(key, raw);
     return true;
   } catch (e) {
-    logError(e, isQuotaError(e) ? `storage.quota:${key}` : `storage.write:${key}`);
+    const quota = isQuotaError(e);
+    logError(e, quota ? `storage.quota:${key}` : `storage.write:${key}`);
+    notifyFailure(key, quota ? 'quota' : 'error');
     return false;
   }
 }
@@ -276,7 +307,10 @@ function writeSave(raw) {
 /** Écrit une valeur JSON (synchrone) ; renvoie true si l'écriture a réussi. */
 export function writeJSON(key, value) {
   pending.delete(key);
-  if (!ls()) return false;
+  if (!ls()) {
+    notifyFailure(key, 'unavailable');
+    return false;
+  }
   let raw;
   try {
     raw = JSON.stringify(value);

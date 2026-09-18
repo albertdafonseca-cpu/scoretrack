@@ -3,6 +3,7 @@ test-results
 playwright-report
 .lighthouseci
 coverage
+dist
 package-lock.json
 assets
 icons

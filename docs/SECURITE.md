@@ -33,7 +33,7 @@ y compris dans les workflows GitHub Actions (jeton implicite en lecture seule ; 
 
 ### 2.2 Content-Security-Policy en balise `<meta>` et ses limites
 
-La CSP est déclarée dans `index.html` :
+La CSP **actuellement** déclarée dans `index.html` (vérifiée le 17 septembre 2026) :
 
 ```
 default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline';
@@ -47,6 +47,22 @@ font-src 'self'; script-src 'self'; connect-src 'self'; manifest-src 'self'
   `report-to` et `sandbox` y sont **ignorées** ; la politique ne s'applique qu'après l'analyse de la
   balise (ce qui précède dans le `<head>` n'est pas couvert, d'où sa position en tête) ; le
   service worker n'est pas gouverné par la CSP du document.
+- **Écart ouvert** : `base-uri` et `form-action` **ne retombent pas** sur `default-src` (spécifiés
+  hors de son champ), ils sont donc absents. Sans `base-uri`, une balise `<base>` injectée
+  redirigerait toutes les URL relatives ; sans `form-action`, un `<form>` injecté pourrait poster
+  vers un tiers. `object-src` et `worker-src` retombent bien sur `default-src`, mais les déclarer
+  explicitement rend la politique lisible et résiste aux évolutions de la spécification. Ligne
+  attendue, à poser par les propriétaires d'`index.html` (éléments C/A) :
+
+```
+default-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none';
+img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self';
+script-src 'self'; worker-src 'self'; connect-src 'self'; manifest-src 'self'
+```
+
+(Vérifié : aucun `new Worker`, aucun `<form>`, aucun `<base>`, aucun `<object>`/`<embed>` dans le
+code servi ; l'export de données passe par un `<a download>` + Blob, non soumis à ces directives.)
+
 - `style-src 'unsafe-inline'` est requis tant que du style est posé via `element.style` (couleurs
   des joueurs, tailles adaptatives). Ce n'est pas un vecteur d'exécution de code ; le durcir
   (nonces) est impossible sans serveur. Lighthouse le signale en « informatif » uniquement.
@@ -91,8 +107,10 @@ font-src 'self'; script-src 'self'; connect-src 'self'; manifest-src 'self'
   audit `critical` bloquant en CI, `package-lock.json` versionné et `npm ci` en CI.
 - `@lhci/cli` est appelé par `npx` avec une **version épinglée** (`0.15.1`) pour ne pas exécuter
   une version inconnue sur le runner.
-- Actions GitHub épinglées par tag majeur et suivies par Dependabot ; `permissions: contents: read`
-  par défaut, élargi (`pages: write`, `id-token: write`) uniquement dans le workflow de déploiement.
+- Actions GitHub épinglées par tag majeur (mutable) et suivies par Dependabot ; le passage à un
+  épinglage par SHA est décidé mais reporté faute d'accès à GitHub depuis l'environnement d'audit
+  (ADR-20 — un SHA ne s'invente pas). `permissions: contents: read` sur les deux workflows ; seul le
+  job `deploy` de `deploy-pages.yml` reçoit `pages: write` et `id-token: write`.
 
 ### 2.7 Déni de service local
 

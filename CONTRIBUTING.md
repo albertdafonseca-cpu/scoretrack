@@ -12,8 +12,11 @@ Playwright télécharge Chromium à la première exécution (`npx playwright ins
 
 ## Règles non négociables
 
-1. **`npm run check` vert avant tout commit** : lint (ESLint + Prettier), `check:sw`, tests
-   unitaires, tests e2e. La CI rejoue exactement ces commandes.
+1. **`npm run check` vert avant tout commit** : lint (ESLint + Prettier, anti-emoji), `check:sw`,
+   tests unitaires, tests e2e. La CI fait les mêmes vérifications, réparties en jobs parallèles
+   (elle appelle les outils un par un, pas `npm run check`), et en ajoute quatre que `check` ne
+   couvre pas : empaquetage `dist/` et poids du précache, contraste et daltonisme, Lighthouse,
+   audit des dépendances.
 2. **`npm run build:sw` après tout ajout, suppression ou modification d'un fichier servi**
    (HTML, CSS, JS, JSON, police, image). Le précache et le hash de version de `sw-st.js` sont
    générés ; un oubli fait échouer `check:sw` et priverait les utilisateurs de la mise à jour.
@@ -22,9 +25,9 @@ Playwright télécharge Chromium à la première exécution (`npx playwright ins
 4. **Zéro dépendance à l'exécution, zéro bundler** (D2) : pas d'`import` depuis `node_modules`
    dans `js/`, pas d'étape de build pour servir.
 5. **Vie privée** (D4) : aucune requête réseau vers un tiers, aucune police ou script externe.
-6. **Accessibilité et daltonisme** (D1) : toute information portée par une couleur l'est aussi par
-   un glyphe, une icône, un texte ou une position ; contraste AA sur les 14 thèmes ; cibles ≥ 44 px ;
-   navigation clavier et focus visible.
+6. **Accessibilité et daltonisme** (D1, D10) : toute information portée par une couleur l'est aussi
+   par un glyphe, une icône, un texte ou une position ; contraste AA sur les 14 thèmes ; cibles
+   ≥ 44 px ; **aucun texte sous 12 px** ; navigation clavier et focus visible.
 7. **Aucune donnée fictive, aucun identifiant de modèle d'IA** dans le code, les commits ou les
    docs (D9).
 
@@ -47,7 +50,10 @@ Playwright télécharge Chromium à la première exécution (`npx playwright ins
 - Bout en bout : `tests/e2e/*.spec.js` (Playwright, iPhone 13 émulé, tactile). Utiliser les
   sélecteurs de rôle/texte plutôt que des classes CSS ; toute correction de bug s'accompagne d'un
   test qui échouait avant.
-- Visuel/perf : `npm run lhci` (budget dans `lighthouserc.json`, voir ADR-15 pour les exceptions).
+- Visuel/perf : `npm run build:dist` puis `npm run lhci` (Lighthouse mesure le paquet publié ;
+  budget dans `lighthouserc.json`, voir ADR-15 pour la seule dérogation admise).
+- Contraste et daltonisme : `npm run dev` dans un terminal, puis `npm run audit:contrast` et
+  `npm run audit:cvd` (mêmes scripts qu'en CI, rapports dans `test-results/`).
 
 ## Style
 

@@ -1,7 +1,8 @@
 # Déploiement sur GitHub Pages depuis la branche par défaut (source Pages : « GitHub Actions »).
 # Aucun secret n'est requis : l'authentification passe par le jeton OIDC (id-token) du dépôt.
 # Le dépôt est servable tel quel (D2) : « deploy from branch » à la racine fonctionne aussi ; ce
-# workflow ne fait que retirer les fichiers d'outillage de l'artefact publié.
+# workflow ne fait que retirer les fichiers d'outillage de l'artefact publié (`npm run build:dist`,
+# la même commande que la CI mesure avec Lighthouse).
 name: Déploiement GitHub Pages
 
 on:
@@ -9,10 +10,9 @@ on:
     branches: [master]
   workflow_dispatch:
 
+# Permissions minimales : seul le job `deploy` reçoit les droits d'écriture sur Pages.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
@@ -23,6 +23,8 @@ jobs:
     name: Vérifications rapides et empaquetage
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -34,28 +36,17 @@ jobs:
         run: npm run lint && npm run check:sw && npm run test:unit
       - name: 'Empaquetage dans dist/ (sans outillage : node_modules, tests, docs, scripts, configs)'
         run: |
-          rm -rf dist && mkdir dist
-          tar -cf - \
-            --exclude='./.git' --exclude='./.github' --exclude='./node_modules' \
-            --exclude='./tests' --exclude='./docs' --exclude='./scripts' \
-            --exclude='./coverage' --exclude='./test-results' --exclude='./playwright-report' \
-            --exclude='./.lighthouseci' --exclude='./dist' \
-            --exclude='./package.json' --exclude='./package-lock.json' \
-            --exclude='./eslint.config.js' --exclude='./playwright.config.js' \
-            --exclude='./vitest.config.js' --exclude='./lighthouserc.json' \
-            --exclude='./.prettierrc' --exclude='./.prettierignore' --exclude='./.editorconfig' \
-            --exclude='./.gitignore' \
-            --exclude='./README.md' --exclude='./CONTRIBUTING.md' --exclude='./CHANGELOG.md' \
-            --exclude='./SECURITY.md' \
-            . | tar -xf - -C dist
-          touch dist/.nojekyll
+          npm run build:dist
           echo "Contenu publié :" && find dist -type f | sort && du -sh dist
-      - name: 'Contrôle : les fichiers essentiels sont présents'
+      - name: 'Contrôle : fichiers essentiels présents, outillage absent'
         run: |
-          for f in index.html sw-st.js manifest-st.json js/main.js css/tokens.css icons/icon-192.png; do
+          for f in index.html sw-st.js manifest-st.json .nojekyll \
+                   js/main.js css/tokens.css icons/icon-192.png; do
             test -f "dist/$f" || { echo "Manque dist/$f"; exit 1; }
           done
-          test ! -e dist/package.json && test ! -d dist/tests && test ! -d dist/node_modules
+          for f in package.json package-lock.json tests docs scripts node_modules .git; do
+            test ! -e "dist/$f" || { echo "dist/$f ne doit pas être publié"; exit 1; }
+          done
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
@@ -66,6 +57,10 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

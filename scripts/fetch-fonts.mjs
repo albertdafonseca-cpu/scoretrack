@@ -72,6 +72,103 @@ async function fetchOk(url, init) {
   return res;
 }
 
+/* Faces de repli à métriques ajustées (D11), réémises telles quelles : elles portent des mesures
+   faites au navigateur, que ce script ne sait pas recalculer. Les remesurer si une police change
+   de version (méthode décrite dans le bloc lui-même). */
+const FALLBACK_FACES = String.raw`
+/* ── Faces de repli à métriques ajustées (décision D11) ─────────────────────────────────────
+   Tant que la police auto-hébergée n'est pas peinte, le texte est rendu par une police locale.
+   Sans ces faces, la substitution déplace la mise en page : 0,031 de décalage cumulé mesuré sur
+   l'écran d'accueil (H1.logo-name, DIV.presets-grid). Chaque face de repli reprend la métrique de
+   la police finale — largeur moyenne (size-adjust), hauteurs d'ascendante et de descendante —
+   si bien que la substitution ne bouge plus aucun bloc.
+
+   Valeurs MESURÉES dans Chromium (canvas measureText, 100 px, échantillon latin complet) :
+   size-adjust = largeur(police) / largeur(repli local) ; ascent/descent-override = métrique de la
+   police divisée par size-adjust, la face de repli étant elle-même redimensionnée.
+
+   Chaque face couvre toute la plage de graisses (100 à 1000) : sans cela, un titre en 900 ne la
+   sélectionne pas et retombe sur la générique, sans métrique ajustée — le décalage réapparaît.
+
+   | Police          | Repli local     | size-adjust | ascendante | descendante |
+   | Orbitron        | Arial           |   125,65 %  |   80,4 %   |   19,1 %    |
+   | Share Tech Mono | Courier New     |    89,99 %  |   98,9 %   |   26,7 %    |
+   | Inter           | Arial           |   104,66 %  |   92,7 %   |   22,9 %    |
+   | Press Start 2P  | Courier New     |   166,64 %  |   60,0 %   |    0,0 %    |
+   | Cinzel          | Times New Roman |   118,90 %  |   82,4 %   |   31,1 %    |
+
+   Ces familles sont référencées dans les piles de css/tokens.css et css/themes.css, juste après
+   la police finale. Les deux polices du premier rendu du thème par défaut (Orbitron et Share Tech
+   Mono) sont en outre préchargées depuis le <head> d'index.html. */
+
+@font-face {
+  font-family: 'Orbitron fallback';
+  font-style: normal;
+  font-weight: 100 1000;
+  src:
+    local('Arial'),
+    local('Helvetica'),
+    local('Liberation Sans');
+  size-adjust: 125.65%;
+  ascent-override: 80.4%;
+  descent-override: 19.1%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'Share Tech Mono fallback';
+  font-style: normal;
+  font-weight: 100 1000;
+  src:
+    local('Courier New'),
+    local('Liberation Mono');
+  size-adjust: 89.99%;
+  ascent-override: 98.9%;
+  descent-override: 26.7%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'Inter fallback';
+  font-style: normal;
+  font-weight: 100 1000;
+  src:
+    local('Arial'),
+    local('Helvetica'),
+    local('Liberation Sans');
+  size-adjust: 104.66%;
+  ascent-override: 92.7%;
+  descent-override: 22.9%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'Press Start 2P fallback';
+  font-style: normal;
+  font-weight: 100 1000;
+  src:
+    local('Courier New'),
+    local('Liberation Mono');
+  size-adjust: 166.64%;
+  ascent-override: 60%;
+  descent-override: 0%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'Cinzel fallback';
+  font-style: normal;
+  font-weight: 100 1000;
+  src:
+    local('Times New Roman'),
+    local('Liberation Serif');
+  size-adjust: 118.9%;
+  ascent-override: 82.4%;
+  descent-override: 31.1%;
+  line-gap-override: 0%;
+}
+`;
+
 async function main() {
   await mkdir(FONTS_DIR, { recursive: true });
   await mkdir(dirname(CSS_OUT), { recursive: true });
@@ -144,7 +241,7 @@ async function main() {
     `/* Polices auto-hébergées — GÉNÉRÉ par scripts/fetch-fonts.mjs, ne pas éditer à la main.\n` +
     `   Source : Google Fonts (SIL Open Font License 1.1, voir assets/fonts/LICENSES.md).\n` +
     `   Sous-ensembles : latin, latin-ext. */\n\n`;
-  await writeFile(CSS_OUT, header + blocks.join('\n\n') + '\n');
+  await writeFile(CSS_OUT, header + blocks.join('\n\n') + '\n' + FALLBACK_FACES + '\n');
 
   console.log(`\n${blocks.length} fichiers, ${(totalBytes / 1024).toFixed(0)} Ko au total → ${CSS_OUT}`);
   if (missing.length) {

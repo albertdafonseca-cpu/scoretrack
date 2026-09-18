@@ -47,6 +47,13 @@
       "type": "image/png",
       "form_factor": "narrow",
       "label": "Table de jeu à 4 joueurs, cartes orientées vers chaque joueur"
+    },
+    {
+      "src": "assets/screenshots/game-1280x800.png",
+      "sizes": "1280x800",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Table de jeu à 4 joueurs sur tablette posée à plat"
     }
   ],
   "shortcuts": [

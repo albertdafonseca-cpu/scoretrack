@@ -1,10 +1,13 @@
 # Intégration continue ScoreTrack.
 # Aucun secret n'est requis : tout s'exécute avec le GITHUB_TOKEN implicite en lecture seule.
+# Ce que la CI vérifie est décrit dans docs/SECURITE.md § 3.
 name: CI
 
 on:
   push:
+    branches: [master]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,6 +18,9 @@ concurrency:
 
 env:
   NODE_VERSION: 22
+  # Poids maximal du précache du service worker (octets téléchargés à l'installation).
+  # Mesuré le 17 septembre 2026 (`npm run build:dist`) : ≈ 644 000 octets, 61 fichiers.
+  PRECACHE_MAX_BYTES: 750000
 
 jobs:
   lint:
@@ -34,13 +40,8 @@ jobs:
         run: npx prettier --check .
       - name: Précache du service worker à jour
         run: npm run check:sw
-      - name: Aucun emoji système dans l'interface (si le script existe)
-        run: |
-          if [ -f scripts/lint-no-emoji.mjs ]; then
-            node scripts/lint-no-emoji.mjs
-          else
-            echo "scripts/lint-no-emoji.mjs absent : étape ignorée"
-          fi
+      - name: Aucun emoji système dans l'interface
+        run: npm run lint:emoji
 
   unit:
     name: Tests unitaires (vitest + couverture)
@@ -91,6 +92,94 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
+  paquet:
+    name: Empaquetage (dist/) et poids du précache
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      # Le paquet publié est construit à chaque PR, pas seulement au déploiement : une régression
+      # d'empaquetage (fichier servi oublié, outillage publié par erreur) échoue ici.
+      - name: Construire dist/
+        run: npm run build:dist
+      - name: Fichiers essentiels présents, outillage absent
+        run: |
+          for f in index.html sw-st.js manifest-st.json .nojekyll \
+                   js/main.js css/tokens.css icons/icon-192.png; do
+            test -f "dist/$f" || { echo "Manque dist/$f"; exit 1; }
+          done
+          for f in package.json package-lock.json tests docs scripts node_modules .git; do
+            test ! -e "dist/$f" || { echo "dist/$f ne doit pas être publié"; exit 1; }
+          done
+          echo "dist/ : $(find dist -type f | wc -l) fichiers, $(du -sh dist | cut -f1)"
+      - name: Précache complet et sous le poids maximal
+        run: |
+          node - <<'NODE'
+          import { readFileSync, statSync } from 'node:fs';
+          const max = Number(process.env.PRECACHE_MAX_BYTES);
+          const sw = readFileSync('dist/sw-st.js', 'utf8');
+          const block = sw.match(/const PRECACHE = \[([\s\S]*?)\];/);
+          if (!block) { console.error('Liste PRECACHE introuvable dans sw-st.js'); process.exit(1); }
+          const urls = [...block[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
+          let total = 0;
+          const missing = [];
+          for (const u of urls) {
+            const rel = u.replace(/^\.\//, '') || 'index.html';
+            try { total += statSync(`dist/${rel}`).size; } catch { missing.push(rel); }
+          }
+          console.log(`Précache : ${urls.length} entrées, ${total} octets (max ${max}).`);
+          if (missing.length) { console.error('Absents de dist/ :', missing.join(', ')); process.exit(1); }
+          if (total > max) { console.error('Précache trop lourd : première visite dégradée.'); process.exit(1); }
+          NODE
+      - name: Paquet publié (artefact)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  design:
+    name: Contraste et daltonisme (14 thèmes)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Navigateur Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Construire dist/ et le servir
+        run: |
+          npm run build:dist
+          npx http-server -p 8765 -s dist > /tmp/http-dist.log 2>&1 &
+          for _ in $(seq 1 30); do
+            curl -sf http://localhost:8765/ > /dev/null && break
+            sleep 1
+          done
+          curl -sf http://localhost:8765/ > /dev/null
+      # D13 : ces deux audits font échouer la construction en cas de régression
+      # (code 1 = seuil non tenu, code 2 = audit impossible à exécuter).
+      - name: Contraste AA sur les 14 thèmes
+        run: npm run audit:contrast
+      - name: Lisibilité en protanopie, deutéranopie et tritanopie
+        run: npm run audit:cvd
+      - name: Rapports de contraste et de daltonisme (artefact)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: contraste-daltonisme
+          path: test-results/
+          retention-days: 14
+          if-no-files-found: ignore
+
   lighthouse:
     name: Lighthouse (budget lighthouserc.json)
     runs-on: ubuntu-latest
@@ -108,7 +197,10 @@ jobs:
         run: >
           echo "CHROME_PATH=$(node -e "console.log(require('@playwright/test').chromium.executablePath())")"
           >> "$GITHUB_ENV"
-      - name: Collecte (serveur statique local) puis assertions
+      # Lighthouse mesure le paquet réellement publié (dist/), pas la racine du dépôt.
+      - name: Construire dist/
+        run: npm run build:dist
+      - name: Collecte puis assertions
         run: npm run lhci
       - name: Rapports Lighthouse (artefact)
         if: always()

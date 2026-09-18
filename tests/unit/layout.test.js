@@ -2,17 +2,26 @@ import { describe, expect, it } from 'vitest';
 import {
   BAR_H,
   HEADER_H,
+  MAX_NAME_PX,
   MAX_PLAYERS,
+  MAX_SCORE_PX,
+  MIN_NAME_PX,
+  MIN_SCORE_PX,
+  READABLE_SCORE_PX,
+  cardBox,
   computeFit,
   computeLayout,
   layoutStats,
   nameMaxLength,
   rotateSeats,
 } from '../../js/core/layout.js';
+import { fmtNum } from '../../js/core/format.js';
 import { identity, randInt, rng } from './helpers.js';
 
 const ROTS = ['rot-0', 'rot-180', 'rot-l', 'rot-r'];
 const byIndex = (placements, i) => placements.find((p) => p.i === i);
+/** iPhone 13 — l'écran de référence du projet (tests e2e et captures). */
+const VP = { width: 390, height: 844 };
 
 describe('computeLayout : propriétés pour n = 1..12', () => {
   for (let n = 1; n <= 12; n++) {
@@ -40,24 +49,23 @@ describe('computeLayout : propriétés pour n = 1..12', () => {
       expect(grid.flat().every((v) => v === 1)).toBe(true);
     });
 
-    it(`${n} joueur(s) : aire vide ≤ 10 % (ici 0) et plus petite cellule ≥ 80 % de l'aire idéale`, () => {
+    it(`${n} joueur(s) : aire vide nulle et plus petite cellule ≥ 75 % de l'aire idéale`, () => {
       const s = layoutStats(n);
       expect(s.emptyArea).toBe(0);
-      expect(s.emptyPct).toBeLessThanOrEqual(10);
-      expect(s.minRatio).toBeGreaterThanOrEqual(0.8);
+      expect(s.emptyPct).toBe(0);
+      expect(s.minRatio).toBeGreaterThanOrEqual(0.75);
       expect(s.cells).toBe(n);
-      expect(s.minCellArea).toBeLessThanOrEqual(s.maxCellArea);
-      expect(s.idealArea).toBeCloseTo(1 / n);
     });
 
     it(`${n} joueur(s) : le joueur 1 touche le bas de l'écran`, () => {
       const j1 = byIndex(placements, 0);
       expect(j1.r + j1.rs - 1).toBe(rows);
-      if (n !== 4 && n !== 6) expect(j1.rot).toBe('rot-0');
+      // À 4 et 6 joueurs, deux joueurs par grand côté : le joueur 1 est latéral (arbitrage documenté).
+      expect(j1.rot).toBe(n === 4 || n === 6 ? 'rot-l' : 'rot-0');
     });
 
     if (n >= 3) {
-      it(`${n} joueur(s) : sens horaire — gauche de bas en haut, droite de haut en bas, latéraux tournés vers leur joueur`, () => {
+      it(`${n} joueur(s) : sens horaire — gauche de bas en haut, droite de haut en bas`, () => {
         const left = placements.filter((p) => p.c === 1 && p.rot === 'rot-l');
         const right = placements.filter((p) => p.c === cols && p.rot === 'rot-r');
         expect(left.length).toBeGreaterThan(0);
@@ -65,9 +73,7 @@ describe('computeLayout : propriétés pour n = 1..12', () => {
         const leftBottomUp = left.slice().sort((a, b) => b.r - a.r);
         const rightTopDown = right.slice().sort((a, b) => a.r - b.r);
         const seq = [...leftBottomUp.map((p) => p.i), ...rightTopDown.map((p) => p.i)];
-        const expected = seq.slice().sort((a, b) => a - b);
-        expect(seq).toEqual(expected);
-        // Aucune carte latérale mal orientée
+        expect(seq).toEqual(seq.slice().sort((a, b) => a - b));
         expect(
           placements.filter((p) => p.c === 1 && p.cs === 1).every((p) => p.rot === 'rot-l'),
         ).toBe(true);
@@ -78,16 +84,34 @@ describe('computeLayout : propriétés pour n = 1..12', () => {
     }
 
     it(`${n} joueur(s) : les cartes du haut de table sont à 180° et touchent le haut`, () => {
-      placements
-        .filter((p) => p.rot === 'rot-180')
-        .forEach((p) => {
-          expect(p.r).toBe(1);
-        });
-      if (n === 2 || n >= 8) {
-        if (n % 2 === 0) expect(placements.filter((p) => p.rot === 'rot-180')).toHaveLength(1);
-      }
+      const top = placements.filter((p) => p.rot === 'rot-180');
+      top.forEach((p) => expect(p.r).toBe(1));
+      // Une carte « haut de table » n'existe qu'à 2 joueurs et dans les grilles à 3 colonnes (8, 10, 12).
+      expect(top.length).toBe(n === 2 || (n >= 8 && n % 2 === 0) ? 1 : 0);
     });
   }
+
+  it('table de référence des 12 dispositions (verrou de non-régression)', () => {
+    const table = {};
+    for (let n = 1; n <= 12; n++) {
+      const s = layoutStats(n, VP);
+      table[n] = `${s.cols}x${s.rows} vide=${s.emptyPct}% min=${s.minRatio.toFixed(3)}`;
+    }
+    expect(table).toEqual({
+      1: '1x1 vide=0% min=1.000',
+      2: '1x2 vide=0% min=1.000',
+      3: '2x3 vide=0% min=1.000',
+      4: '2x2 vide=0% min=1.000',
+      5: '2x3 vide=0% min=0.833',
+      6: '2x3 vide=0% min=1.000',
+      7: '2x4 vide=0% min=0.875',
+      8: '3x3 vide=0% min=0.889',
+      9: '2x5 vide=0% min=0.900',
+      10: '3x4 vide=0% min=0.833',
+      11: '2x6 vide=0% min=0.917',
+      12: '3x5 vide=0% min=0.800',
+    });
+  });
 });
 
 describe('computeLayout : dispositions particulières', () => {
@@ -110,13 +134,15 @@ describe('computeLayout : dispositions particulières', () => {
     expect(byIndex(placements, 1)).toMatchObject({ rot: 'rot-l', c: 1, r: 1, rs: 2 });
     expect(byIndex(placements, 2)).toMatchObject({ rot: 'rot-r', c: 2, r: 1, rs: 2 });
   });
-  it('4 et 6 joueurs : deux colonnes latérales (disposition historique)', () => {
+  it('4 et 6 joueurs : deux colonnes latérales (deux joueurs par grand côté)', () => {
     const four = computeLayout(4, identity(4));
     expect([four.cols, four.rows]).toEqual([2, 2]);
-    expect(byIndex(four.placements, 0)).toMatchObject({ rot: 'rot-l', c: 1, r: 2 });
-    expect(byIndex(four.placements, 1)).toMatchObject({ rot: 'rot-l', c: 1, r: 1 });
-    expect(byIndex(four.placements, 2)).toMatchObject({ rot: 'rot-r', c: 2, r: 1 });
-    expect(byIndex(four.placements, 3)).toMatchObject({ rot: 'rot-r', c: 2, r: 2 });
+    expect(four.placements.map((p) => [p.i, p.c, p.r])).toEqual([
+      [0, 1, 2],
+      [1, 1, 1],
+      [2, 2, 1],
+      [3, 2, 2],
+    ]);
     const six = computeLayout(6, identity(6));
     expect([six.cols, six.rows]).toEqual([2, 3]);
     expect(six.placements.map((p) => [p.i, p.c, p.r])).toEqual([
@@ -128,7 +154,14 @@ describe('computeLayout : dispositions particulières', () => {
       [5, 2, 3],
     ]);
   });
-  it('5, 7, 9, 11 joueurs : bandeau J1 + (n−1)/2 latéraux par côté, sans colonne centrale vide', () => {
+  it('arbitrage n = 6 : deux colonnes donnent un score nettement plus grand que trois', () => {
+    const two = layoutStats(6, VP);
+    const three = { w: (VP.width / 3) * 1, h: (VP.height - HEADER_H - BAR_H) / 2 };
+    const scoreTwo = computeFit(two.minCard, '40').scoreSz;
+    const scoreThree = computeFit({ w: three.h, h: three.w }, '40').scoreSz;
+    expect(scoreTwo).toBeGreaterThan(scoreThree * 1.4);
+  });
+  it('5, 7, 9, 11 joueurs : bandeau J1 + (n−1)/2 latéraux par côté', () => {
     for (const n of [5, 7, 9, 11]) {
       const { cols, rows, placements } = computeLayout(n, identity(n));
       const k = (n - 1) / 2;
@@ -140,7 +173,7 @@ describe('computeLayout : dispositions particulières', () => {
       expect(byIndex(placements, k + 1)).toMatchObject({ rot: 'rot-r', r: 1 });
     }
   });
-  it('8, 10, 12 joueurs : trois colonnes, colonne centrale partagée J1 (bas) / vis-à-vis (haut)', () => {
+  it('8, 10, 12 joueurs : trois colonnes, colonne centrale partagée J1 / vis-à-vis', () => {
     for (const n of [8, 10, 12]) {
       const { cols, rows, placements } = computeLayout(n, identity(n));
       const k = (n - 2) / 2;
@@ -157,11 +190,6 @@ describe('computeLayout : dispositions particulières', () => {
       expect(byIndex(placements, k + 2)).toMatchObject({ rot: 'rot-r', c: 3, r: 1 });
       expect(byIndex(placements, n - 1)).toMatchObject({ rot: 'rot-r', c: 3, r: k });
     }
-  });
-  it('12 joueurs : la disposition est 3×5, J1 sur 3 lignes, vis-à-vis sur 2', () => {
-    const { placements } = computeLayout(12, identity(12));
-    expect(byIndex(placements, 0)).toMatchObject({ c: 2, r: 3, rs: 3 });
-    expect(byIndex(placements, 6)).toMatchObject({ c: 2, r: 1, rs: 2 });
   });
 });
 
@@ -204,23 +232,29 @@ describe('computeLayout : ordre des sièges', () => {
   });
 });
 
-describe('layoutStats', () => {
-  it('fournit les mesures en pixels pour un écran donné', () => {
-    const s = layoutStats(12, { width: 390, height: 844 });
+describe('cardBox et layoutStats', () => {
+  it('échange largeur et hauteur pour une carte latérale', () => {
+    const grid = { cols: 3, rows: 5, ...VP };
+    const upright = cardBox({ rot: 'rot-0', cs: 1, rs: 3 }, grid);
+    const lateral = cardBox({ rot: 'rot-l', cs: 1, rs: 1 }, grid);
+    expect(upright.w).toBeCloseTo(130);
+    expect(upright.h).toBeCloseTo((844 - HEADER_H - BAR_H) * (3 / 5));
+    expect(lateral.w).toBeCloseTo((844 - HEADER_H - BAR_H) / 5);
+    expect(lateral.h).toBeCloseTo(130);
+  });
+  it('fournit les mesures en pixels et le repère de la carte la plus contrainte', () => {
+    const s = layoutStats(12, VP);
     expect(s).toMatchObject({ n: 12, cols: 3, rows: 5, cells: 12, emptyPct: 0 });
     expect(s.minCellPx).toEqual({ w: 130, h: 146 });
     expect(s.minRef).toBe(130);
-    expect(layoutStats(1, { width: 390, height: 844 }).minCellPx).toEqual({
-      w: 390,
-      h: 844 - HEADER_H - BAR_H,
-    });
+    expect(s.minCard.w).toBeCloseTo(146.4);
+    expect(s.minCard.h).toBeCloseTo(130);
+    expect(layoutStats(1, VP).minCard).toEqual({ w: 390, h: 844 - HEADER_H - BAR_H });
   });
   it('ne fournit pas de mesures pixels sans écran', () => {
     expect(layoutStats(4).minCellPx).toBeUndefined();
+    expect(layoutStats(4).minCard).toBeUndefined();
     expect(layoutStats(4).minRatio).toBe(1);
-  });
-  it('les nouvelles dispositions 7, 9, 11, 12 ne perdent plus 20 % de surface', () => {
-    expect([7, 9, 11, 12].map((n) => layoutStats(n).emptyPct)).toEqual([0, 0, 0, 0]);
   });
 });
 
@@ -241,56 +275,140 @@ describe('rotateSeats', () => {
   });
 });
 
+describe('computeFit : seuils de lisibilité de la grille', () => {
+  it('score ≥ 96 px à 4 joueurs et ≥ 30 px à 12 joueurs, 7 chiffres compris (390×844)', () => {
+    const four = computeFit(layoutStats(4, VP).minCard, '40');
+    expect(four.scoreSz).toBeGreaterThanOrEqual(96);
+    const twelve = computeFit(layoutStats(12, VP).minCard, fmtNum(9999999));
+    expect(twelve.scoreSz).toBeGreaterThanOrEqual(READABLE_SCORE_PX);
+    expect(twelve.compact).toBe(true);
+    expect(computeFit(layoutStats(12, VP).minCard, '40').scoreSz).toBeGreaterThanOrEqual(30);
+  });
+
+  it('un score court occupe vraiment la hauteur de sa carte (le score est l’élément héros)', () => {
+    // La largeur n'étant pas la contrainte sur une carte large, le chiffre doit remplir la hauteur.
+    for (const n of [1, 2, 3, 4, 5, 6]) {
+      const { minCard } = layoutStats(n, VP);
+      const fit = computeFit(minCard, '40');
+      expect(fit.scoreSz).toBeGreaterThanOrEqual(Math.min(MAX_SCORE_PX, minCard.h * 0.65));
+    }
+  });
+
+  it('tous les nombres de joueurs tiennent le plancher, même à 7 chiffres négatifs', () => {
+    for (let n = 1; n <= 12; n++) {
+      const { minCard } = layoutStats(n, VP);
+      for (const value of [0, -7, 40, 999, -1234567, 9999999]) {
+        const fit = computeFit(minCard, fmtNum(value));
+        expect(fit.scoreSz).toBeGreaterThanOrEqual(MIN_SCORE_PX);
+        expect(fit.nameSz).toBeGreaterThanOrEqual(MIN_NAME_PX);
+        expect(fit.deltaSz).toBeGreaterThanOrEqual(MIN_NAME_PX);
+        expect(fit.signSz).toBeGreaterThanOrEqual(24);
+      }
+    }
+  });
+
+  it('demande le mode compact seulement quand les séparateurs coûtent la lisibilité', () => {
+    const small = layoutStats(12, VP).minCard;
+    const big = layoutStats(1, VP).minCard;
+    expect(computeFit(small, fmtNum(1234567)).compact).toBe(true);
+    expect(computeFit(big, fmtNum(1234567)).compact).toBe(false);
+    expect(computeFit(small, '40').compact).toBe(false);
+    // Le mode compact rend le nombre plus grand que la version séparée.
+    const sepAdvantage =
+      computeFit(small, fmtNum(1234567)).scoreSz > computeFit(small, '1 234 567').scoreSz * 0.99;
+    expect(sepAdvantage).toBe(true);
+  });
+
+  it('tient compte des DEUX dimensions : une carte large et basse écrit plus grand', () => {
+    const wide = computeFit({ w: 366, h: 195 }, '40').scoreSz;
+    const narrow = computeFit({ w: 195, h: 195 }, '40').scoreSz;
+    expect(wide).toBeGreaterThanOrEqual(narrow);
+    // Contrainte de largeur : plus de chiffres ⇒ score plus petit, à hauteur égale
+    const sizes = ['4', '44', '444', '4444', '44444', '444444', '4444444'].map(
+      (s) => computeFit({ w: 200, h: 120 }, s).scoreSz,
+    );
+    for (let i = 1; i < sizes.length; i++) expect(sizes[i]).toBeLessThanOrEqual(sizes[i - 1]);
+    expect(sizes.at(-1)).toBeLessThan(sizes[0]);
+  });
+
+  it('respecte planchers et plafonds, et tolère un repère absurde', () => {
+    const huge = computeFit({ w: 4000, h: 4000 }, '4');
+    expect(huge.scoreSz).toBe(MAX_SCORE_PX);
+    expect(huge.nameSz).toBe(MAX_NAME_PX);
+    for (const box of [{ w: 0, h: 0 }, { w: -5, h: 10 }, undefined, null]) {
+      const fit = computeFit(box, '9999999');
+      expect(fit.scoreSz).toBe(MIN_SCORE_PX);
+      expect(fit.nameSz).toBe(MIN_NAME_PX);
+    }
+    expect(computeFit({ w: 200, h: 120 }, '').scoreSz).toBe(
+      computeFit({ w: 200, h: 120 }, '0').scoreSz,
+    );
+    expect(computeFit({ w: 200, h: 120 }, undefined).scoreSz).toBeGreaterThan(0);
+    // Chaîne sans aucun chiffre : la largeur retombe sur celle d'un chiffre, jamais sur zéro.
+    expect(computeFit({ w: 200, h: 120 }, 'abc').scoreSz).toBeGreaterThan(0);
+  });
+
+  it('le signe négatif coûte de la place', () => {
+    expect(computeFit({ w: 200, h: 120 }, '-44444').scoreSz).toBeLessThan(
+      computeFit({ w: 200, h: 120 }, '44444').scoreSz,
+    );
+  });
+
+  it('ghostH suit la taille du nom', () => {
+    const fit = computeFit({ w: 300, h: 200 }, '40');
+    expect(fit.ghostH).toBe(Math.round(fit.nameSz * 1.15));
+  });
+});
+
 describe('nameMaxLength', () => {
-  it("reste borné entre 3 et 18 quel que soit l'écran et le nombre de joueurs", () => {
-    expect(HEADER_H).toBe(44);
-    expect(BAR_H).toBe(68);
+  it("dépend réellement de la disposition et de l'écran", () => {
+    expect(nameMaxLength(12, 320, 568)).toBeLessThan(nameMaxLength(1, 1024, 1366));
+    expect(nameMaxLength(12, VP.width, VP.height)).toBeLessThan(
+      nameMaxLength(4, VP.width, VP.height),
+    );
+    expect(nameMaxLength(4, 320, 568)).toBeLessThan(nameMaxLength(4, 1024, 1366));
+    // Deux dispositions différentes sur le même écran ne donnent pas la même longueur
+    const lengths = new Set(
+      [1, 2, 4, 6, 8, 10, 12].map((n) => nameMaxLength(n, VP.width, VP.height)),
+    );
+    expect(lengths.size).toBeGreaterThan(1);
+  });
+
+  it('atteint 18 caractères sur une grande carte et reste ≥ 3 sur la plus petite', () => {
+    expect(nameMaxLength(1, 1024, 1366)).toBe(18);
+    expect(nameMaxLength(4, VP.width, VP.height)).toBe(18);
+    expect(nameMaxLength(12, 240, 400)).toBeGreaterThanOrEqual(3);
+  });
+
+  it('sans écran mesurable, renvoie le minimum', () => {
+    expect(nameMaxLength(4, 0, 0)).toBe(3);
+    expect(nameMaxLength(4, undefined, undefined)).toBe(3);
+  });
+
+  it('reste borné entre 3 et 18 quel que soit le contexte', () => {
     for (let n = 1; n <= 12; n++) {
       for (const [w, h] of [
         [320, 568],
         [390, 844],
         [1024, 1366],
         [100, 200],
+        [2000, 2000],
       ]) {
         const len = nameMaxLength(n, w, h);
         expect(len).toBeGreaterThanOrEqual(3);
         expect(len).toBeLessThanOrEqual(18);
+        expect(Number.isInteger(len)).toBe(true);
       }
     }
+    expect(HEADER_H).toBe(44);
+    expect(BAR_H).toBe(68);
   });
-  it('vaut 12 sur iPhone 13 (formule invariante d’échelle : 1/(0,13·0,62) ≈ 12,4)', () => {
-    for (let n = 1; n <= 12; n++) expect(nameMaxLength(n, 390, 844)).toBe(12);
-  });
-});
 
-describe('computeFit', () => {
-  it('produit des tailles bornées et cohérentes', () => {
-    const f = computeFit(300, 180, '40');
-    expect(f.scoreSz).toBeGreaterThanOrEqual(12);
-    expect(f.scoreSz).toBeLessThanOrEqual(180);
-    expect(f.nameSz).toBeLessThanOrEqual(32);
-    expect(f.signSz).toBeGreaterThanOrEqual(10);
-    expect(f.ghostH).toBe(Math.max(8, f.nameSz));
-    expect(f.deltaSz).toBeCloseTo(Math.max(8, f.scoreSz * 0.42));
-  });
-  it('réduit la taille quand le score a plus de chiffres (monotone)', () => {
-    const sizes = ['4', '40', '400', '4000', '40 000', '400 000', '4 000 000'].map(
-      (s) => computeFit(300, 180, s).scoreSz,
-    );
-    for (let i = 1; i < sizes.length; i++) expect(sizes[i]).toBeLessThanOrEqual(sizes[i - 1]);
-    expect(sizes[0]).toBe(sizes[1]);
-  });
-  it('ne descend jamais sous les minimums', () => {
-    expect(computeFit(12, 12, '9999999')).toMatchObject({
-      scoreSz: 12,
-      signSz: 10,
-      nameSz: 8,
-      ghostH: 8,
-    });
-    expect(computeFit(0, 0, '').scoreSz).toBe(12);
-  });
-  it('plafonne le score à 180 px sur les très grandes cartes', () => {
-    expect(computeFit(2000, 2000, '1').scoreSz).toBe(180);
-    expect(computeFit(2000, 2000, '1').nameSz).toBe(32);
+  it('un écran plus petit ne donne jamais plus de caractères', () => {
+    for (let n = 1; n <= 12; n++) {
+      const small = nameMaxLength(n, 320, 568);
+      const large = nameMaxLength(n, 430, 932);
+      expect(small).toBeLessThanOrEqual(large);
+    }
   });
 });

@@ -24,6 +24,22 @@ const EXTENSIONS = new Set([
   '.webp',
 ]);
 
+/**
+ * Fichiers volontairement hors précache : jamais demandés à l'exécution (les icônes vivent dans
+ * `js/ui/icons.js`, la marque est inline). `assertUnreferenced` échoue si l'un d'eux devient référencé,
+ * pour que l'exclusion ne puisse pas casser le hors-ligne en silence.
+ */
+const PRECACHE_EXCLUDE = new Set([
+  'assets/brand/logo.svg',
+  'assets/brand/logo-mono.svg',
+  'assets/icons/sprite.svg',
+  'icons/favicon-32.png',
+]);
+
+/** Sources inspectées pour vérifier qu'un fichier exclu n'est référencé nulle part. */
+const SOURCE_DIRS = ['css', 'js'];
+const SOURCE_FILES = ['index.html', 'manifest-st.json'];
+
 const START = '// >>> PRECACHE (généré — ne pas éditer à la main)';
 const END = '// <<< PRECACHE';
 
@@ -45,6 +61,30 @@ function walk(dir) {
   return out;
 }
 
+/** Lève si un fichier exclu du précache est référencé par le HTML, le CSS, le JS ou le manifeste. */
+export function assertUnreferenced(excluded = PRECACHE_EXCLUDE) {
+  const sources = [...SOURCE_FILES, ...SOURCE_DIRS.flatMap((d) => walk(d))];
+  const haystack = sources
+    .map((f) => {
+      try {
+        return readFileSync(join(ROOT, f), 'utf8');
+      } catch {
+        return '';
+      }
+    })
+    .join('\n');
+  // Une référence réelle est toujours citée : attribut HTML, `url()` CSS ou littéral JS. Les simples
+  // mentions en commentaire (backticks, parenthèses) ne comptent pas.
+  const referenced = [...excluded].filter((f) =>
+    ['"', "'", 'url(', 'url("', "url('"].some((prefix) => haystack.includes(prefix + f)),
+  );
+  if (referenced.length) {
+    throw new Error(
+      `Fichiers exclus du précache mais référencés (retirez-les de PRECACHE_EXCLUDE) : ${referenced.join(', ')}`,
+    );
+  }
+}
+
 export function collectFiles() {
   const files = ROOT_FILES.filter((f) => {
     try {
@@ -54,9 +94,11 @@ export function collectFiles() {
     }
   });
   for (const d of DIRS) files.push(...walk(d));
+  assertUnreferenced();
   return [...new Set(files)]
-    .sort((a, b) => a.localeCompare(b, 'en'))
-    .map((f) => f.split('\\').join('/'));
+    .map((f) => f.split('\\').join('/'))
+    .filter((f) => !PRECACHE_EXCLUDE.has(f))
+    .sort((a, b) => a.localeCompare(b, 'en'));
 }
 
 export function computeVersion(files) {

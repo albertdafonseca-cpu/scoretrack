@@ -8,13 +8,13 @@
 // Mise à jour : le nouveau SW attend (`waiting`) que l'utilisateur applique la mise à jour depuis la bannière
 // (message SKIP_WAITING) — sauf lors de la première migration depuis les anciens caches `st-v1`/`st-fonts-v1`/
 // `st-v2`, où il prend la main immédiatement afin de les purger.
+// Installation tout-ou-rien : un seul fichier manquant annule l'installation (jamais de version « à moitié
+// hors ligne » qui dégraderait en polices de secours) ; la page en est informée (état `redundant`).
 
 // >>> PRECACHE (généré — ne pas éditer à la main)
-const VERSION = 'b4704f20';
+const VERSION = 'ffc4ea52';
 const PRECACHE = [
   './',
-  './assets/brand/logo-mono.svg',
-  './assets/brand/logo.svg',
   './assets/fonts/bebas-neue-400-latin-ext.woff2',
   './assets/fonts/bebas-neue-400-latin.woff2',
   './assets/fonts/cinzel-400-700-latin-ext.woff2',
@@ -25,7 +25,6 @@ const PRECACHE = [
   './assets/fonts/press-start-2p-400-latin-ext.woff2',
   './assets/fonts/press-start-2p-400-latin.woff2',
   './assets/fonts/share-tech-mono-400-latin.woff2',
-  './assets/icons/sprite.svg',
   './css/base.css',
   './css/fonts.css',
   './css/game.css',
@@ -36,7 +35,6 @@ const PRECACHE = [
   './css/themes.css',
   './css/tokens.css',
   './icons/apple-touch-icon.png',
-  './icons/favicon-32.png',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/maskable-512.png',
@@ -47,11 +45,18 @@ const PRECACHE = [
   './js/core/layout.js',
   './js/core/rules.js',
   './js/core/save-schema.js',
+  './js/fx/confetti.js',
+  './js/fx/flip.js',
+  './js/fx/hold-ring.js',
+  './js/fx/layout-fit.js',
+  './js/fx/motion.js',
+  './js/fx/score.js',
   './js/main.js',
   './js/platform/backup.js',
   './js/platform/boot.js',
   './js/platform/errors.js',
   './js/platform/haptics.js',
+  './js/platform/shortcuts.js',
   './js/platform/storage.js',
   './js/platform/sw-client.js',
   './js/store.js',
@@ -73,22 +78,38 @@ const PRECACHE = [
 const CACHE = `st-${VERSION}`;
 /** Caches des versions antérieures au précache versionné : leur présence déclenche la migration immédiate. */
 const LEGACY_CACHES = ['st-v1', 'st-fonts-v1', 'st-v2'];
-/** Extensions dont l'échec de précache fait échouer l'installation (l'application ne marcherait pas hors ligne). */
-const ESSENTIAL = /\.(html|css|js|json)$|\/$/;
 
 const scopeUrl = (u) => new URL(u, self.registration.scope).href;
 const PRECACHED = new Set(PRECACHE.map(scopeUrl));
 
+// Page de dernier recours : aucun script (ni en ligne ni externe), sa propre CSP, « Réessayer » = simple lien.
 const OFFLINE_PAGE = `<!doctype html><html lang="fr"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>ScoreTrack — hors ligne</title>
 <style>html{background:#020d12;color:#e0fff8;font:16px/1.5 system-ui,sans-serif}body{margin:0;min-height:100vh;display:grid;place-items:center;text-align:center;padding:24px}
-h1{font-size:20px;margin:0 0 8px}p{margin:0 0 20px;color:#9ad}button{font:inherit;padding:12px 20px;border-radius:8px;border:1px solid #00ffe0;background:transparent;color:#00ffe0;min-height:44px}</style></head>
+h1{font-size:20px;margin:0 0 8px}p{margin:0 0 20px;color:#9addd0}a{display:inline-block;font:inherit;padding:12px 20px;border-radius:8px;border:1px solid #00ffe0;color:#00ffe0;text-decoration:none;min-height:44px;box-sizing:border-box}</style></head>
 <body><main><h1>ScoreTrack est hors ligne</h1><p>La première visite doit se faire en ligne pour installer l'application.</p>
-<button type="button" onclick="location.reload()">Réessayer</button></main></body></html>`;
+<a href="./">Réessayer</a></main></body></html>`;
 
 // ── Installation ────────────────────────────────────────────────────
 
-/** Précache : chaque fichier est tenté séparément ; un échec sur un fichier essentiel annule l'installation. */
+/** Signale un précache incomplet aux pages ouvertes (elles ne voient pas les journaux du worker). */
+async function reportInstallFailure(failed) {
+  try {
+    const clients = await self.clients.matchAll({ includeUncontrolled: true, type: 'window' });
+    clients.forEach((c) =>
+      c.postMessage({ type: 'INSTALL_FAILED', version: VERSION, missing: failed.slice(0, 5) }),
+    );
+  } catch {
+    /* aucune page à prévenir */
+  }
+}
+
+/**
+ * Précache tout-ou-rien : chaque fichier est tenté séparément pour pouvoir les nommer tous, mais le moindre
+ * échec (y compris une police ou une icône) annule l'installation — sinon l'application se croirait hors ligne
+ * tout en affichant des polices de secours. Le cache partiel est supprimé et les pages sont averties.
+ */
 async function precache() {
   const cache = await caches.open(CACHE);
   const results = await Promise.allSettled(
@@ -98,13 +119,16 @@ async function precache() {
       await cache.put(url, res);
     }),
   );
-  const failed = [];
-  results.forEach((r, i) => {
-    if (r.status !== 'rejected') return;
-    console.warn(`[sw-st ${VERSION}] précache impossible : ${PRECACHE[i]}`, r.reason);
-    if (ESSENTIAL.test(PRECACHE[i])) failed.push(PRECACHE[i]);
-  });
-  if (failed.length) throw new Error(`Précache incomplet : ${failed.join(', ')}`);
+  const failed = PRECACHE.filter((_, i) => results[i].status === 'rejected');
+  if (!failed.length) return;
+  failed.forEach((url, i) =>
+    console.warn(`[sw-st ${VERSION}] précache impossible : ${url}`, results[i].reason),
+  );
+  await caches.delete(CACHE);
+  await reportInstallFailure(failed);
+  throw new Error(
+    `Précache incomplet (${failed.length}/${PRECACHE.length}) : ${failed.slice(0, 3).join(', ')}`,
+  );
 }
 
 /** Vrai si un cache d'une version antérieure au précache versionné existe encore. */
@@ -166,7 +190,8 @@ async function putInCache(request, response) {
 
 /** Navigation : index.html précaché, sinon réseau, sinon page hors ligne intégrée. */
 async function handleNavigation(request) {
-  const cached = await caches.match('./index.html');
+  const cache = await caches.open(CACHE);
+  const cached = await cache.match('./index.html');
   if (cached) return cached;
   try {
     const res = await fetch(request);
@@ -181,12 +206,45 @@ async function handleNavigation(request) {
   }
 }
 
-/** Actif précaché : cache d'abord, réseau en secours. */
+/**
+ * Réponse partielle (206) découpée dans une réponse complète mise en cache, pour les requêtes `Range`
+ * (lecteurs audio/vidéo) ; null si l'en-tête n'est pas une plage d'octets simple exploitable.
+ */
+async function sliceRange(response, rangeHeader) {
+  const m = /^bytes=(\d*)-(\d*)$/.exec((rangeHeader || '').trim());
+  if (!m || (m[1] === '' && m[2] === '')) return null;
+  const buffer = await response.clone().arrayBuffer();
+  const size = buffer.byteLength;
+  let start = m[1] === '' ? size - Number(m[2]) : Number(m[1]);
+  let end = m[1] === '' || m[2] === '' ? size - 1 : Number(m[2]);
+  start = Math.max(0, start);
+  end = Math.min(end, size - 1);
+  if (start > end) {
+    return new Response(null, {
+      status: 416,
+      statusText: 'Range Not Satisfiable',
+      headers: { 'Content-Range': `bytes */${size}` },
+    });
+  }
+  const headers = new Headers(response.headers);
+  headers.set('Content-Range', `bytes ${start}-${end}/${size}`);
+  headers.set('Content-Length', String(end - start + 1));
+  headers.set('Accept-Ranges', 'bytes');
+  return new Response(buffer.slice(start, end + 1), {
+    status: 206,
+    statusText: 'Partial Content',
+    headers,
+  });
+}
+
+/** Actif précaché : cache d'abord (cache courant uniquement), réseau en secours ; gère les requêtes `Range`. */
 async function cacheFirst(request) {
-  const cached = await caches.match(request, { ignoreSearch: true });
-  if (cached) return cached;
+  const cache = await caches.open(CACHE);
+  const cached = await cache.match(request, { ignoreSearch: true });
+  const range = request.headers.get('range');
+  if (cached) return range ? ((await sliceRange(cached, range)) ?? cached) : cached;
   const res = await fetch(request);
-  if (res.ok) putInCache(request, res.clone());
+  if (res.ok && !range) putInCache(request, res.clone());
   return res;
 }
 
@@ -197,7 +255,8 @@ async function networkFirst(request) {
     if (res.ok) putInCache(request, res.clone());
     return res;
   } catch (err) {
-    const cached = await caches.match(request, { ignoreSearch: true });
+    const cache = await caches.open(CACHE);
+    const cached = await cache.match(request, { ignoreSearch: true });
     if (cached) return cached;
     throw err;
   }

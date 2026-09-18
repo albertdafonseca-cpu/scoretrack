@@ -5,6 +5,7 @@ import { registerServiceWorker } from './platform/sw-client.js';
 import { clearAll, has } from './platform/storage.js';
 import { KEYS } from './core/save-schema.js';
 import { byId, showPage } from './ui/dom.js';
+import { announce, armConfirm } from './ui/a11y.js';
 import { hydrateIcons } from './ui/icons.js';
 import {
   armClearAll,
@@ -40,21 +41,30 @@ import {
   discardSave,
   initGame,
   leaveGame,
+  redoLast,
+  renamePlayer,
   restoreGame,
   rotatePlayers,
   startGame,
+  togglePlayerElimination,
+  undoLast,
 } from './ui/game.js';
 import {
   closeGameOverlays,
   closeModal,
+  closePlayerSheet,
   closeScoreModal,
+  confirmPlayerSheet,
   confirmScoreModal,
+  initPlayerSheet,
   initScoreModal,
   openModal,
   setSign,
+  togglePlayerElim,
 } from './ui/modals.js';
-import { hideRecap, showRecap } from './ui/recap.js';
+import { cancelJump, confirmJump, copyResult, hideRecap, showRecap } from './ui/recap.js';
 import './ui/update-banner.js';
+import { applyLaunchAction } from './platform/shortcuts.js';
 
 /** Délai (ms) avant le fondu du splash, puis durée du fondu. */
 const SPLASH_DELAY = 150;
@@ -73,6 +83,9 @@ function clearAllData() {
   clearAll();
   closePrivacy();
   confirmReset();
+  // Le focus ne doit jamais retomber sur <body> après une action destructrice.
+  byId('app-title').focus({ preventScroll: true });
+  announce('Toutes les données ont été supprimées', 'assertive');
 }
 
 /** Table des actions déclarées dans le HTML via data-action. Chaque gestionnaire reçoit (bouton, événement). */
@@ -90,14 +103,23 @@ const ACTIONS = {
   'open-modal': (btn) => openModal(btn.dataset.modal),
   'close-modal': (btn) => closeModal(btn.dataset.modal),
   'restore-game': restoreGame,
-  'discard-save': discardSave,
+  'discard-save': (btn) => {
+    // Effacer une partie en cours est destructeur : confirmation en deux temps.
+    if (
+      armConfirm(btn, {
+        label: 'Confirmer',
+        message: 'Appuyez de nouveau pour effacer la partie sauvegardée',
+      })
+    )
+      discardSave();
+  },
   'toggle-negative': toggleNegative,
   'show-names': showNamesScreen,
   'apply-defaults': applyDefaults,
   'save-as-default': (btn) => saveAsDefault(btn),
   'shuffle-players': shufflePlayers,
   'save-profiles': saveProfiles,
-  'clear-saved-names': clearSavedNames,
+  'clear-saved-names': (btn) => clearSavedNames(btn),
   'clear-names': clearNames,
   'quick-start': () => startGame(quickStartNames()),
   'start-game': () => startGame(collectNamesAndRemember()),
@@ -110,6 +132,14 @@ const ACTIONS = {
   'confirm-reset': confirmReset,
   'cancel-elim': cancelElimination,
   'confirm-elim': confirmElimination,
+  'undo-action': undoLast,
+  'redo-action': redoLast,
+  'close-player-sheet': closePlayerSheet,
+  'confirm-player-sheet': confirmPlayerSheet,
+  'toggle-player-elim': togglePlayerElim,
+  'copy-result': copyResult,
+  'confirm-jump': confirmJump,
+  'cancel-jump': cancelJump,
 };
 
 function wireActions() {
@@ -137,10 +167,14 @@ function init() {
   initSetup();
   initSettings();
   initScoreModal({ onConfirm: applyManualDelta });
+  initPlayerSheet({ onRename: renamePlayer, onToggleElim: togglePlayerElimination });
   initGame();
   loadSettings();
   setRestoreBannerVisible(has(KEYS.save));
   applyDefaults();
+  // Raccourcis du manifeste (D14, implémentés par js/platform/shortcuts.js) :
+  // « Nouvelle partie » doit aussi repartir d'un formulaire neuf.
+  if (applyLaunchAction() === 'new') resetSetupForm();
   hideSplash();
 }
 

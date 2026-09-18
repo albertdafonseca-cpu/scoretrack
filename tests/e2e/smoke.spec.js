@@ -1,5 +1,6 @@
 // Parcours de fumée : setup → noms → jeu → tap +/− → appui long → pavé → récap → rechargement → undo → reset.
 import { expect, test } from '@playwright/test';
+import { tapCard } from './helpers.js';
 
 /** Erreurs console/page à ignorer : uniquement les échecs réseau de polices en environnement à proxy TLS. */
 const IGNORED = /ERR_CERT_AUTHORITY_INVALID/;
@@ -20,7 +21,7 @@ async function openApp(page) {
 }
 
 async function setupGame(page, { players, start, max }) {
-  await page.locator('#players-grid .player-chip', { hasText: new RegExp(`^${players}$`) }).click();
+  await page.locator(`#players-grid .player-chip[data-val="${players}"]`).click();
   await page.locator(`#start-presets .points-chip[data-val="${start}"]`).click();
   if (max) await page.locator(`#max-presets .points-chip[data-val="${max}"]`).click();
   const limit = max ? `max ${max}` : 'sans limite';
@@ -29,22 +30,6 @@ async function setupGame(page, { players, start, max }) {
   );
   await page.locator('#names-btn').click();
   await expect(page.locator('.name-input')).toHaveCount(players);
-}
-
-/** Tape sur une carte : `side` = 'plus' | 'minus' selon l'orientation de la carte. */
-async function tapCard(page, cardId, side) {
-  const card = page.locator(`#${cardId}`);
-  const rot = await card.evaluate((c) => [...c.classList].find((k) => k.startsWith('rot-')));
-  const box = await card.boundingBox();
-  const far = side === 'plus' ? 0.8 : 0.2;
-  const near = 1 - far;
-  let x = box.x + box.width / 2;
-  let y = box.y + box.height / 2;
-  if (rot === 'rot-l') y = box.y + box.height * far;
-  else if (rot === 'rot-r') y = box.y + box.height * near;
-  else if (rot === 'rot-180') x = box.x + box.width * near;
-  else x = box.x + box.width * far;
-  await page.touchscreen.tap(x, y);
 }
 
 /** Appui long réel (touchStart… touchEnd) via CDP, plus long que le seuil de 450 ms. */
@@ -108,12 +93,13 @@ test('parcours complet à 4 joueurs, restauration, annulation et reset', async (
   await expect(page.locator('#sc-0')).toHaveText('10');
   await expect(page.locator('#sc-0')).toHaveClass(/low/);
 
-  // Récap
+  // Récap : classement (tous les joueurs) + journal chronologique
   await page.locator('#bar').getByRole('button', { name: /Récap/ }).click();
   await expect(page.locator('#recap')).toBeVisible();
+  await expect(page.locator('.recap-rank-row')).toHaveCount(4);
   await expect(page.locator('#recap-body')).toContainText('Alice');
-  await expect(page.locator('#recap-body')).toContainText('Perte de 30 pts');
-  await expect(page.locator('#recap-body')).toContainText('Bilan · Score final');
+  await expect(page.locator('.recap-action').last()).toContainText('Pavé');
+  await expect(page.locator('.recap-action').last()).toContainText('-30');
   await page.locator('#recap-close-btn').click();
   await expect(page.locator('#recap')).toBeHidden();
 
@@ -130,18 +116,21 @@ test('parcours complet à 4 joueurs, restauration, annulation et reset', async (
   await expect(page.locator('.pcard')).toHaveCount(4);
   await expect(page.locator('#sc-0')).toHaveText('10');
   await expect(page.locator('#card-1 .pplayer')).toHaveText(tricky);
-  await expect(page.locator('#undo-btn')).toBeDisabled();
+  // Le journal est persisté : l'annulation reste disponible après rechargement (RUBRIC 7.5)
+  await expect(page.locator('#undo-btn')).toBeEnabled();
 
-  // Undo : deux taps − (le plafond 40 interdit le +) puis deux annulations
+  // Undo : deux taps − rapprochés = UNE action (groupe), donc une seule annulation
   await tapCard(page, 'card-2', 'minus');
   await expect(page.locator('#sc-2')).toHaveText('39');
   await tapCard(page, 'card-2', 'minus');
   await expect(page.locator('#sc-2')).toHaveText('38');
   await page.locator('#undo-btn').tap();
-  await expect(page.locator('#sc-2')).toHaveText('39');
+  await expect(page.locator('#sc-2')).toHaveText('40');
+  await expect(page.locator('#redo-btn')).toBeEnabled();
+  await page.locator('#redo-btn').tap();
+  await expect(page.locator('#sc-2')).toHaveText('38');
   await page.locator('#undo-btn').tap();
   await expect(page.locator('#sc-2')).toHaveText('40');
-  await expect(page.locator('#undo-btn')).toBeDisabled();
 
   // Reset → retour au setup, sauvegarde effacée
   await page.getByRole('button', { name: /Reset/ }).click();
@@ -197,12 +186,13 @@ test("élimination à 0 et vainqueur (2 joueurs), annulation de l'élimination",
   await page.locator('.key-btn', { hasText: /^1$/ }).click();
   await page.locator('.key-btn', { hasText: /^0$/ }).click();
   await page.getByRole('button', { name: 'Appliquer' }).click();
-  await page.getByRole('button', { name: 'Éliminer' }).click();
+  await page.locator('#elim-modal [data-action="confirm-elim"]').click();
   await expect(page.locator('#card-1')).toHaveClass(/elim/);
   await expect(page.locator('#card-1 .elim-label')).toHaveText('Éliminé');
   await expect(page.locator('#winner-modal')).toBeVisible();
-  await expect(page.locator('#winner-name')).toHaveText('Dernier survivant');
-  await expect(page.locator('#winner-sub')).toHaveText('Dernier survivant · Score : 10');
+  await expect(page.locator('#winner-title')).toHaveText('Dernier survivant');
+  await expect(page.locator('#winner-name')).toHaveText('Joueur 1');
+  await expect(page.locator('#winner-sub')).toHaveText('Score final : 10');
 
   expect(errors).toEqual([]);
 });

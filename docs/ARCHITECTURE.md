@@ -23,8 +23,8 @@ flowchart TB
     BANNER["update-banner.js"]
   end
 
-  subgraph FX["js/fx — animations (élément A, à venir)"]
-    FXM["roulement de chiffres, FLIP rotation"]
+  subgraph FX["js/fx — animations"]
+    FXM["score, flip, motion, hold-ring, confetti, layout-fit"]
   end
 
   subgraph CORE["js/core — logique pure, sans DOM, testée (vitest)"]
@@ -101,9 +101,8 @@ sequenceDiagram
   applique ; `redo` jusqu'au prochain `record`. Plus d'instantanés JSON.
 - **Fin de partie** : `findWinner(players, {maxPoints, startPoints})` → `{ index, reason }` avec
   `reason` = `last-alive` (élimination à 0) ou `max-reached` (D : correction du défaut P0 n° 3).
-- **État d'avancement** : `redo`, `jumpTo`, `timeline` et `ranking` existent et sont testés dans
-  `core` ; leur exposition dans l'écran de jeu et le récapitulatif relève de l'élément A (en cours).
-  `js/fx/` n'existe pas encore pour la même raison.
+- **Rétablissement et retour en arrière** : `redo(log)` et `jumpTo(log, entryId)` sont appelés par
+  `js/ui/game.js` ; `ranking(players)` alimente le récapitulatif.
 
 ## 3. Schéma de sauvegarde (localStorage)
 
@@ -144,14 +143,14 @@ save, profiles }`, validée en bloc avant toute écriture.
 
 ```mermaid
 flowchart TD
-  I[install] --> P["précache de PRECACHE (liste générée)\néchec d'un fichier essentiel = échec de l'installation"]
-  P --> L{cache hérité\nst-v1 / st-fonts-v1 / st-v2 ?}
-  L -- oui --> SK[skipWaiting immédiat\n(migration des anciens utilisateurs)]
-  L -- non --> W[waiting : attend la bannière]
+  I["install"] --> P["précache de PRECACHE (liste générée)<br/>échec d'un fichier essentiel = échec de l'installation"]
+  P --> L{"cache hérité st-v1 / st-fonts-v1 / st-v2 ?"}
+  L -- oui --> SK["skipWaiting immédiat<br/>(migration des anciens utilisateurs)"]
+  L -- non --> W["waiting : attend la bannière"]
   W -- "postMessage SKIP_WAITING" --> A
-  SK --> A[activate : purge de tout cache ≠ st-hash,\nentrées orphelines, clients.claim]
-  A --> F{fetch GET même origine}
-  F -- navigation --> N["index.html du cache → réseau → page hors ligne intégrée"]
+  SK --> A["activate : purge de tout cache différent de st-hash,<br/>entrées orphelines, clients.claim"]
+  A --> F{"fetch GET même origine"}
+  F -- navigation --> N["index.html du cache, puis réseau, puis page hors ligne intégrée"]
   F -- précaché --> CF["cache d'abord, réseau en secours"]
   F -- autre --> NF["réseau d'abord, cache en secours"]
 ```
@@ -195,14 +194,43 @@ Le journal complet, avec contexte et conséquences, est dans [DECISIONS.md](DECI
 
 ## 7. Outillage
 
-| Commande            | Rôle                                                                                        |
-| ------------------- | ------------------------------------------------------------------------------------------- |
-| `npm run dev`       | serveur statique local (port 8765)                                                          |
-| `npm run lint`      | ESLint + Prettier                                                                           |
-| `npm run build:sw`  | régénère `PRECACHE`/`VERSION` de `sw-st.js` (obligatoire après tout ajout de fichier servi) |
-| `npm run check:sw`  | vérifie que `sw-st.js` est à jour                                                           |
-| `npm run test:unit` | vitest (`tests/unit`, logique pure)                                                         |
-| `npm run test:e2e`  | Playwright, Chromium émulant un iPhone 13 tactile                                           |
-| `npm run check`     | lint + check:sw + unit + e2e — obligatoire avant tout commit                                |
-| `npm run lhci`      | Lighthouse CI (collecte sur `http-server` + budget)                                         |
-| `npm run audit`     | `npm audit --omit=dev` (aucune dépendance de production)                                    |
+| Commande                 | Rôle                                                                                        |
+| ------------------------ | ------------------------------------------------------------------------------------------- |
+| `npm run dev`            | serveur statique local sur la racine (port 8765)                                            |
+| `npm run lint`           | ESLint + Prettier + anti-emoji                                                              |
+| `npm run build:sw`       | régénère `PRECACHE`/`VERSION` de `sw-st.js` (obligatoire après tout ajout de fichier servi) |
+| `npm run check:sw`       | vérifie que `sw-st.js` est à jour                                                           |
+| `npm run test:unit`      | vitest (`tests/unit`, logique pure)                                                         |
+| `npm run test:e2e`       | Playwright, Chromium émulant un iPhone 13 tactile                                           |
+| `npm run check`          | lint + check:sw + unit + e2e — obligatoire avant tout commit                                |
+| `npm run build:dist`     | construit `dist/` : le dépôt moins l'outillage, exactement ce qui est publié                |
+| `npm run serve:dist`     | sert `dist/` sur le port 8765 (pour les audits ci-dessous)                                  |
+| `npm run lhci`           | Lighthouse CI sur `dist/` + budget de `lighthouserc.json`                                   |
+| `npm run audit:contrast` | contraste AA des 14 thèmes (serveur local requis) — échoue en cas de régression             |
+| `npm run audit:cvd`      | lisibilité en protanopie, deutéranopie, tritanopie — idem                                   |
+| `npm run audit`          | `npm audit --omit=dev` (aucune dépendance de production)                                    |
+
+La CI (`.github/workflows/ci.yml`) exécute ces mêmes vérifications en sept jobs parallèles ; le job
+`paquet` construit `dist/`, vérifie qu'aucun fichier d'outillage n'y figure, que chaque entrée du
+précache y existe, et que le poids téléchargé à la première visite reste sous
+`PRECACHE_MAX_BYTES`.
+
+## 8. Poids et chiffres
+
+Ordres de grandeur mesurés le 17 septembre 2026, alors que les éléments A et D travaillaient encore :
+chaque ligne indique la commande qui les reproduit, à relancer avant toute publication.
+
+| Élément                       | Valeur                                        | Comment la reproduire                                         |
+| ----------------------------- | --------------------------------------------- | ------------------------------------------------------------- |
+| Coquille `index.html`         | ≈ 24 Ko                                       | `stat -c%s index.html`                                        |
+| Paquet publié `dist/`         | 66 fichiers, ≈ 840 Kio                        | `npm run build:dist && du -sb dist`                           |
+| Précache du service worker    | 61 entrées, ≈ 640 Ko (dont 238 Ko de polices) | job `paquet` de la CI (plafond `PRECACHE_MAX_BYTES`)          |
+| Chargement initial de la page | ≈ 400 Kio                                     | audit Lighthouse `total-byte-weight` (plafond 512 000 octets) |
+
+Le précache et le chargement initial diffèrent : la page n'a besoin que d'une partie des fichiers
+pour s'afficher, le service worker télécharge le reste en arrière-plan pour le mode hors ligne.
+
+Ne sont **pas** précachées : les deux captures déclarées dans `manifest-st.json`
+(`assets/screenshots/`, 218 Ko) — elles ne servent qu'à la fiche d'installation du navigateur, qui
+n'est consultée qu'en ligne ; et `favicon.png` à la racine, qu'aucune page ne référence
+(`index.html` pointe `icons/icon-192.png`).

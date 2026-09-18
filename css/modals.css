@@ -1,5 +1,7 @@
-/* Modales (score, vainqueur, reset, élimination, confidentialité) et récapitulatif. */
-/* MODALS */
+/* Modales (pavé, feuille joueur, vainqueur, reset, élimination, retour à un point,
+   confidentialité) et récapitulatif. Toutes les couleurs viennent des jetons. */
+
+/* ── Coquille commune ───────────────────────────────────────────── */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -13,137 +15,162 @@
 .modal-overlay.hidden {
   display: none !important;
 }
-.modal-overlay:not(.hidden) .modal-box {
-  animation: slideUp 0.22s cubic-bezier(0.32, 0.72, 0, 1) both;
-}
-.modal-overlay:not(.hidden) .simple-modal-box {
-  animation: fadeIn 0.18s ease both;
-}
 .modal-box {
   background: var(--bg2);
   border: 1px solid var(--border);
-  border-radius: 16px 16px 0 0;
-  padding: 24px 20px 36px;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: var(--sp-6) var(--sp-5) var(--sp-8);
   width: 100%;
   max-width: 480px;
   box-shadow: var(--modal-glow);
+  max-height: 92vh;
+  overflow-y: auto;
 }
 .modal-handle {
-  width: 40px;
-  height: 3px;
+  width: 44px;
+  height: 4px;
   background: var(--border);
-  border-radius: 2px;
-  margin: 0 auto 20px;
+  border-radius: var(--radius-full);
+  margin: 0 auto var(--sp-5);
 }
 .modal-title {
   font-family: var(--btn-font);
-  font-size: 14px;
+  font-size: var(--fs-3);
   font-weight: 700;
   color: var(--accent);
-  margin-bottom: 6px;
+  margin: 0 0 var(--sp-2);
   text-align: center;
   text-shadow: 0 0 10px var(--accent);
-  letter-spacing: 0.1em;
+  letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
 }
 .modal-player {
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 13px;
+  font-family: var(--font-ui);
+  font-size: var(--fs-2);
   color: var(--muted2);
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: var(--sp-5);
 }
+
+/* ── Pavé numérique ─────────────────────────────────────────────── */
 .modal-score-display {
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 52px;
+  font-family: var(--score-font);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-8);
   text-align: center;
-  margin-bottom: 20px;
-  line-height: 1;
-  min-height: 64px;
+  margin-bottom: var(--sp-5);
+  line-height: 1.2;
+  min-height: 56px;
 }
 .modal-score-display.pos {
-  color: var(--green);
-  text-shadow: 0 0 20px var(--green);
+  color: var(--gain);
 }
 .modal-score-display.neg {
-  color: var(--red);
-  text-shadow: 0 0 20px var(--red);
+  color: var(--loss);
 }
 .modal-keypad {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
 }
 .key-btn {
-  padding: 16px 8px;
+  min-height: var(--tap-min);
+  padding: 14px 8px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: var(--text);
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 22px;
+  font-family: var(--score-font);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-5);
   cursor: pointer;
-  transition: all 0.12s;
-  text-align: center;
+  transition:
+    background-color var(--dur-1) var(--ease-out),
+    transform var(--dur-1) var(--ease-out);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .key-btn:active {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
   border-color: var(--accent);
   transform: scale(0.95);
 }
+.key-btn:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
 .key-btn.del {
-  font-size: 18px;
   color: var(--muted2);
+}
+.key-btn .icon {
+  width: 24px;
+  height: 24px;
 }
 .modal-sign-row {
   display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
 }
 .sign-btn {
   flex: 1;
-  padding: 14px;
+  min-height: var(--tap-min);
+  padding: 12px;
   border: 1.5px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-family: var(--btn-font);
-  font-size: 11px;
+  font-size: var(--fs-1);
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.15s;
-  text-align: center;
+  transition:
+    background-color var(--dur-1) var(--ease-out),
+    color var(--dur-1) var(--ease-out);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   background: var(--surface);
   color: var(--muted2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+}
+.sign-btn .icon {
+  width: 20px;
+  height: 20px;
+}
+.sign-btn:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
 }
 .sign-btn.plus.active {
-  background: var(--green);
-  border-color: var(--green);
-  color: #000;
-  box-shadow: 0 0 16px color-mix(in srgb, var(--green) 35%, transparent);
+  background: var(--gain);
+  border-color: var(--gain);
+  /* Texte sur aplat sémantique : même jeton que les puces pressées (noir sur thème sombre,
+     blanc sur thème clair) — contraste garanti par l'audit de B sur les 14 thèmes. */
+  color: var(--chip-on-text);
 }
 .sign-btn.minus.active {
-  background: var(--red);
-  border-color: var(--red);
-  color: #fff;
-  box-shadow: 0 0 16px color-mix(in srgb, var(--red) 35%, transparent);
+  background: var(--loss);
+  border-color: var(--loss);
+  color: var(--chip-on-text);
 }
 .modal-confirm-row {
   display: flex;
-  gap: 8px;
+  gap: var(--sp-2);
 }
 .modal-btn {
   flex: 1;
-  padding: 15px;
+  min-height: var(--tap-min);
+  padding: 13px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-family: var(--btn-font);
-  font-size: 10px;
+  font-size: var(--fs-1);
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.15s;
-  letter-spacing: 0.1em;
+  transition: transform var(--dur-1) var(--ease-out);
+  letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
 }
 .modal-btn.primary {
@@ -157,85 +184,169 @@
   color: var(--muted2);
   border: 1px solid var(--border);
 }
+.modal-btn:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
 .modal-btn:active {
   transform: scale(0.97);
 }
+
+/* ── Feuille joueur ─────────────────────────────────────────────── */
+.player-name-input {
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: 12px 14px;
+  margin-bottom: var(--sp-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--fs-4);
+  text-align: center;
+}
+.player-name-input:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.player-elim-btn {
+  width: 100%;
+  margin-bottom: var(--sp-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+}
+.player-elim-btn .icon {
+  width: 20px;
+  height: 20px;
+}
+
+/* ── Modales simples (reset, élimination, vainqueur, retour) ─────── */
 .simple-modal-box {
   background: var(--bg2);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 28px 20px 20px;
+  border-radius: var(--radius-lg);
+  padding: var(--sp-8) var(--sp-5) var(--sp-5);
   text-align: center;
-  max-width: 300px;
+  max-width: 320px;
   width: 100%;
   margin: auto;
 }
 .simple-modal-title {
   font-family: var(--btn-font);
-  font-size: 16px;
+  font-size: var(--fs-4);
   font-weight: 700;
   color: var(--text);
-  margin-bottom: 6px;
-  letter-spacing: 0.08em;
+  margin: 0 0 var(--sp-2);
+  letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
 }
 .simple-modal-title.danger {
-  color: var(--red);
-  text-shadow: 0 0 10px var(--red);
+  color: var(--loss);
 }
 .simple-modal-sub {
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 12px;
+  font-family: var(--font-ui);
+  font-size: var(--fs-2);
   color: var(--muted2);
-  margin-bottom: 20px;
-  line-height: 1.6;
+  margin-bottom: var(--sp-5);
+  line-height: var(--lh-base);
 }
 .simple-modal-btns {
   display: flex;
-  gap: 8px;
+  gap: var(--sp-2);
 }
-.simple-modal-btns .modal-btn {
-  font-size: 9px;
-  padding: 13px;
+
+/* ── Vainqueur ──────────────────────────────────────────────────── */
+.winner-modal-box {
+  max-width: 340px;
 }
 .winner-icon {
-  font-size: 40px;
-  margin-bottom: 12px;
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--sp-3);
+  color: var(--accent);
+}
+.winner-icon .icon {
+  width: 44px;
+  height: 44px;
+}
+.winner-title {
+  font-family: var(--btn-font);
+  font-size: var(--fs-1);
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--muted2);
+  margin-bottom: var(--sp-1);
 }
 .winner-name {
   font-family: var(--btn-font);
-  font-size: 20px;
+  font-size: var(--fs-6);
   font-weight: 700;
   color: var(--accent);
-  margin-bottom: 4px;
+  margin-bottom: var(--sp-1);
   text-shadow: 0 0 16px var(--accent);
+  overflow-wrap: anywhere;
 }
 .winner-sub {
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 12px;
+  font-family: var(--font-ui);
+  font-size: var(--fs-2);
   color: var(--muted2);
-  margin-bottom: 20px;
+  margin-bottom: var(--sp-5);
 }
 .winner-btns {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--sp-2);
 }
 
-/* RECAP */
+/* ── Élimination ────────────────────────────────────────────────── */
+.elim-icon-sm .icon {
+  width: 32px;
+  height: 32px;
+  color: var(--loss);
+}
+.elim-confirm-name {
+  font-family: var(--btn-font);
+  font-size: var(--fs-4);
+  font-weight: 700;
+  color: var(--loss);
+  text-align: center;
+  margin-bottom: var(--sp-1);
+  overflow-wrap: anywhere;
+}
+.elim-confirm-sub {
+  font-family: var(--font-ui);
+  font-size: var(--fs-2);
+  color: var(--muted2);
+  text-align: center;
+  margin-bottom: var(--sp-5);
+}
+.btn-elim-confirm {
+  border-color: var(--loss);
+  color: var(--loss);
+  text-shadow: none;
+}
+
+/* ── Récapitulatif ──────────────────────────────────────────────── */
 .fullpage {
   position: fixed;
   inset: 0;
   z-index: 300;
   background: var(--bg);
   overflow-y: auto;
-  padding-bottom: 40px;
+  padding-bottom: var(--sp-10);
+}
+.fullpage.hidden {
+  display: none !important;
 }
 .fullpage-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 16px 12px;
+  padding: var(--sp-4) var(--sp-4) var(--sp-3);
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
@@ -244,186 +355,346 @@
 }
 .fullpage-title {
   font-family: var(--btn-font);
-  font-size: 14px;
+  font-size: var(--fs-3);
   font-weight: 700;
   color: var(--accent);
   text-shadow: 0 0 10px var(--accent);
-  letter-spacing: 0.12em;
+  letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
+  margin: 0;
 }
 .fullpage-close {
   background: var(--surface);
   border: 1px solid var(--border);
   color: var(--muted2);
-  width: 32px;
-  height: 32px;
+  width: var(--tap-min);
+  height: var(--tap-min);
   border-radius: var(--radius);
-  font-size: 15px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.recap-player {
-  margin: 12px 12px 0;
-  background: var(--surface);
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid var(--border);
+.fullpage-close .icon {
+  width: 20px;
+  height: 20px;
 }
-.recap-player-header {
-  padding: 12px 14px 10px;
+.fullpage-close:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.recap-block {
+  margin: var(--sp-3) var(--sp-3) 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.recap-block-title {
+  font-family: var(--btn-font);
+  font-size: var(--fs-1);
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--muted2);
+  margin: 0;
+  padding: var(--sp-3) var(--sp-4);
   border-bottom: 1px solid var(--border);
+}
+.recap-empty {
+  font-family: var(--font-ui);
+  font-size: var(--fs-2);
+  color: var(--muted2);
+  text-align: center;
+  padding: var(--sp-6) var(--sp-4);
+  margin: 0;
+}
+
+/* Classement */
+.recap-rank-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--border);
 }
-.recap-player-dot {
-  width: 8px;
-  height: 8px;
+.recap-rank-row.winner {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.recap-rank-row.out {
+  opacity: 0.6;
+}
+.recap-rank-pos {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 34px;
+  color: var(--accent);
+}
+.recap-rank-pos .icon {
+  width: 18px;
+  height: 18px;
+}
+.recap-rank-n {
+  font-family: var(--score-font);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-3);
+  color: var(--muted2);
+}
+.recap-rank-row.winner .recap-rank-n {
+  color: var(--accent);
+}
+.recap-rank-dot {
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
 }
-.recap-player-name {
-  font-family: var(--btn-font);
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text);
-  letter-spacing: 0.06em;
+.recap-rank-main {
+  flex: 1;
+  min-width: 0;
 }
-.recap-entry {
+.recap-rank-name {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-}
-.recap-entry-rank {
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 11px;
-  color: var(--muted2);
-}
-.recap-entry-detail {
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 13px;
+  gap: var(--sp-2);
+  min-width: 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-3);
+  font-weight: 700;
   color: var(--text);
+}
+.recap-rank-name > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recap-rank-meta {
+  font-family: var(--font-ui);
+  font-size: var(--fs-1);
+  color: var(--muted2);
   margin-top: 2px;
 }
-.recap-delta {
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 22px;
+.recap-rank-score {
+  font-family: var(--score-font);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-5);
+  color: var(--score-color);
+  min-width: 56px;
+  text-align: right;
 }
-.recap-delta.pos {
-  color: var(--green);
-  text-shadow: 0 0 8px var(--green);
+.recap-tag {
+  flex-shrink: 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-1);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--muted2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  padding: 0 6px;
 }
-.recap-delta.neg {
-  color: var(--red);
-  text-shadow: 0 0 8px var(--red);
+.recap-spark {
+  width: 72px;
+  height: 26px;
+  flex-shrink: 0;
 }
-.recap-total {
+.recap-spark-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.recap-spark-flat {
+  stroke: var(--muted);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+/* Journal chronologique */
+.recap-action {
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: 'head jump' 'body jump';
+  gap: 2px var(--sp-2);
+  align-items: center;
+}
+.recap-action.undone {
+  opacity: 0.45;
+}
+.recap-action.undone .recap-action-detail {
+  text-decoration: line-through;
+}
+.recap-action-head {
+  grid-area: head;
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  font-family: var(--font-ui);
+  font-size: var(--fs-1);
+  color: var(--muted2);
+}
+.recap-action-n {
+  color: var(--accent2);
+  font-weight: 700;
+}
+.recap-action-who {
+  color: var(--text);
+  font-weight: 700;
+  font-size: var(--fs-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 12em;
+}
+.recap-action-body {
+  grid-area: body;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px;
-  background: rgba(0, 255, 200, 0.03);
+  gap: var(--sp-2);
+  font-family: var(--font-ui);
+  font-size: var(--fs-2);
+  color: var(--text);
 }
-.recap-total-label {
+.recap-action-delta {
+  font-family: var(--score-font);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-4);
+}
+.recap-action-delta.gain {
+  color: var(--gain);
+}
+.recap-action-delta.loss {
+  color: var(--loss);
+}
+.recap-jump-btn {
+  grid-area: jump;
+  min-height: var(--tap-min);
+  padding: 8px 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--muted2);
   font-family: var(--btn-font);
-  font-size: 7px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
+  font-size: var(--fs-1);
   text-transform: uppercase;
-  color: var(--muted2);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
 }
-.recap-total-val {
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 20px;
-  color: var(--accent2);
-  text-shadow: 0 0 8px var(--accent2);
+.recap-jump-btn .icon {
+  width: 16px;
+  height: 16px;
 }
-
-/* CONFIRMATION ÉLIMINATION */
-.elim-confirm-name {
+.recap-jump-btn.wide {
+  width: calc(100% - 2 * var(--sp-4));
+  margin: var(--sp-3) var(--sp-4);
+  justify-content: center;
+}
+.recap-jump-btn:focus-visible,
+.recap-copy-btn:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.recap-copy-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  width: calc(100% - 2 * var(--sp-3));
+  margin: var(--sp-3) var(--sp-3) 0;
+  min-height: var(--tap-min);
+  padding: 12px;
+  background: transparent;
+  border: 2px solid var(--accent);
+  border-radius: var(--radius-md);
+  color: var(--accent);
   font-family: var(--btn-font);
-  font-size: 18px;
+  font-size: var(--fs-1);
   font-weight: 700;
-  color: var(--red);
-  text-align: center;
-  margin-bottom: 4px;
-  text-shadow: 0 0 12px var(--red);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  cursor: pointer;
 }
-.elim-confirm-sub {
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 12px;
-  color: var(--muted2);
-  text-align: center;
-  margin-bottom: 20px;
+.recap-copy-btn .icon {
+  width: 18px;
+  height: 18px;
 }
 
-/* ── Privacy modal ── */
+/* ── Modale de confidentialité (contenu de l'élément C, style commun) ── */
 .st-privacy-box {
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   max-width: 460px;
   margin: auto;
   max-height: 80vh;
   overflow-y: auto;
 }
 .st-privacy-body {
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 12px;
+  font-family: var(--font-ui);
+  font-size: var(--fs-2);
   color: var(--muted2);
-  line-height: 1.7;
+  line-height: var(--lh-loose);
   text-align: left;
 }
 .st-privacy-intro {
   color: var(--text);
-  font-size: 13px;
-  margin-bottom: 12px;
+  font-size: var(--fs-2);
+  margin-bottom: var(--sp-3);
   font-weight: 700;
 }
 .privacy-strong {
   color: var(--accent2);
 }
 .st-privacy-p {
-  margin-bottom: 10px;
+  margin-bottom: var(--sp-3);
 }
 .st-privacy-p-last {
-  margin-bottom: 16px;
+  margin-bottom: var(--sp-4);
 }
 .btn-clear-all {
-  margin-top: 6px;
-  padding: 8px 14px;
-  background: color-mix(in srgb, var(--red) 15%, transparent);
-  border: 1px solid var(--red);
+  margin-top: var(--sp-2);
+  min-height: var(--tap-min);
+  padding: 10px 14px;
+  background: color-mix(in srgb, var(--loss) 15%, transparent);
+  border: 1px solid var(--loss);
   border-radius: var(--radius);
-  color: var(--red);
+  color: var(--loss);
   font-family: var(--btn-font);
-  font-size: 9px;
+  font-size: var(--fs-1);
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
   cursor: pointer;
 }
 .st-privacy-date {
-  opacity: 0.5;
-  font-size: 10px;
+  /* Pas d'`opacity` : elle dégradait le contraste sous 4,5:1 (axe « color-contrast », thème clair).
+     La nuance vient du jeton de texte secondaire, audité sur les 14 thèmes. */
+  color: var(--muted2);
+  font-size: var(--fs-1);
 }
 .st-privacy-close {
-  margin-top: 16px;
+  margin-top: var(--sp-4);
 }
-/* ── Winner modal ── */
-.winner-modal-box {
-  border-radius: 16px;
-  max-width: 340px;
-  margin: auto;
+.recap-jump-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
-/* ── Elim modal ── */
-.elim-icon-sm {
-  font-size: 28px;
-  margin-bottom: 8px;
+
+/* La confirmation « revenir ici » s'ouvre depuis le récapitulatif (z-index 300) : elle doit passer
+   au-dessus de lui, sinon elle est visible mais inatteignable. */
+#jump-modal {
+  z-index: 400;
 }
-.btn-elim-confirm {
-  border-color: var(--red);
-  color: var(--red);
+
+/* La carte du vainqueur reste au-dessus du canevas de confettis (inséré dans la surcouche). */
+#winner-modal .simple-modal-box {
+  position: relative;
+  z-index: 1;
 }

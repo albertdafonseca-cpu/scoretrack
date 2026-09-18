@@ -22,13 +22,28 @@ body {
   min-height: 100vh;
   background: var(--bg-grad);
   color: var(--text);
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-ui);
   overflow-x: hidden;
 }
 
-/* Les champs de saisie restent sélectionnables (copier/coller autorisé). */
+:root {
+  /* Garde-fou D10 : aucun texte rendu sous 12 px, même si le jeton --fs-1 descend plus bas. */
+  --fs-min: max(var(--fs-1, 12px), 12px);
+  /* Texte secondaire des écrans d'entrée : dérivé de --text pour garantir le contraste sur les
+     fonds texturés, là où --muted2 descend sous 4,5:1 (mesuré sur les pixels rendus, D16). */
+  --text-2: color-mix(in srgb, var(--text) 82%, var(--bg));
+}
+
+/* Champs de saisie et contenus longs restent sélectionnables (copier/coller autorisé). */
 input,
-textarea {
+textarea,
+.st-privacy-body,
+.setup-help,
+.setup-summary,
+.setup-names-hint,
+.restore-preview,
+.restore-when,
+.field-error {
   -webkit-user-select: text;
   user-select: text;
 }
@@ -103,11 +118,6 @@ textarea {
   align-items: center;
   justify-content: center;
   gap: 16px;
-  transition: opacity var(--dur-2, 200ms) ease;
-}
-#splash.hidden {
-  opacity: 0;
-  pointer-events: none;
 }
 .splash-icon {
   font-size: 52px;
@@ -124,7 +134,7 @@ textarea {
 }
 .splash-sub {
   font-family: var(--score-font);
-  font-size: var(--fs-1, 11px);
+  font-size: var(--fs-min);
   letter-spacing: 0.2em;
   color: var(--muted2);
   text-transform: uppercase;
