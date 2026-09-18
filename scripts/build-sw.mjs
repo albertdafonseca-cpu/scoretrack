@@ -73,10 +73,11 @@ export function assertUnreferenced(excluded = PRECACHE_EXCLUDE) {
       }
     })
     .join('\n');
-  // Une référence réelle est toujours citée : attribut HTML, `url()` CSS ou littéral JS. Les simples
-  // mentions en commentaire (backticks, parenthèses) ne comptent pas.
+  // Une référence réelle est toujours citée : attribut HTML, `url()` CSS ou littéral JS, avec ou sans
+  // préfixe « ./ ». Les simples mentions en commentaire (backticks, parenthèses) ne comptent pas.
+  const prefixes = ['"', "'", 'url(', 'url("', "url('"];
   const referenced = [...excluded].filter((f) =>
-    ['"', "'", 'url(', 'url("', "url('"].some((prefix) => haystack.includes(prefix + f)),
+    [f, `./${f}`].some((path) => prefixes.some((prefix) => haystack.includes(prefix + path))),
   );
   if (referenced.length) {
     throw new Error(
@@ -101,12 +102,31 @@ export function collectFiles() {
     .sort((a, b) => a.localeCompare(b, 'en'));
 }
 
-export function computeVersion(files) {
+/**
+ * Source de `sw-st.js` privée du bloc PRECACHE généré : c'est la « logique » du service worker.
+ * L'exclure du hachage évite le point fixe (le bloc contient la version qu'on est en train de calculer)
+ * tout en garantissant que toute modification de comportement du SW change bien la version.
+ */
+export function swLogicSource(source = readFileSync(SW_PATH, 'utf8')) {
+  const start = source.indexOf(START);
+  const end = source.indexOf(END);
+  if (start < 0 || end < 0) return source;
+  return source.slice(0, start) + source.slice(end + END.length);
+}
+
+/**
+ * Empreinte du contenu servi : tous les fichiers précachés **et** la logique de `sw-st.js` lui-même.
+ * Sans ce dernier, une correction portant uniquement sur le service worker laisserait la version
+ * inchangée : le nouveau SW s'installerait dans le cache déjà servi par le SW actif.
+ */
+export function computeVersion(files, swSource) {
   const h = createHash('sha256');
   for (const f of files) {
     h.update(f);
     h.update(readFileSync(join(ROOT, f)));
   }
+  h.update('sw-st.js');
+  h.update(swLogicSource(swSource));
   return h.digest('hex').slice(0, 8);
 }
 
@@ -121,7 +141,7 @@ export function buildSw(source) {
   const end = source.indexOf(END);
   if (start < 0 || end < 0) throw new Error('Marqueurs PRECACHE introuvables dans sw-st.js');
   const files = collectFiles();
-  const version = computeVersion(files);
+  const version = computeVersion(files, source);
   const block = renderBlock(files, version);
   return { next: source.slice(0, start) + block + source.slice(end + END.length), files, version };
 }

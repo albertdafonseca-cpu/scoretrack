@@ -1,10 +1,14 @@
 // Tests de bout en bout : Chromium émulant un iPhone 13 (tactile), serveur statique local.
+//
+// Deux projets. `mobile-chromium` couvre le fonctionnel (tests/e2e). `perf` couvre les mesures de
+// trames et de latence (tests/perf) : elles sont FAUSSÉES par tout voisin qui s'exécute en même
+// temps, donc ce projet tourne seul, après les autres, avec un unique ouvrier.
 import { defineConfig, devices } from '@playwright/test';
 
 const PORT = 8765;
 
 export default defineConfig({
-  testDir: 'tests/e2e',
+  testDir: 'tests',
   timeout: 60_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,
@@ -18,7 +22,23 @@ export default defineConfig({
   projects: [
     {
       name: 'mobile-chromium',
+      testDir: 'tests/e2e',
       use: { ...devices['iPhone 13'], browserName: 'chromium', hasTouch: true },
+    },
+    {
+      name: 'perf',
+      testDir: 'tests/perf',
+      // Gabarit imposé par la grille d'évaluation (390 × 844, DPR 3).
+      use: {
+        ...devices['iPhone 13'],
+        browserName: 'chromium',
+        hasTouch: true,
+        viewport: { width: 390, height: 844 },
+      },
+      fullyParallel: false,
+      // `dependencies` garantit que RIEN d'autre ne tourne pendant la mesure : le projet
+      // fonctionnel est intégralement terminé avant que la première trame ne soit comptée.
+      dependencies: ['mobile-chromium'],
     },
   ],
   webServer: {

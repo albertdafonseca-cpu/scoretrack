@@ -57,7 +57,7 @@ import {
   openWinnerModal,
 } from './modals.js';
 import { setRestoreBannerVisible } from './setup.js';
-import { fitCard } from '../fx/layout-fit.js';
+import { fitCard, lastFitGap } from '../fx/layout-fit.js';
 import { captureRects, playFlip } from '../fx/flip.js';
 import { flashHalf, hideDeltaBubble, setScoreText, showDeltaBubble } from '../fx/score.js';
 import { createRing, startRing } from '../fx/hold-ring.js';
@@ -72,6 +72,14 @@ const UNDO_REPEAT_DELAY = 500;
 const UNDO_REPEAT_INTERVAL = 140;
 /** Longueur maximale d'un prénom saisi en cours de partie. */
 export const NAME_MAX = 18;
+/**
+ * Écart maximal toléré entre le plus grand et le plus petit score d'une même disposition.
+ * Les cartes n'ont pas toutes la même largeur de lecture (une carte latérale lit sur la hauteur de
+ * sa cellule, une carte en bandeau sur toute la largeur de l'écran) : sans harmonisation, le joueur
+ * du bas lirait un chiffre deux fois plus grand que ses voisins. Tous les joueurs sont à la même
+ * distance de l'appareil : une table cohérente vaut mieux qu'un chiffre géant isolé.
+ */
+const SCORE_RATIO_MAX = 1.4;
 
 /** Messages de reprise impossible, par raison renvoyée par `parseGame`. */
 const RESTORE_MESSAGES = {
@@ -96,8 +104,16 @@ let layout = null;
 const compact = [];
 
 let resizeObserver = null;
-let pressed = null;
+/**
+ * Appuis en cours, indexés par `pointerId`.
+ * Un seul état global perdait un tap sur deux dès que deux joueurs marquaient en même temps
+ * (téléphone posé au milieu de la table, cas d'usage central de l'application) : chaque doigt a
+ * donc désormais son propre appui, sa propre minuterie d'appui long et son propre anneau.
+ */
+const presses = new Map();
 let gameReadyMarked = false;
+/** Plus grand écart relatif entre `computeFit` et la taille posée, sur la dernière mesure. */
+let fitGap = 0;
 let winnerFor = -1;
 
 const gameScreen = () => byId('game-screen');
@@ -292,11 +308,24 @@ function scoreText(pi) {
 }
 
 /**
- * Mesure une carte et applique les tailles calculées par le cœur.
- * Le repère vient de `cardBox` ; `computeFit` décide notamment de retirer les séparateurs de
- * milliers (`compact`) plutôt que de rendre un score à 7 chiffres illisible.
+ * Ajustement calculé par le cœur pour une carte, sans toucher au DOM.
+ * Le mode compact est décidé sur le score AVEC séparateurs ; si `computeFit` le réclame, la taille
+ * est recalculée sur la chaîne réellement affichée (sans séparateurs). Idempotent.
  */
-function measureCard(card) {
+function fitFor(pi, box) {
+  const p = store.game.players[pi];
+  if (!p) return null;
+  let fit = computeFit(box, fmtNum(p.score));
+  compact[pi] = fit.compact;
+  if (fit.compact) fit = computeFit(box, String(p.score));
+  return fit;
+}
+
+/**
+ * Applique à une carte les tailles calculées par le cœur (`fit`), plafonnées par `ceiling` pour
+ * harmoniser la disposition, puis corrigées par la largeur réellement rendue.
+ */
+function measureCard(card, precomputed, ceiling = Infinity) {
   if (!card || !card.isConnected) return;
   const ref = parts.get(card);
   if (!ref) return;
@@ -308,12 +337,9 @@ function measureCard(card) {
   ref.inner.style.width = `${lateral ? h : w}px`;
   ref.inner.style.height = `${lateral ? w : h}px`;
   const box = boxes[pi] || (lateral ? { w: h, h: w } : { w, h });
-  const p = store.game.players[pi];
-  // Le mode compact est décidé sur le score AVEC séparateurs ; si `computeFit` le réclame, la
-  // taille est recalculée sur la chaîne réellement affichée (sans séparateurs). Idempotent.
-  let fit = computeFit(box, fmtNum(p.score));
-  compact[pi] = fit.compact;
-  if (fit.compact) fit = computeFit(box, String(p.score));
+  const base = precomputed || fitFor(pi, box);
+  if (!base) return;
+  const fit = { ...base, scoreSz: Math.min(base.scoreSz, ceiling) };
   ref.score.textContent = scoreText(pi);
   const ghost = ref.nameBtn.querySelector('.pplayer-ghost');
   const label = ref.nameBtn.querySelector('.pplayer');
@@ -323,6 +349,7 @@ function measureCard(card) {
     fit,
   );
   scoreLen[pi] = ref.score.textContent.length;
+  fitGap = Math.max(fitGap, lastFitGap());
 }
 
 const signsOf = (card) => Array.from(card.querySelectorAll('.tap-sign'));
@@ -354,7 +381,44 @@ function measureAll() {
       boxes[placement.i] = cardBox(placement, viewport);
     });
   }
-  for (const card of cards) measureCard(card);
+  fitGap = 0;
+  // Pré-passe purement calculatoire : on connaît la taille visée de chaque carte avant d'en poser
+  // une seule, ce qui permet de plafonner l'écart entre la plus grande et la plus petite.
+  const fits = [];
+  cards.forEach((card, i) => {
+    if (!card || !boxes[i]) return;
+    fits[i] = fitFor(i, boxes[i]);
+  });
+  const sizes = fits.filter(Boolean).map((f) => f.scoreSz);
+  const ceiling = sizes.length ? Math.min(...sizes) * SCORE_RATIO_MAX : Infinity;
+  cards.forEach((card, i) => measureCard(card, fits[i], ceiling));
+  syncBarLabels();
+}
+
+/**
+ * Écart relatif maximal, sur la dernière mesure, entre la taille de score calculée par le cœur et
+ * celle réellement posée. Doit rester faible : au-delà, la géométrie du DOM contredit `computeFit`.
+ */
+export function fitCoherence() {
+  return fitGap;
+}
+
+/**
+ * Les libellés de la barre disparaissent au profit des seules icônes quand la taille de police du
+ * système ne leur laisse plus la place (D19 : jetons en rem, police système jusqu'à 200 %).
+ * Masquer vaut mieux que tronquer ; le nom accessible reste porté par `aria-label`.
+ */
+function syncBarLabels() {
+  const barEl = bar();
+  if (!barEl || barEl.style.display !== 'flex') return;
+  barEl.classList.remove('icons-only');
+  const tooWide = Array.from(barEl.querySelectorAll('.btn-label')).some((label) => {
+    if (!label.dataset.full) label.dataset.full = label.textContent.trim();
+    const btn = label.closest('.bar-btn');
+    if (btn && !btn.hasAttribute('aria-label')) btn.setAttribute('aria-label', label.dataset.full);
+    return label.scrollWidth > label.clientWidth + 0.5;
+  });
+  barEl.classList.toggle('icons-only', tooWide);
 }
 
 /** Ajustement piloté par la taille réelle de la zone de jeu (aucun sondage). */
@@ -402,13 +466,24 @@ function renderName(pi, card = cards[pi]) {
   refreshLabels(pi, card);
 }
 
+/** Libellés des deux moitiés : ils ne dépendent QUE du prénom, donc jamais réécrits sur un tap. */
 function refreshLabels(pi, card = cards[pi]) {
   const ref = parts.get(card);
   if (!ref) return;
   const who = displayName(pi);
   ref.minus.setAttribute('aria-label', `Retirer 1 point à ${who}`);
   ref.plus.setAttribute('aria-label', `Ajouter 1 point à ${who}`);
-  ref.score.setAttribute('aria-label', `${who} : ${fmtNum(store.game.players[pi].score)} points`);
+  refreshScoreLabel(pi, card);
+}
+
+/** Libellé du score seul (le seul qui change à chaque tap). */
+function refreshScoreLabel(pi, card = cards[pi]) {
+  const ref = parts.get(card);
+  if (!ref) return;
+  ref.score.setAttribute(
+    'aria-label',
+    `${displayName(pi)} : ${fmtNum(store.game.players[pi].score)} points`,
+  );
 }
 
 /** Applique l'état « éliminé » d'un joueur à sa carte, sans reconstruire quoi que ce soit. */
@@ -430,9 +505,12 @@ function updateScore(pi, direction) {
   const text = scoreText(pi);
   const p = store.game.players[pi];
   setScoreText(ref.score, text, direction);
-  ref.score.className = `score ${scoreClass(p.score, store.config.startPoints)}`.trim();
-  if (text.length !== scoreLen[pi]) measureCard(cards[pi]);
-  refreshLabels(pi);
+  const cls = `score ${scoreClass(p.score, store.config.startPoints)}`.trim();
+  if (ref.score.className !== cls) ref.score.className = cls;
+  // Un changement du nombre de chiffres rebat les tailles de TOUTE la disposition (plafond
+  // d'harmonisation) : on repasse donc sur l'ensemble des cartes, ce qui reste rare.
+  if (text.length !== scoreLen[pi]) measureAll();
+  refreshScoreLabel(pi);
 }
 
 /** Active/désactive Annuler et Rétablir selon le journal. */
@@ -445,14 +523,19 @@ function refreshHistoryButtons() {
 
 // ── Gestes (Pointer Events unifiés) ────────────────────────────────
 
-function endPress({ apply = false } = {}) {
-  if (!pressed) return;
-  const { half, pi, dir, timer, stopRing, held } = pressed;
-  clearTimeout(timer);
-  stopRing();
-  half.classList.remove('pressed');
-  pressed = null;
-  if (apply && !held) adjust(pi, dir, half);
+/** Termine l'appui d'un pointeur donné (ou tous si `id` est omis) et applique le tap si demandé. */
+function endPress(id, { apply = false } = {}) {
+  if (id === undefined) {
+    for (const key of [...presses.keys()]) endPress(key);
+    return;
+  }
+  const press = presses.get(id);
+  if (!press) return;
+  presses.delete(id);
+  clearTimeout(press.timer);
+  press.stopRing();
+  press.half.classList.remove('pressed');
+  if (apply && !press.held) adjust(press.pi, press.dir, press.half);
 }
 
 function onPointerDown(e) {
@@ -460,48 +543,50 @@ function onPointerDown(e) {
   if (!half || half.disabled || e.button > 0) return;
   // Empêche les événements souris de compatibilité (le clic clavier reste reconnu à detail === 0).
   e.preventDefault();
-  endPress();
+  // On n'annule QUE l'éventuel appui du même pointeur : les autres doigts continuent leur course.
+  endPress(e.pointerId);
   const pi = Number(half.dataset.pi);
   const dir = Number(half.dataset.dir);
   // Retour visuel immédiat : classe posée dans le gestionnaire, donc avant la trame suivante.
   half.classList.add('pressed');
   const stopRing = startRing(half.querySelector('.hold-ring'), HOLD_DELAY);
+  const id = e.pointerId;
   const timer = setTimeout(() => {
-    if (!pressed) return;
-    pressed.held = true;
-    endPress();
+    const press = presses.get(id);
+    if (!press) return;
+    press.held = true;
+    endPress(id);
     haptic('longpress');
     swallowNextClick();
     openManualEntry(pi);
   }, HOLD_DELAY);
-  pressed = {
+  presses.set(id, {
     half,
     pi,
     dir,
     timer,
     stopRing,
     held: false,
-    id: e.pointerId,
     x: e.clientX,
     y: e.clientY,
-  };
+  });
   try {
-    half.setPointerCapture(e.pointerId);
+    half.setPointerCapture(id);
   } catch {
     /* capture non prise en charge */
   }
 }
 
 function onPointerMove(e) {
-  if (!pressed || e.pointerId !== pressed.id) return;
-  const dx = e.clientX - pressed.x;
-  const dy = e.clientY - pressed.y;
-  if (dx * dx + dy * dy > SLIDE_CANCEL * SLIDE_CANCEL) endPress();
+  const press = presses.get(e.pointerId);
+  if (!press) return;
+  const dx = e.clientX - press.x;
+  const dy = e.clientY - press.y;
+  if (dx * dx + dy * dy > SLIDE_CANCEL * SLIDE_CANCEL) endPress(e.pointerId);
 }
 
 function onPointerUp(e) {
-  if (!pressed || e.pointerId !== pressed.id) return;
-  endPress({ apply: true });
+  endPress(e.pointerId, { apply: true });
 }
 
 /**
@@ -670,9 +755,10 @@ function maybeWinner() {
   if (winnerFor === w.index) return;
   winnerFor = w.index;
   const p = store.game.players[w.index];
+  // Le titre dit déjà « Objectif atteint » / « Dernier survivant » : le sous-titre ne le répète pas.
   const sub =
     w.reason === 'max-reached'
-      ? `Objectif atteint · ${fmtNum(p.score)} / ${fmtNum(store.config.maxPoints)} pts`
+      ? `${fmtNum(p.score)} / ${fmtNum(store.config.maxPoints)} points`
       : `Score final : ${fmtNum(p.score)}`;
   openWinnerModal(displayName(w.index), sub, w.reason);
   haptic('win');
@@ -720,7 +806,7 @@ export function renamePlayer(pi, rawName) {
   p.playerName = to;
   recordRename(store.game.log, pi, from, to);
   renderName(pi);
-  measureCard(cards[pi]);
+  measureAll();
   refreshHistoryButtons();
   saveGame();
   announce(`${displayName(pi)} renommé`);
@@ -764,7 +850,7 @@ function applyAction(action) {
     lastTapDir.delete(pi);
     if (action.via === 'rename') {
       renderName(pi);
-      measureCard(cards[pi]);
+      measureAll();
     } else if (action.via === 'elim' || action.via === 'unelim') {
       refreshElim(pi);
     } else {
@@ -876,7 +962,7 @@ export function initGame() {
   wrap.addEventListener('pointerdown', onPointerDown);
   wrap.addEventListener('pointermove', onPointerMove);
   wrap.addEventListener('pointerup', onPointerUp);
-  wrap.addEventListener('pointercancel', () => endPress());
+  wrap.addEventListener('pointercancel', (e) => endPress(e.pointerId));
   wrap.addEventListener('click', onClick);
   wrap.addEventListener('keydown', onGridKey);
   wrap.addEventListener('contextmenu', (e) => e.preventDefault());

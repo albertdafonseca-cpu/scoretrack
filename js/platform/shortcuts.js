@@ -14,12 +14,17 @@ export function readLaunchAction(search = location.search) {
   return ACTIONS.includes(raw) ? raw : null;
 }
 
-/** Retire le paramètre de l'URL : un rechargement ne doit pas rejouer le raccourci. */
+/**
+ * Retire tout paramètre `action` de l'URL (quelle que soit sa casse ou sa valeur, même inconnue) :
+ * un rechargement ne doit pas rejouer le raccourci, et une valeur non reconnue ne doit pas rester
+ * affichée dans la barre d'adresse.
+ */
 function cleanUrl() {
   try {
     const url = new URL(location.href);
-    if (!url.searchParams.has('action')) return;
-    url.searchParams.delete('action');
+    const keys = [...url.searchParams.keys()].filter((k) => k.toLowerCase() === 'action');
+    if (!keys.length) return;
+    keys.forEach((k) => url.searchParams.delete(k));
     history.replaceState(null, '', url.pathname + url.search + url.hash);
   } catch {
     /* history indisponible : l'URL reste telle quelle, sans conséquence fonctionnelle */
@@ -33,8 +38,8 @@ function cleanUrl() {
  * À appeler en fin d'initialisation, une fois la bannière de reprise posée.
  */
 export function applyLaunchAction(action = readLaunchAction()) {
-  if (!action) return null;
   cleanUrl();
+  if (!action) return null;
   if (action === 'new') {
     // Nouvelle partie : la sauvegarde est conservée, mais l'accueil ne propose pas de la reprendre.
     setRestoreBannerVisible(false);

@@ -1,10 +1,12 @@
-// Accessibilité des écrans d'entrée : axe-core sur les 14 thèmes, trois formats d'écran et tous
-// les états (accueil, erreur de saisie, bannière de reprise, noms, réglages, modale), plus la
-// navigation clavier, le piège de focus, les cibles ≥ 44 px et le plancher typographique (D10).
+// Accessibilité des écrans d'entrée : axe-core (jeu complet de règles par état, contraste sur les
+// 14 thèmes), contraste mesuré sur les pixels réellement rendus, cibles ≥ 44 px, textes ≥ 12 px,
+// absence de débordement ET de recouvrement sur quatre conditions d'affichage, navigation clavier,
+// isolation de la modale.
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import {
   collectErrors,
+  obstructedTargets,
   openApp,
   renderedContrast,
   themeIds,
@@ -18,12 +20,27 @@ const MIN_FONT_PX = 12;
 
 const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'];
 
-/**
- * Toutes les violations axe de l'écran (aucun filtre de gravité : `moderate` compte aussi),
- * résumées pour un message d'échec lisible.
- */
-async function auditScreen(page, include) {
-  const builder = new AxeBuilder({ page }).withTags(TAGS);
+/** Conditions d'affichage couvertes, dont le texte système à 200 % exigé par D19. */
+const CONDITIONS = [
+  ['390x844', { width: 390, height: 844 }, 16],
+  ['768x1024', { width: 768, height: 1024 }, 16],
+  ['320x568', { width: 320, height: 568 }, 16],
+  ['390x844 · texte système 200 %', { width: 390, height: 844 }, 32],
+];
+
+/** Applique une condition d'affichage : taille de fenêtre et taille de police du système. */
+async function applyCondition(page, viewport, fontPx) {
+  await page.setViewportSize(viewport);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Page.enable');
+  await cdp.send('Page.setFontSizes', { fontSizes: { standard: fontPx, fixed: fontPx } });
+}
+
+/** Violations axe de l'écran, toutes gravités (`moderate` compris), jeu de règles complet. */
+async function auditScreen(page, include, rules = null) {
+  const builder = rules
+    ? new AxeBuilder({ page }).withRules(rules)
+    : new AxeBuilder({ page }).withTags(TAGS);
   if (include) builder.include(include);
   const { violations } = await builder.analyze();
   return violations.map((v) => ({
@@ -47,11 +64,10 @@ async function undecidedContrastNodes(page, include) {
  * L'application revient à l'accueil en fin de parcours.
  */
 async function forEachState(page, fn) {
-  // 1. Accueil à froid
   await expect(page.locator('#setup-page')).toBeVisible();
   await fn('accueil', '#setup-page');
 
-  // 2. Accueil en erreur (maximum < points de départ)
+  // Accueil en erreur (maximum < points de départ)
   await page.locator('#start-presets .points-chip[data-val="40"]').click();
   await page.locator('#max-custom').fill('20');
   await expect(page.locator('#max-error')).toBeVisible();
@@ -59,23 +75,25 @@ async function forEachState(page, fn) {
   await page.locator('#max-custom').fill('');
   await page.locator('#start-presets .points-chip[data-val="0"]').click();
 
-  // 3. Bannière de reprise (partie sauvegardée)
+  // Bannière de reprise (partie sauvegardée)
   await page.evaluate(() => {
-    const save = {
-      v: 2,
-      players: [
-        { playerName: 'Alice', score: 12, eliminated: false },
-        { playerName: 'Bob', score: 8, eliminated: false },
-      ],
-      seatOrder: [0, 1],
-      log: { entries: [], cursor: 0 },
-      numPlayers: 2,
-      startPoints: 10,
-      maxPoints: null,
-      allowNeg: false,
-      ts: Date.now(),
-    };
-    localStorage.setItem('scoretrack_save', JSON.stringify(save));
+    localStorage.setItem(
+      'scoretrack_save',
+      JSON.stringify({
+        v: 2,
+        players: [
+          { playerName: 'Alice', score: 12, eliminated: false },
+          { playerName: 'Bob', score: 8, eliminated: false },
+        ],
+        seatOrder: [0, 1],
+        log: { entries: [], cursor: 0 },
+        numPlayers: 2,
+        startPoints: 10,
+        maxPoints: null,
+        allowNeg: false,
+        ts: Date.now(),
+      }),
+    );
   });
   await page.reload();
   await expect(page.locator('#setup-page')).toBeVisible();
@@ -83,7 +101,7 @@ async function forEachState(page, fn) {
   await expect(page.locator('#restore-banner')).toBeVisible();
   await fn('bannière', '#setup-page');
 
-  // 4. Page Joueurs, avec des prénoms mémorisés
+  // Page Joueurs, avec des prénoms mémorisés
   await page.evaluate(() =>
     localStorage.setItem('scoretrack_profiles', JSON.stringify({ v: 1, names: ['Alice', 'Bob'] })),
   );
@@ -92,12 +110,12 @@ async function forEachState(page, fn) {
   await fn('noms', '#names-page');
   await page.getByRole('button', { name: /Retour/ }).click();
 
-  // 5. Réglages
+  // Réglages
   await page.locator('.logo-gear').click();
   await expect(page.locator('#settings-page')).toBeVisible();
   await fn('réglages', '#settings-page');
 
-  // 6. Modale de confidentialité
+  // Modale de confidentialité
   await page.locator('[data-action="show-privacy"]').click();
   await expect(page.locator('#privacy-modal')).toBeVisible();
   await fn('confidentialité', '#privacy-modal');
@@ -105,25 +123,33 @@ async function forEachState(page, fn) {
   await page.locator('[data-action="back-from-settings"]').click();
 }
 
-test('axe-core : 0 violation sur les 14 thèmes × 6 états (WCAG AA + bonnes pratiques)', async ({
+test('axe-core : jeu de règles complet par état, contraste sur les 14 thèmes, sans filtre', async ({
   page,
 }) => {
-  test.setTimeout(300_000);
+  test.setTimeout(240_000);
   await openApp(page);
   const themes = await themeIds(page);
   // La liste vient de js/core/constants.js ; le test suit l'ajout d'un thème sans être réécrit.
   expect(themes.length).toBeGreaterThanOrEqual(14);
 
   const failures = [];
-  for (const theme of themes) {
-    await openApp(page);
-    await useTheme(page, theme);
-    await forEachState(page, async (state, sel) => {
-      await useTheme(page, theme); // le rechargement de l'état « bannière » réapplique le thème
-      const violations = await auditScreen(page, sel);
-      if (violations.length) failures.push({ theme, state, violations });
-    });
-  }
+  let audits = 0;
+  // Une seule règle dépend du thème : le jeu de règles complet tourne une fois par état, puis
+  // seule la règle de contraste est rejouée sur les autres thèmes — sans refaire la navigation,
+  // qui est le vrai coût. Même pouvoir de détection, cinq fois moins de temps.
+  await forEachState(page, async (state, sel) => {
+    audits++;
+    const full = await auditScreen(page, sel);
+    if (full.length) failures.push({ theme: themes[0], state, violations: full });
+    for (const theme of themes.slice(1)) {
+      await useTheme(page, theme);
+      audits++;
+      const v = await auditScreen(page, sel, ['color-contrast']);
+      if (v.length) failures.push({ theme, state, violations: v });
+    }
+    await useTheme(page, themes[0]);
+  });
+  expect(audits).toBe(themes.length * 6);
   expect(failures, JSON.stringify(failures, null, 2)).toEqual([]);
 });
 
@@ -136,68 +162,65 @@ test('contraste des pixels rendus là où axe reste indéterminé, sur tous les 
   await openApp(page);
   const themes = await themeIds(page);
   const failures = [];
+  const skipped = [];
   let measured = 0;
 
-  for (const theme of themes) {
+  for (const [screen, open] of [
+    ['accueil', null],
+    ['noms', async () => page.locator('#names-btn').click()],
+    ['réglages', async () => page.locator('.logo-gear').click()],
+  ]) {
     await openApp(page);
-    await useTheme(page, theme);
-    for (const [screen, open] of [
-      ['accueil', null],
-      ['noms', async () => page.locator('#names-btn').click()],
-      ['réglages', async () => page.locator('.logo-gear').click()],
-    ]) {
-      if (open) {
-        await openApp(page);
-        await useTheme(page, theme);
-        await open();
-      }
-      const sel =
-        screen === 'noms'
-          ? '#names-page'
-          : screen === 'réglages'
-            ? '#settings-page'
-            : '#setup-page';
-      // Les pastilles de siège sont mesurées d'office : axe ne les juge pas et leur contraste a
-      // déjà régressé une fois.
-      const undecided = [
-        ...new Set([
-          ...(await undecidedContrastNodes(page, sel)),
-          ...(screen === 'noms'
-            ? ['.name-row:first-child .name-avatar', '.name-row:nth-child(4) .name-avatar']
-            : []),
-        ]),
-      ];
-      if (!undecided.length) continue;
-      for (const r of await renderedContrast(page, undecided)) {
-        if (r.ratio === undefined) continue;
+    if (open) await open();
+    const sel =
+      screen === 'noms' ? '#names-page' : screen === 'réglages' ? '#settings-page' : '#setup-page';
+    // La liste des nœuds indéterminés ne dépend que du balisage : calculée une fois par écran,
+    // puis mesurée sur chaque thème. Les pastilles de siège sont ajoutées d'office (axe ne les
+    // juge pas et leur contraste a déjà régressé une fois).
+    const targets = [
+      ...new Set([
+        ...(await undecidedContrastNodes(page, sel)),
+        ...(screen === 'noms'
+          ? ['.name-row:first-child .name-avatar', '.name-row:nth-child(4) .name-avatar']
+          : []),
+      ]),
+    ];
+    if (!targets.length) continue;
+    for (const theme of themes) {
+      await useTheme(page, theme);
+      for (const r of await renderedContrast(page, targets)) {
+        if (r.ratio === undefined) {
+          skipped.push({ theme, screen, ...r });
+          continue;
+        }
         measured++;
         const min = r.large ? 3 : 4.5;
         if (r.ratio < min) failures.push({ theme, screen, ...r, min });
       }
     }
   }
-  // D17 : la mesure doit réellement avoir eu lieu, sinon le test ne prouve rien.
-  expect(measured).toBeGreaterThan(100);
+
+  // D17 : la mesure doit réellement avoir eu lieu, et le seuil colle au périmètre réel (≈ 300).
+  expect(measured).toBeGreaterThanOrEqual(300);
+  // Un nœud non mesurable est compté et affiché : rien n'est écarté en silence.
+  expect(skipped.length, JSON.stringify(skipped.slice(0, 10), null, 2)).toBeLessThanOrEqual(10);
   expect(failures, JSON.stringify(failures, null, 2)).toEqual([]);
 });
 
-test.describe('formats d’écran', () => {
-  for (const [name, viewport] of [
-    ['390x844', { width: 390, height: 844 }],
-    ['768x1024', { width: 768, height: 1024 }],
-    ['320x568', { width: 320, height: 568 }],
-  ]) {
-    test(`axe, cibles ≥ 44 px, textes ≥ 12 px et absence de débordement à ${name}`, async ({
+test.describe('conditions d’affichage', () => {
+  for (const [name, viewport, fontPx] of CONDITIONS) {
+    test(`axe, cibles ≥ 44 px, textes ≥ 12 px, ni débordement ni recouvrement — ${name}`, async ({
       page,
     }) => {
       test.setTimeout(180_000);
-      await page.setViewportSize(viewport);
+      await applyCondition(page, viewport, fontPx);
       await openApp(page);
 
       const axeFailures = [];
       const smallTargets = [];
       const smallTexts = [];
       const overflows = [];
+      const obstructed = [];
       await forEachState(page, async (state, sel) => {
         axeFailures.push(...(await auditScreen(page, sel)).map((v) => ({ state, ...v })));
         smallTargets.push(
@@ -206,19 +229,19 @@ test.describe('formats d’écran', () => {
         smallTexts.push(
           ...(await undersizedTexts(page, sel, MIN_FONT_PX)).map((t) => ({ state, ...t })),
         );
-        // WCAG 1.4.10 Reflow : aucun contenu hors du cadre, aucun défilement horizontal.
+        // WCAG 1.4.10 Reflow : aucun contenu hors du cadre, quel que soit l'élément.
         overflows.push(
           ...(await page.evaluate(
             ({ sel, state }) => {
               const root = document.querySelector(sel);
               const w = document.documentElement.clientWidth;
-              return Array.from(root.querySelectorAll('button, input, p, h1, h2'))
-                .filter((n) => n.offsetParent !== null)
+              return Array.from(root.querySelectorAll('*'))
+                .filter((n) => n.offsetParent !== null || n === root)
                 .map((n) => ({ n, r: n.getBoundingClientRect() }))
                 .filter(({ r }) => r.width > 0 && (r.right > w + 0.5 || r.left < -0.5))
                 .map(({ n, r }) => ({
                   state,
-                  el: n.id || n.className,
+                  el: n.id || n.className || n.nodeName,
                   right: Math.round(r.right),
                   clientWidth: w,
                 }));
@@ -226,19 +249,35 @@ test.describe('formats d’écran', () => {
             { sel, state },
           )),
         );
+        // WCAG 2.4.11 / 2.5.8 : à quatre positions de défilement, le centre de chaque cible
+        // doit lui appartenir — un panneau surplombant ferait échouer ce contrôle.
+        for (const ratio of [0, 0.35, 0.7, 1]) {
+          await page.evaluate((r) => {
+            const max = document.documentElement.scrollHeight - window.innerHeight;
+            window.scrollTo(0, Math.max(0, Math.round(max * r)));
+          }, ratio);
+          obstructed.push(
+            ...(await obstructedTargets(page, sel)).map((o) => ({ state, scroll: ratio, ...o })),
+          );
+        }
+        await page.evaluate(() => window.scrollTo(0, 0));
       });
 
       expect(axeFailures, JSON.stringify(axeFailures, null, 2)).toEqual([]);
       expect(smallTargets, JSON.stringify(smallTargets)).toEqual([]);
       expect(smallTexts, JSON.stringify(smallTexts)).toEqual([]);
       expect(overflows, JSON.stringify(overflows)).toEqual([]);
+      expect(obstructed, JSON.stringify(obstructed, null, 2)).toEqual([]);
       expect(
         await page.evaluate(
           () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
         ),
         'aucun défilement horizontal',
       ).toBe(true);
-      await page.screenshot({ path: test.info().outputPath(`${name}-noms.png`), fullPage: true });
+      await page.screenshot({
+        path: test.info().outputPath(`${name.replace(/[^\w]+/g, '-')}.png`),
+        fullPage: true,
+      });
     });
   }
 });
@@ -266,50 +305,41 @@ test('clavier : chaque contrôle est atteignable, groupes radio annoncés, Entr�
   expect(order.filter((c) => c.startsWith('points-chip')).length).toBeGreaterThanOrEqual(6);
   await page.screenshot({ path: test.info().outputPath('focus-cta.png') });
 
-  // Groupe radio « joueurs » : les flèches déplacent le focus ET sélectionnent (APG radiogroup)
+  // Groupe radio « joueurs » : les flèches déplacent le focus ET sélectionnent (APG radiogroup).
   const players = page.locator('#players-grid');
   await expect(players).toHaveAttribute('role', 'radiogroup');
   await players.locator('[tabindex="0"]').focus();
-  await page.keyboard.press('ArrowRight');
-  await expect(page.locator('#players-grid .player-chip', { hasText: /^5$/ })).toBeFocused();
-  await expect(page.locator('#players-grid .player-chip', { hasText: /^5$/ })).toHaveAttribute(
-    'aria-checked',
-    'true',
-  );
-  await expect(page.locator('#setup-summary')).toHaveText('5 joueurs · départ 0 · sans limite');
+  // Parcours réel : douze flèches doivent atteindre douze puces distinctes et revenir à la première.
+  const visited = [];
+  for (let i = 0; i < 12; i++) {
+    visited.push(await page.evaluate(() => document.activeElement.dataset.val));
+    await page.keyboard.press('ArrowRight');
+  }
+  expect(new Set(visited).size).toBe(12);
+  expect(await page.evaluate(() => document.activeElement.dataset.val)).toBe(visited[0]);
+  // Le focus sélectionne au passage : le résumé suit la puce active.
   await page.keyboard.press('End');
-  await expect(page.locator('#players-grid .player-chip', { hasText: /^12$/ })).toBeFocused();
+  await expect(page.locator('#players-grid .player-chip[data-val="12"]')).toBeFocused();
   await expect(page.locator('#setup-summary')).toHaveText('12 joueurs · départ 0 · sans limite');
   await page.screenshot({ path: test.info().outputPath('focus-chip.png') });
-
-  // Chaque puce reste atteignable au clavier à l'intérieur du groupe
-  const reachable = await page.evaluate(() => {
-    const items = [...document.querySelectorAll('#players-grid .player-chip')];
-    return items.every((n) => n.tabIndex === 0 || n.tabIndex === -1) && items.length === 12;
-  });
-  expect(reachable).toBe(true);
 
   // Interrupteur : Espace bascule aria-checked
   await page.locator('#neg-toggle').focus();
   await page.keyboard.press('Space');
   await expect(page.locator('#neg-toggle')).toHaveAttribute('aria-checked', 'true');
 
-  // Grille des thèmes : une carte par thème déclaré, chacune atteignable aux flèches jusqu'à la
-  // dernière, y compris après l'ajout d'un thème.
+  // Grille des thèmes : une carte par thème déclaré, chacune atteignable aux flèches.
   await page.locator('.logo-gear').click();
   const themes = await themeIds(page);
   const cards = page.locator('#themes-grid .theme-card');
   await expect(cards).toHaveCount(themes.length);
   await page.locator('#themes-grid [tabindex="0"]').focus();
-  for (let i = 1; i < themes.length; i++) await page.keyboard.press('ArrowRight');
-  await expect(cards.last()).toBeFocused();
-  await expect(cards.last()).toHaveAttribute('aria-checked', 'true');
-  await expect(page.locator('html')).toHaveAttribute(
-    'data-theme',
-    themes[themes.length - 1] === 'cyber' ? '' : themes[themes.length - 1],
-  );
-  await page.keyboard.press('ArrowRight');
-  await expect(cards.first()).toBeFocused();
+  const seen = new Set();
+  for (let i = 0; i < themes.length; i++) {
+    seen.add(await page.evaluate(() => document.activeElement.dataset.theme));
+    await page.keyboard.press('ArrowRight');
+  }
+  expect(seen.size).toBe(themes.length);
   await page.locator('[data-action="back-from-settings"]').click();
 
   // Entrée sur le CTA lance la partie

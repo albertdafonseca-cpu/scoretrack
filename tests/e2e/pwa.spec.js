@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startStaticServer } from './helpers/static-server.js';
+import { collectFiles, computeVersion } from '../../scripts/build-sw.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SHOTS = process.env.PWA_SHOTS_DIR || join(ROOT, 'test-results', 'pwa');
@@ -396,6 +397,72 @@ test('précache tout-ou-rien : une police manquante annule l’installation et p
   await page.reload();
   await waitForController(page);
   await expect.poll(() => cacheNames(page)).toEqual([`st-${SW_VERSION}`]);
+  expect(errors).toEqual([]);
+});
+
+test('mise à jour du seul service worker : version recalculée, cache hors-ligne jamais détruit', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  // 1. La version est bien fonction de la logique du SW : sans cela, une correction du SW seule
+  //    s'installerait dans le cache que le SW actif dessert encore.
+  const logicChanged = swSource.replace(
+    '// ── Installation',
+    '// correctif de logique\n// ── Installation',
+  );
+  // (La fraîcheur du bloc généré est garantie par `npm run check:sw` ; ici c'est la propriété qui compte.)
+  const files = collectFiles();
+  expect(computeVersion(files, logicChanged)).not.toBe(computeVersion(files, swSource));
+
+  // 2. Installation saine, puis preuve que l'application fonctionne hors ligne.
+  await openApp(page);
+  await waitForController(page);
+  await expect.poll(() => cacheNames(page)).toEqual([`st-${SW_VERSION}`]);
+  const entriesBefore = await page.evaluate(
+    async (name) => (await (await caches.open(name)).keys()).length,
+    `st-${SW_VERSION}`,
+  );
+  expect(entriesBefore).toBe(PRECACHE.length);
+  await server.stop();
+  await page.reload();
+  await expect(page.locator('#setup-page')).toBeVisible();
+  await server.start();
+
+  // 3. Déploiement de maintenance : la logique du SW change, la version servie reste la même
+  //    (cas le plus défavorable), et une requête réseau échoue pendant le nouveau précache.
+  server.setSwPatch((src) =>
+    src.replace('// ── Installation', '// correctif de logique\n// ── Installation'),
+  );
+  const font = PRECACHE.find((p) => p.endsWith('.woff2')).replace(/^\./, '');
+  server.setBlocked([font]);
+  try {
+    await page.evaluate(() => navigator.serviceWorker.getRegistration().then((r) => r.update()));
+    await expect(page.locator('#sys-toast')).toContainText('incomplète');
+    // Le cache installé est intact : l'échec n'a touché que le cache de travail.
+    await expect.poll(() => cacheNames(page)).toEqual([`st-${SW_VERSION}`]);
+    expect(
+      await page.evaluate(
+        async (name) => (await (await caches.open(name)).keys()).length,
+        `st-${SW_VERSION}`,
+      ),
+    ).toBe(entriesBefore);
+  } finally {
+    server.setBlocked([]);
+    server.setSwPatch(null);
+  }
+
+  // 4. Test décisif : l'utilisateur garde son application hors ligne.
+  await server.stop();
+  try {
+    await page.goto('about:blank');
+    await page.goto(server.url);
+    await expect(page.locator('#setup-page')).toBeVisible();
+    expect(await page.evaluate(() => document.body.innerText)).not.toContain(
+      'ScoreTrack est hors ligne',
+    );
+  } finally {
+    await server.start();
+  }
   expect(errors).toEqual([]);
 });
 

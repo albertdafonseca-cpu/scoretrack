@@ -53,7 +53,10 @@ function reserveSpace(visible) {
   // Mesure indépendante de la position courante (la bannière peut être en cours d'apparition) :
   // hauteur propre + interstice qui la sépare de la barre, tel que défini dans css/system.css.
   const gap = parseFloat(getComputedStyle(root).getPropertyValue('--sys-banner-gap')) || 12;
-  const height = Math.max(0, Math.round(banner.offsetHeight + gap));
+  // Hauteur FRACTIONNAIRE (`getBoundingClientRect`, pas `offsetHeight` qui est déjà arrondi à l'entier),
+  // puis arrondi au pixel supérieur : sans cela il subsiste une fraction de pixel de bannière au-dessus
+  // de la carte la plus basse.
+  const height = Math.max(0, Math.ceil(banner.getBoundingClientRect().height + gap));
   root.style.setProperty('--sys-banner-h', `${height}px`);
   root.classList.add('sys-banner-open');
 }

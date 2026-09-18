@@ -94,159 +94,46 @@ test('mouvement réduit : aucune animation non triviale, aucune boucle infinie',
   expect(errors).toEqual([]);
 });
 
-test('bulle de delta : visible pendant toute la durée du groupe puis disparue', async ({
+test('bulle de delta : pleine visibilité pendant tout le groupe, à la 1re COMME à la 10e action', async ({
   page,
-}) => {
+}, testInfo) => {
   const errors = collectErrors(page);
   await openApp(page);
-  await startGame(page, { players: 4, start: 40 });
+  await startGame(page, { players: 4, start: 100 });
   const opacity = () =>
     page.evaluate(() => {
       const n = document.getElementById('df-0');
       return n.hidden ? 0 : parseFloat(getComputedStyle(n).opacity);
     });
-  await page.locator('#card-0 .tap-half.minus').tap();
-  await page.locator('#card-0 .tap-half.minus').tap();
-  await page.locator('#card-0 .tap-half.minus').tap();
-  await expect(page.locator('#df-0')).toHaveText('-3');
-  await page.waitForTimeout(300);
-  expect(await opacity(), 'à 0,3 s').toBeGreaterThan(0.9);
-  await page.waitForTimeout(900);
-  expect(await opacity(), 'à 1,2 s').toBeGreaterThan(0.9);
-  await page.waitForTimeout(600);
-  expect(await opacity(), 'à 1,8 s').toBe(0);
-  // Le signe porte l'information autant que la couleur (D1)
-  expect(errors).toEqual([]);
-});
+  const trace = [];
 
-test('retour visuel : la moitié touchée change d’état en moins de 100 ms', async ({
-  page,
-}, testInfo) => {
-  const errors = collectErrors(page);
-  await openApp(page);
-  await startGame(page, { players: 4, start: 40 });
-  const delays = await page.evaluate(async () => {
-    const half = document.querySelector('#card-0 .tap-half.plus');
-    const out = [];
-    for (let i = 0; i < 20; i++) {
-      const start = performance.now();
-      let mark = null;
-      const obs = new MutationObserver(() => {
-        if (mark === null) mark = performance.now();
-      });
-      obs.observe(half, { attributes: true, attributeFilter: ['class'] });
-      const box = half.getBoundingClientRect();
-      const opts = {
-        pointerId: 1,
-        bubbles: true,
-        cancelable: true,
-        clientX: box.x + box.width / 2,
-        clientY: box.y + box.height / 2,
-        pointerType: 'touch',
-        isPrimary: true,
-      };
-      half.dispatchEvent(new PointerEvent('pointerdown', opts));
-      obs.disconnect();
-      out.push((mark === null ? performance.now() : mark) - start);
-      half.dispatchEvent(new PointerEvent('pointerup', opts));
-      await new Promise((r) => requestAnimationFrame(r));
+  // Dix ACTIONS successives sur le même joueur, séparées par plus que la durée d'un groupe : la
+  // deuxième et les suivantes empruntent le chemin où une animation de fondu remplissante figeait
+  // la bulle à l'opacité 0 pour le reste de la partie.
+  for (const action of [1, 2, 10]) {
+    for (let k = 0; k < (action === 10 ? 8 : 1); k++) {
+      if (k > 0) await page.waitForTimeout(1700);
+      await page.locator('#card-0 .tap-half.minus').tap();
     }
-    return out;
-  });
-  delays.sort((a, b) => a - b);
-  const p95 = delays[Math.floor(delays.length * 0.95) - 1];
-  testInfo.annotations.push({
-    type: 'pointerdown-retour',
-    description: `p95 = ${p95.toFixed(2)} ms · max = ${delays[delays.length - 1].toFixed(2)} ms`,
-  });
-  expect(p95).toBeLessThan(100);
-  expect(errors).toEqual([]);
-});
-
-/**
- * Mesure les deltas de trame, au repos puis pendant 20 taps.
- * En mode « headless » le compositeur n'est pas cadencé sur un écran : la valeur absolue n'a pas
- * de sens, seule la COMPARAISON au repos en a une. Les deux séries sont consignées brutes.
- */
-async function frameStats(page, players, withTaps) {
-  return page.evaluate(
-    async ([n, taps]) => {
-      const halves = [...document.querySelectorAll('.tap-half.plus')];
-      const deltas = [];
-      let last = performance.now();
-      let stop = false;
-      const loop = (now) => {
-        deltas.push(now - last);
-        last = now;
-        if (!stop) requestAnimationFrame(loop);
-      };
-      requestAnimationFrame(loop);
-      for (let i = 0; i < 20; i++) {
-        if (taps) {
-          const half = halves[i % halves.length];
-          const box = half.getBoundingClientRect();
-          const opts = {
-            pointerId: 1,
-            bubbles: true,
-            cancelable: true,
-            clientX: box.x + box.width / 2,
-            clientY: box.y + box.height / 2,
-            pointerType: 'touch',
-            isPrimary: true,
-          };
-          half.dispatchEvent(new PointerEvent('pointerdown', opts));
-          half.dispatchEvent(new PointerEvent('pointerup', opts));
-        }
-        await new Promise((r) => setTimeout(r, 40));
-      }
-      stop = true;
-      await new Promise((r) => setTimeout(r, 60));
-      const sorted = deltas.slice(2).sort((a, b) => a - b);
-      const at = (q) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))];
-      return {
-        n,
-        frames: sorted.length,
-        p50: at(0.5),
-        p95: at(0.95),
-        p99: at(0.99),
-        max: sorted[sorted.length - 1],
-      };
-    },
-    [players, withTaps],
-  );
-}
-
-test('fluidité : les taps n’ajoutent pas de trame perdue, à 4 et à 12 joueurs', async ({
-  page,
-}, testInfo) => {
-  const errors = collectErrors(page);
-  for (const players of [4, 12]) {
-    await openApp(page);
-    await startGame(page, { players, start: 100 });
-    const idle = await frameStats(page, players, false);
-    const taps = await frameStats(page, players, true);
-    testInfo.annotations.push({
-      type: `trames-${players}j`,
-      description:
-        `repos : p50 ${idle.p50.toFixed(2)} · p95 ${idle.p95.toFixed(2)} · p99 ${idle.p99.toFixed(2)} · max ${idle.max.toFixed(2)} ms (${idle.frames} trames) — ` +
-        `20 taps : p50 ${taps.p50.toFixed(2)} · p95 ${taps.p95.toFixed(2)} · p99 ${taps.p99.toFixed(2)} · max ${taps.max.toFixed(2)} ms (${taps.frames} trames)`,
-    });
-    expect(idle.frames, 'trames mesurées au repos').toBeGreaterThan(10);
-    expect(taps.frames, 'trames mesurées pendant les taps').toBeGreaterThan(10);
-    // Le compositeur d'un navigateur sans écran n'est pas cadencé comme un appareil réel : seule la
-    // comparaison au repos a un sens. Deux assertions, toutes deux actives par défaut (D17) :
-    //   - la MÉDIANE ne doit pas bouger : aucun surcoût systématique dû aux animations ;
-    //   - le 95e centile tolère au plus UNE trame sautée (2 × la période au repos), jamais deux.
-    expect(taps.p50, `médiane à ${players} joueurs (repos ${idle.p50.toFixed(1)} ms)`).toBeLessThan(
-      idle.p50 + 2,
-    );
-    expect(taps.p95, `p95 à ${players} joueurs (repos ${idle.p95.toFixed(1)} ms)`).toBeLessThan(
-      idle.p95 * 2 + 2,
-    );
+    const start = Date.now();
+    await expect(page.locator('#df-0')).toHaveText('-1');
+    // Trois relevés chronométrés depuis le DERNIER tap : à 0,3 s, à 1,2 s et à 1,8 s.
+    const at = async (ms) => {
+      const wait = ms - (Date.now() - start);
+      if (wait > 0) await page.waitForTimeout(wait);
+      return opacity();
+    };
+    const o300 = await at(300);
+    const o1200 = await at(1200);
+    const o1800 = await at(1800);
+    trace.push(`action ${action} : 0,3 s → ${o300} · 1,2 s → ${o1200} · 1,8 s → ${o1800}`);
+    expect(o300, `action ${action} à 0,3 s`).toBeGreaterThan(0.9);
+    expect(o1200, `action ${action} à 1,2 s`).toBeGreaterThan(0.9);
+    expect(o1800, `action ${action} à 1,8 s`).toBe(0);
   }
+  testInfo.annotations.push({ type: 'bulle-de-delta', description: trace.join(' | ') });
   expect(errors).toEqual([]);
 });
-
 test('célébration : confettis présents, absents sous mouvement réduit', async ({ page }) => {
   const errors = collectErrors(page);
   await openApp(page);

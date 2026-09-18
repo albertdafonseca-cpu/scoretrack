@@ -38,8 +38,9 @@ const timeOf = (t) =>
 
 // ── Mini-courbe ─────────────────────────────────────────────────────
 
-/** Courbe d'évolution d'un joueur ; un trait plat si le joueur n'a encore rien marqué. */
-function sparkline(points, color) {
+/** Courbe d'évolution d'un joueur, à l'ÉCHELLE COMMUNE `scale` (sinon +25 et −5 auraient la même
+ * pente, ce qui est trompeur) ; un trait plat si le joueur n'a encore rien marqué. */
+function sparkline(points, color, scale) {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('class', 'recap-spark');
   svg.setAttribute('viewBox', `0 0 ${SPARK_W} ${SPARK_H}`);
@@ -62,10 +63,8 @@ function sparkline(points, color) {
     );
     return svg;
   }
-  const scores = points.map((p) => p.score);
-  const lo = Math.min(...scores);
-  const hi = Math.max(...scores);
-  const span = hi - lo || 1;
+  const lo = scale.lo;
+  const span = scale.hi - scale.lo || 1;
   const coords = points.map((p, i) => {
     const x = 1 + (i / (points.length - 1)) * (SPARK_W - 2);
     const y = SPARK_H - 3 - ((p.score - lo) / span) * (SPARK_H - 6);
@@ -83,10 +82,10 @@ function sparkline(points, color) {
 
 // ── Classement ──────────────────────────────────────────────────────
 
-function rankRow(row, isWinner) {
+function rankRow(row, isWinner, scale) {
   const color = COLORS[row.index % COLORS.length];
   const { points, total } = playerRecap(store.game.log, row.index);
-  const gapText = row.gap === 0 ? 'en tête' : `−${fmtNum(row.gap)} vs 1er`;
+  const gapText = row.gap === 0 ? 'en tête' : `−${fmtNum(row.gap)}`;
   return el(
     'div',
     { className: `recap-rank-row${isWinner ? ' winner' : ''}${row.eliminated ? ' out' : ''}` },
@@ -108,16 +107,30 @@ function rankRow(row, isWinner) {
       ),
       el('div', {
         className: 'recap-rank-meta',
-        text: `${gapText} · bilan ${total > 0 ? '+' : ''}${fmtNum(total)}`,
+        text: `${gapText} · ${total > 0 ? '+' : ''}${fmtNum(total)}`,
       }),
     ),
-    sparkline(points, color),
+    sparkline(points, color, scale),
     el('div', { className: 'recap-rank-score', text: fmtNum(row.score) }),
   );
 }
 
+/** Bornes communes à toutes les mini-courbes (tous les joueurs, tous les points). */
+function commonScale() {
+  let lo = Infinity;
+  let hi = -Infinity;
+  store.game.players.forEach((_, i) => {
+    playerRecap(store.game.log, i).points.forEach((pt) => {
+      if (pt.score < lo) lo = pt.score;
+      if (pt.score > hi) hi = pt.score;
+    });
+  });
+  return Number.isFinite(lo) ? { lo, hi } : { lo: 0, hi: 1 };
+}
+
 function rankingBlock() {
   const rows = ranking(store.game.players);
+  const scale = commonScale();
   const winner = rows.find((r) => !r.eliminated);
   const alive = rows.filter((r) => !r.eliminated).length;
   const decided = alive === 1 || rows.length === 1;
@@ -125,7 +138,7 @@ function rankingBlock() {
     'section',
     { className: 'recap-block' },
     el('h2', { className: 'recap-block-title', text: 'Classement' }),
-    ...rows.map((r) => rankRow(r, decided && winner === r && rows.length > 1)),
+    ...rows.map((r) => rankRow(r, decided && winner === r && rows.length > 1, scale)),
   );
 }
 

@@ -18,17 +18,22 @@
 :root {
   color-scheme: dark;
 
-  /* ── Typographie : échelle ×1,2 arrondie au pixel, plancher 12 px (D10) ──
-     D10 porte le plancher de 11 à 12 px : aucun texte rendu ne descend sous --fs-1, libellés de
-     la barre d'action et mentions légales compris. Gardé par tests/unit/themes.test.js. */
-  --fs-1: 12px;
-  --fs-2: 13px;
-  --fs-3: 15px;
-  --fs-4: 18px;
-  --fs-5: 22px;
-  --fs-6: 26px;
-  --fs-7: 32px;
-  --fs-8: 40px;
+  /* ── Typographie : échelle ×1,2 en rem, base 16 px, plancher effectif 12 px (D10 + D19) ──
+     Les tailles sont en rem et non en pixels : `user-scalable=no` interdit déjà le pincement (D7),
+     donc si l'échelle était absolue, agrandir la taille du texte dans les réglages du système
+     n'aurait STRICTEMENT aucun effet — l'application serait inutilisable pour qui a besoin de
+     gros caractères. En rem, elle suit la taille de base choisie par l'utilisateur.
+     Les trois plus petits échelons sont bornés par `max(…, 12px)` : réduire la base ne peut pas
+     ramener un texte sous le plancher de lisibilité (D10), l'augmenter fonctionne sans limite.
+     Équivalents à la base par défaut : 12, 13, 15, 18, 22, 26, 32, 40 px. */
+  --fs-1: max(0.75rem, 12px);
+  --fs-2: max(0.8125rem, 12px);
+  --fs-3: max(0.9375rem, 12px);
+  --fs-4: 1.125rem;
+  --fs-5: 1.375rem;
+  --fs-6: 1.625rem;
+  --fs-7: 2rem;
+  --fs-8: 2.5rem;
   --lh-tight: 1.1;
   --lh-base: 1.45;
   --lh-loose: 1.65;
@@ -97,6 +102,12 @@
   --gain: #8fe0ff;
   --loss: #ff8844;
   --warn: #ffb454;
+  /* Encre à poser SUR un aplat --gain / --loss (bouton « Gain » actif du pavé, pastilles pleines).
+     Sur fond sombre la paire est claire : l'encre est noire. Les thèmes clairs, où la paire est
+     assombrie, la repassent en blanc. À consommer partout où l'un des deux sert de fond — écrire
+     `color: #000` en dur donne 1,85:1 en thème clair (mesuré, scripts/audit-contrast.mjs). */
+  --on-gain: #000000;
+  --on-loss: #000000;
   --focus: var(--accent);
   --focus-ring: 0 0 0 3px var(--focus);
   /* Anciens noms conservés pour compatibilité : alias de la paire daltonien-safe (D1). */

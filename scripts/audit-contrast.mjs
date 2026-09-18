@@ -227,6 +227,23 @@ function showForegrounds() {
   document.getElementById('__audit-hide')?.remove();
 }
 
+/**
+ * Attend que le rendu soit STABLE avant tout échantillonnage : polices chargées (une substitution
+ * en cours déplacerait les boîtes d'encre), animations terminées (une opacité transitoire ferait
+ * lire un premier plan à moitié composé), puis deux trames pour que la composition soit peinte.
+ * Sans cette attente, la mesure est fausse dans les deux sens — c'est le reproche fait au tour 1.
+ */
+async function settle() {
+  await document.fonts.ready;
+  const running = document
+    .getAnimations()
+    .filter(
+      (a) => a.playState === 'running' && a.effect && a.effect.getTiming().iterations !== Infinity,
+    );
+  await Promise.all(running.map((a) => a.finished.catch(() => {})));
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+}
+
 /** Échantillonne le fond composé sous chaque boîte : moyenne globale et moyenne par quadrant. */
 async function sampleBackgrounds({ b64, boxes }) {
   const img = new Image();
@@ -443,14 +460,39 @@ const PLANS = [
 
 async function main() {
   const browser = await chromium.launch();
-  const ctx = await browser.newContext({
-    ...devices['iPhone 13'],
-    viewport: { width: 390, height: 844 },
-    deviceScaleFactor: DPR,
-    hasTouch: true,
-    locale: 'fr-FR',
-  });
-  const page = await ctx.newPage();
+  /** Un contexte par thème : le schéma de couleurs est posé à la création, jamais après coup —
+      c'est la seule façon fiable de faire résoudre `light-dark()` du thème « auto ». */
+  const newCtx = (scheme) =>
+    browser.newContext({
+      ...devices['iPhone 13'],
+      viewport: { width: 390, height: 844 },
+      deviceScaleFactor: DPR,
+      hasTouch: true,
+      locale: 'fr-FR',
+      colorScheme: scheme,
+      // Mouvement réduit : les modales et les cartes sont mesurées dans leur état stable, jamais
+      // au milieu d'un fondu. Une opacité transitoire ferait lire un premier plan à moitié composé
+      // et produirait des ratios fantaisistes (1,00 quand l'élément est encore invisible).
+      reducedMotion: 'reduce',
+    });
+  /**
+   * Chaque navigation repart d'un stockage vierge. Sans cela, une partie sauvegardée par le thème
+   * précédent fait apparaître la bannière de reprise sur l'écran d'accueil et change le jeu
+   * d'éléments mesurés : deux exécutions ne seraient plus comparables.
+   */
+  const freshCtx = async (scheme) => {
+    const c = await newCtx(scheme);
+    await c.addInitScript(() => {
+      try {
+        localStorage.clear();
+      } catch {
+        /* stockage indisponible : l'application démarre déjà vierge */
+      }
+    });
+    return c;
+  };
+  let ctx = await freshCtx('dark');
+  let page = await ctx.newPage();
 
   const rows = [];
   const skipped = new Set();
@@ -462,10 +504,11 @@ async function main() {
 
   /** Mesure l'écran courant : relève, masque, capture, échantillonne, calcule. */
   async function measure(theme, screen, state) {
+    await page.evaluate(settle);
     const fgs = await page.evaluate(collectForegrounds);
     if (!fgs.length) return;
     await page.evaluate(hideForegrounds);
-    await page.waitForTimeout(80);
+    await page.evaluate(settle);
     const buf = await page.screenshot();
     await page.evaluate(showForegrounds);
     const bgs = await page.evaluate(sampleBackgrounds, {
@@ -500,9 +543,14 @@ async function main() {
     });
   }
 
+  let currentScheme = 'dark';
   for (const [id, scheme] of THEMES) {
-    await ctx.clearCookies();
-    await page.emulateMedia({ colorScheme: scheme });
+    if (scheme !== currentScheme) {
+      await ctx.close();
+      ctx = await freshCtx(scheme);
+      page = await ctx.newPage();
+      currentScheme = scheme;
+    }
     const theme = id === 'auto' ? `auto (${scheme})` : id;
     let gameReady = false;
     for (const plan of PLANS) {

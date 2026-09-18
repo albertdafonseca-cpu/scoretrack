@@ -284,26 +284,31 @@ export function savePreviewText(players, limit = 6) {
 /** Affiche (avec aperçu : noms, scores, date relative) ou masque la bannière de reprise. */
 export function setRestoreBannerVisible(visible) {
   const banner = byId('restore-banner');
-  const page = byId('setup-page');
   if (!visible) {
     hide(banner);
-    page.classList.remove('has-restore');
+    banner.classList.remove('is-visible');
+    document.documentElement.removeAttribute('data-has-save');
     return;
   }
   const parsed = parseGame(readJSON(KEYS.save, null));
   if (!parsed.ok) {
     hide(banner);
-    page.classList.remove('has-restore');
+    banner.classList.remove('is-visible');
+    document.documentElement.removeAttribute('data-has-save');
     return;
   }
   byId('restore-preview').textContent = savePreviewText(parsed.game.players);
   const when = byId('restore-when');
   const ts = parsed.game.ts > 0 ? parsed.game.ts : null;
   when.textContent = ts ? `Sauvegardée ${relativeTime(ts)}` : 'Sauvegardée';
-  if (ts) when.setAttribute('datetime', new Date(ts).toISOString());
+  // Horodatage borné au présent, comme le texte de `relativeTime` : une horloge d'appareil en avance
+  // ne doit pas produire un `datetime` situé dans le futur.
+  if (ts) when.setAttribute('datetime', new Date(Math.min(ts, Date.now())).toISOString());
   else when.removeAttribute('datetime');
   show(banner);
-  page.classList.add('has-restore');
+  // La boîte est déjà réservée par prepaint.js ; la classe couvre le cas d'une sauvegarde créée
+  // pendant la session (retour au setup après une partie).
+  banner.classList.add('is-visible');
 }
 
 // ── Construction ────────────────────────────────────────────────────

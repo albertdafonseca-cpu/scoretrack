@@ -66,13 +66,18 @@ export function showDeltaBubble(node, sum, onClose) {
     clearTimeout(prev.timer);
     cancel(prev.anim);
   }
+  clearFade(node);
   node.textContent = (sum > 0 ? '+' : '') + fmtNum(sum);
   node.classList.toggle('gain', sum > 0);
   node.classList.toggle('loss', sum <= 0);
+  // La bulle n'apparaît en fanfare qu'à l'OUVERTURE du groupe : pendant une salve de taps elle se
+  // contente de changer de valeur. Rejouer l'entrée à chaque tap coûtait un recalcul de style par
+  // tap et faisait « sauter » le chiffre au lieu de le laisser filer.
+  const wasHidden = node.hidden;
+  if (wasHidden) node.hidden = false;
   node.style.opacity = '1';
   node.style.transform = 'none';
-  node.hidden = false;
-  if (!reducedMotion()) {
+  if (wasHidden && !reducedMotion()) {
     animate(
       node,
       [
@@ -90,6 +95,17 @@ export function showDeltaBubble(node, sum, onClose) {
   bubbleTimers.set(node, { timer, anim: null });
 }
 
+/**
+ * Annule toute animation de fondu encore attachée à la bulle.
+ * Une animation terminée en `fill: forwards` PRIME sur le style en ligne : sans cette purge, le
+ * `opacity = 1` de la bulle suivante n'aurait plus aucun effet et la bulle resterait invisible dès
+ * la deuxième action du même joueur.
+ */
+function clearFade(node) {
+  if (typeof node.getAnimations !== 'function') return;
+  for (const anim of node.getAnimations()) cancel(anim);
+}
+
 /** Masque la bulle (avec fondu si `fade`). */
 export function hideDeltaBubble(node, fade = false) {
   if (!node) return;
@@ -99,27 +115,27 @@ export function hideDeltaBubble(node, fade = false) {
     cancel(prev.anim);
     bubbleTimers.delete(node);
   }
+  clearFade(node);
   if (!fade || reducedMotion()) {
     node.style.opacity = '0';
     node.hidden = true;
     return;
   }
+  // `fill: 'none'` : l'état final est déjà porté par le style en ligne ci-dessous. Une animation
+  // remplissante survivrait à sa propre fin et figerait la bulle pour toutes les actions suivantes.
   const anim = animate(node, [{ opacity: 1 }, { opacity: 0 }], {
     duration: BUBBLE_FADE_MS,
     easing: easeOut(),
-    fill: 'forwards',
+    fill: 'none',
   });
   node.style.opacity = '0';
   if (anim) {
+    bubbleTimers.set(node, { timer: 0, anim });
     anim.addEventListener('finish', () => {
+      bubbleTimers.delete(node);
       node.hidden = true;
     });
   } else {
     node.hidden = true;
   }
-}
-
-/** Vrai si une bulle est encore dans sa fenêtre de visibilité (groupe ouvert). */
-export function bubbleOpen(node) {
-  return bubbleTimers.has(node);
 }

@@ -10,9 +10,11 @@
 // `st-v2`, où il prend la main immédiatement afin de les purger.
 // Installation tout-ou-rien : un seul fichier manquant annule l'installation (jamais de version « à moitié
 // hors ligne » qui dégraderait en polices de secours) ; la page en est informée (état `redundant`).
+// Le précache est constitué dans un cache TEMPORAIRE puis basculé : une installation qui échoue ne
+// touche jamais le cache que le service worker actif est peut-être en train de servir.
 
 // >>> PRECACHE (généré — ne pas éditer à la main)
-const VERSION = 'ffc4ea52';
+const VERSION = '97995edc';
 const PRECACHE = [
   './',
   './assets/fonts/bebas-neue-400-latin-ext.woff2',
@@ -56,6 +58,7 @@ const PRECACHE = [
   './js/platform/boot.js',
   './js/platform/errors.js',
   './js/platform/haptics.js',
+  './js/platform/prepaint.js',
   './js/platform/shortcuts.js',
   './js/platform/storage.js',
   './js/platform/sw-client.js',
@@ -76,6 +79,8 @@ const PRECACHE = [
 // <<< PRECACHE
 
 const CACHE = `st-${VERSION}`;
+/** Cache de travail de l'installation : seul lui peut être supprimé en cas d'échec. */
+const STAGING = `${CACHE}-tmp`;
 /** Caches des versions antérieures au précache versionné : leur présence déclenche la migration immédiate. */
 const LEGACY_CACHES = ['st-v1', 'st-fonts-v1', 'st-v2'];
 
@@ -108,27 +113,43 @@ async function reportInstallFailure(failed) {
 /**
  * Précache tout-ou-rien : chaque fichier est tenté séparément pour pouvoir les nommer tous, mais le moindre
  * échec (y compris une police ou une icône) annule l'installation — sinon l'application se croirait hors ligne
- * tout en affichant des polices de secours. Le cache partiel est supprimé et les pages sont averties.
+ * tout en affichant des polices de secours.
+ *
+ * Tout est d'abord écrit dans `STAGING`. En cas d'échec, seul ce cache de travail est supprimé : le cache
+ * définitif, que le service worker actif dessert peut-être encore (même nom si seule la logique du SW a
+ * changé), reste intact — une mise à jour ratée ne peut donc pas priver l'utilisateur de son hors-ligne.
  */
 async function precache() {
-  const cache = await caches.open(CACHE);
+  await caches.delete(STAGING);
+  const staging = await caches.open(STAGING);
   const results = await Promise.allSettled(
     PRECACHE.map(async (url) => {
       const res = await fetch(new Request(url, { cache: 'reload' }));
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      await cache.put(url, res);
+      await staging.put(url, res);
     }),
   );
   const failed = PRECACHE.filter((_, i) => results[i].status === 'rejected');
-  if (!failed.length) return;
-  failed.forEach((url, i) =>
-    console.warn(`[sw-st ${VERSION}] précache impossible : ${url}`, results[i].reason),
+  if (failed.length) {
+    failed.forEach((url, i) =>
+      console.warn(`[sw-st ${VERSION}] précache impossible : ${url}`, results[i].reason),
+    );
+    await caches.delete(STAGING);
+    await reportInstallFailure(failed);
+    throw new Error(
+      `Précache incomplet (${failed.length}/${PRECACHE.length}) : ${failed.slice(0, 3).join(', ')}`,
+    );
+  }
+  // Bascule : le cache définitif n'est écrit qu'une fois le jeu complet téléchargé.
+  const cache = await caches.open(CACHE);
+  const staged = await staging.keys();
+  await Promise.all(
+    staged.map(async (request) => {
+      const res = await staging.match(request);
+      if (res) await cache.put(request, res);
+    }),
   );
-  await caches.delete(CACHE);
-  await reportInstallFailure(failed);
-  throw new Error(
-    `Précache incomplet (${failed.length}/${PRECACHE.length}) : ${failed.slice(0, 3).join(', ')}`,
-  );
+  await caches.delete(STAGING);
 }
 
 /** Vrai si un cache d'une version antérieure au précache versionné existe encore. */
@@ -149,7 +170,10 @@ self.addEventListener('install', (e) => {
 
 // ── Activation ──────────────────────────────────────────────────────
 
-/** Supprime les autres caches (anciennes versions, st-v1, st-fonts-v1…) et les entrées orphelines du cache courant. */
+/**
+ * Supprime les autres caches (anciennes versions, st-v1, st-fonts-v1…, cache de travail éventuel) et les
+ * entrées orphelines du cache courant. N'est appelée qu'à l'activation, donc quand ce SW prend la main.
+ */
 async function cleanup() {
   const keys = await caches.keys();
   await Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)));

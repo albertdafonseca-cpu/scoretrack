@@ -82,7 +82,18 @@ textarea,
   border: 0;
 }
 
-/* Focus visible uniforme (clavier) : anneau ≥ 2 px, décalé pour rester lisible sur tout fond. */
+/* Les libellés de bouton se replient au lieu de déborder (texte système agrandi, D19). */
+.btn-text {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+/* Focus visible uniforme (clavier) : anneau ≥ 2 px, décalé pour rester lisible sur tout fond.
+   `scroll-margin` garantit que l'anneau n'est jamais rogné par le bord de la zone défilante. */
+:where(a, button, input, select, textarea, [tabindex]) {
+  scroll-margin: 16px;
+}
 :focus {
   outline: none;
 }

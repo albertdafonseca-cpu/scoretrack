@@ -46,6 +46,8 @@
     <link rel="stylesheet" href="css/modals.css" />
     <link rel="stylesheet" href="css/motion.css" />
     <link rel="stylesheet" href="css/system.css" />
+    <!-- Décisions de pré-rendu (thème, présence d'une sauvegarde) : bloquant mais minuscule. -->
+    <script type="module" blocking="render" src="js/platform/prepaint.js"></script>
     <script type="module" src="js/main.js"></script>
   </head>
   <body>
@@ -113,7 +115,7 @@
           <p class="logo-sub">Compteur universel</p>
         </header>
 
-        <section class="restore-banner hidden" id="restore-banner" aria-labelledby="restore-title">
+        <section class="restore-banner" id="restore-banner" aria-labelledby="restore-title">
           <div class="restore-banner-text">
             <h2 class="restore-title" id="restore-title">
               <svg
@@ -845,8 +847,8 @@
         <div class="modal-handle" aria-hidden="true"></div>
         <h2 class="modal-title" id="player-modal-title">Joueur</h2>
         <div class="modal-player" id="player-modal-sub"></div>
-        <label class="sr-only" for="player-name-input"
-          >Prénom du joueur (18 caractères maximum)</label
+        <label class="player-name-label" for="player-name-input"
+          >Prénom <span class="player-name-hint">(18 caractères maximum)</span></label
         >
         <input
           class="player-name-input"

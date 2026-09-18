@@ -284,6 +284,9 @@
   color-scheme: light;
   --gain: #003d63;
   --loss: #9a3c00;
+  /* Paire assombrie sur fond clair : l'encre posée dessus repasse en blanc. */
+  --on-gain: #ffffff;
+  --on-loss: #ffffff;
   --warn: #7a4400;
   --card-mix: 15%;
   --muted-mix: 78%;
@@ -397,6 +400,8 @@
     color-mix(in oklab, #111133 78%, #f0f4ff),
     color-mix(in oklab, #e0fff8 66%, #020d12)
   );
+  --on-gain: light-dark(#ffffff, #000000);
+  --on-loss: light-dark(#ffffff, #000000);
   --gain: light-dark(#003d63, #8fe0ff);
   --loss: light-dark(#9a3c00, #ff8844);
   --warn: light-dark(#7a4400, #ffb454);

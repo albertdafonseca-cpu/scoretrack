@@ -15,24 +15,58 @@ const USABLE_W = 0.9;
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
+/** Écart relatif entre la taille calculée par le cœur et celle réellement posée (dernier appel). */
+let lastGap = 0;
+
+/**
+ * Écart relatif du dernier ajustement (0 = le rendu applique exactement ce que `computeFit` a
+ * calculé). Au-delà de 0,2, la géométrie de la carte contredit le cœur : c'est un défaut, et les
+ * tests le vérifient (tests/e2e/game.spec.js).
+ */
+export function lastFitGap() {
+  return lastGap;
+}
+
 /**
  * Pose `size` sur `node` puis le réduit jusqu'à ce que sa largeur RENDUE tienne dans `avail`.
- * `flexible` (le prénom) est figé le temps de la mesure, sinon il se rétrécirait au lieu de
- * déborder et `scrollWidth` serait aveugle.
  * @returns {number} taille retenue (px)
  */
-function shrinkToWidth(node, size, avail, min, max, flexible) {
+function shrinkToWidth(node, size, avail, min, max) {
   let current = clamp(size, min, max);
   node.style.fontSize = `${current}px`;
-  for (let pass = 0; pass < 3; pass++) {
-    if (flexible) flexible.style.flexShrink = '0';
+  for (let pass = 0; pass < 4; pass++) {
     const rendered = node.scrollWidth;
-    if (flexible) flexible.style.flexShrink = '';
     if (rendered <= avail || rendered === 0) break;
     const next = clamp((current * avail) / rendered - 0.5, min, max);
     if (next >= current) break;
     current = next;
     node.style.fontSize = `${current}px`;
+  }
+  return current;
+}
+
+/**
+ * Réduit le bloc d'identité (`row` = numéro + prénom) jusqu'à ce que le PRÉNOM cesse de déborder
+ * de la place que la mise en page lui laisse réellement.
+ *
+ * Mesurer la largeur du bloc entier ne suffisait pas : `.pplayer` est un élément flexible, borné
+ * par la boîte de contenu de la carte, et la boucle s'arrêtait quelques pixels trop tôt — l'ellipse
+ * tombait alors même sur des prénoms de cinq lettres. On compare donc directement la largeur
+ * naturelle du prénom (`scrollWidth`) à la largeur qui lui est accordée (`clientWidth`).
+ * @returns {number} taille retenue (px)
+ */
+function shrinkLabel(row, label, size, avail, min, max) {
+  if (!label) return shrinkToWidth(row, size, avail, min, max);
+  let current = clamp(size, min, max);
+  row.style.fontSize = `${current}px`;
+  for (let pass = 0; pass < 5; pass++) {
+    const natural = label.scrollWidth;
+    const room = label.clientWidth;
+    if (natural <= room + 0.5 || natural === 0 || room === 0) break;
+    const next = clamp((current * room) / natural - 0.5, min, max);
+    if (next >= current) break;
+    current = next;
+    row.style.fontSize = `${current}px`;
   }
   return current;
 }
@@ -56,7 +90,7 @@ export function fitCard(parts, box, fit) {
   let nameSz = fit.nameSz;
   if (name) {
     name.style.maxWidth = `${Math.round(availW)}px`;
-    nameSz = shrinkToWidth(name, fit.nameSz, availW, MIN_NAME_PX, MAX_NAME_PX, label);
+    nameSz = shrinkLabel(name, label, fit.nameSz, availW, MIN_NAME_PX, MAX_NAME_PX);
   }
   if (ghost) ghost.style.height = `${Math.round(nameSz * 1.15)}px`;
 
@@ -72,6 +106,10 @@ export function fitCard(parts, box, fit) {
     MIN_SCORE_PX,
     MAX_SCORE_PX,
   );
+  // Garde-fou de cohérence entre le cœur et le rendu : si l'écart dépasse 20 %, c'est que la
+  // géométrie réelle de la carte contredit le calcul de `computeFit` (rembourrure, police).
+  // Le signaler plutôt que de le masquer silencieusement (leçon du padding en pourcentage).
+  lastGap = fit.scoreSz > 0 ? Math.abs(scoreSz - fit.scoreSz) / fit.scoreSz : 0;
 
   // 3. Signes +/− (≥ 24 px, grille D1.4) et bulle de delta.
   for (const s of signs) {

@@ -116,7 +116,11 @@
 }
 .logo-name {
   font-family: var(--btn-font);
-  font-size: var(--fs-7, 24px);
+  /* Borné : à 200 % de texte système, le mot-symbole doit rester dans le cadre (D19). */
+  font-size: min(var(--fs-7, 24px), 9vw);
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: center;
   font-weight: 900;
   letter-spacing: 0.1em;
   color: var(--accent);
@@ -428,29 +432,28 @@
   transform: scale(0.98);
 }
 
-/* Bannière de reprise : carte fixe au-dessus du contenu. Hors flux, elle n'entraîne aucun
-   décalage de mise en page quand le JavaScript la révèle après le premier rendu (D11). */
+/* Bannière de reprise : DANS LE FLUX. Sa boîte est réservée dès le premier rendu quand une
+   partie existe (attribut posé par js/ui/prepaint.js), donc aucun décalage ; et comme elle ne
+   surplombe rien, elle ne masque ni une cible tactile ni un anneau de focus (WCAG 2.4.11). */
 .restore-banner {
-  position: fixed;
-  left: 12px;
-  right: 12px;
-  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-  z-index: 50;
-  width: auto;
+  width: 100%;
   max-width: 420px;
-  margin: 0 auto;
   background: color-mix(in srgb, var(--accent) 10%, var(--surface));
   border: 1px solid var(--accent);
   border-radius: var(--radius);
   padding: 12px 14px;
-  display: flex;
+  margin-bottom: 16px;
+  display: none;
   flex-direction: column;
   gap: 10px;
-  box-shadow: var(--shadow-3, 0 12px 32px rgba(0, 0, 0, 0.45));
 }
-/* Le contenu de la page peut défiler au-delà de la carte. */
-.page.has-restore {
-  padding-bottom: calc(196px + env(safe-area-inset-bottom, 0px));
+:root[data-has-save] .restore-banner,
+.restore-banner.is-visible {
+  display: flex;
+}
+/* `.hidden` (partie effacée ou illisible) l'emporte sur les deux règles ci-dessus. */
+.restore-banner.hidden {
+  display: none !important;
 }
 .restore-title {
   font-family: var(--btn-font);
@@ -469,6 +472,14 @@
   line-height: 1.4;
   color: var(--text);
   margin-top: 4px;
+  /* Deux lignes réservées, remplies ou non : la boîte ne change pas de taille quand le
+     JavaScript écrit l'aperçu. */
+  min-height: 2.8em;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
 }
 .restore-when {
   display: block;
@@ -476,6 +487,7 @@
   font-size: var(--fs-min);
   color: var(--text);
   margin-top: 2px;
+  min-height: 1.3em;
 }
 .restore-banner-btns {
   display: grid;
@@ -531,7 +543,10 @@
 }
 .settings-title {
   font-family: var(--btn-font);
-  font-size: var(--fs-5, 18px);
+  /* Borné comme le mot-symbole : à 200 % de texte système, le titre reste dans le cadre (D19). */
+  font-size: min(var(--fs-5, 18px), 7vw);
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-weight: 700;
   color: var(--accent);
   text-shadow: 0 0 10px var(--accent);
@@ -602,6 +617,22 @@
 }
 
 /* Modale confidentialité : compléments (les styles de base sont dans modals.css). */
+/* Seul le texte de la politique défile : « Fermer » reste atteignable sans parcourir toute la
+   page, et le dégradé de fin de zone signale qu'il reste du contenu. */
+#privacy-modal .st-privacy-box {
+  display: flex;
+  flex-direction: column;
+  max-height: min(80vh, 640px);
+  overflow: hidden;
+}
+#privacy-modal .st-privacy-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 20px;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 20px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 20px), transparent);
+}
 #privacy-modal .st-privacy-date {
   font-size: var(--fs-min);
 }
@@ -635,7 +666,9 @@
 /* ── JOUEURS ── */
 .names-title {
   font-family: var(--btn-font);
-  font-size: var(--fs-5, 18px);
+  font-size: min(var(--fs-5, 18px), 7vw);
+  max-width: 100%;
+  overflow-wrap: anywhere;
   font-weight: 700;
   color: var(--accent);
   text-shadow: 0 0 12px var(--accent);
@@ -663,6 +696,15 @@
 .name-count.is-full {
   color: var(--warn, var(--loss));
   font-weight: 700;
+}
+/* Prénom plus long que ce que la plus petite carte affichera : marqué par du texte, jamais par
+   la couleur seule, et sans glyphe système (le jeu d'icônes est réservé au balisage). */
+.name-count.is-clipped::after {
+  content: ' abrégé';
+  font-weight: 700;
+}
+.name-count.is-clipped {
+  color: var(--warn, var(--accent2));
 }
 .names-help {
   font-family: var(--score-font);

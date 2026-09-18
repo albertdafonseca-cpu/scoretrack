@@ -59,15 +59,11 @@ test('parcours nommé, puis reprise en 1 clic avec aperçu (noms, scores, date)'
   await expect(page.locator('#names-page')).toBeVisible();
   const inputs = page.locator('.name-input');
   await expect(inputs).toHaveCount(4);
-  // La limite de saisie vient de nameMaxLength (source unique) et se voit dans le compteur
-  const expected = await page.evaluate(async () => {
-    const { nameMaxLength } = await import('/js/core/layout.js');
-    return nameMaxLength(4, window.innerWidth, window.innerHeight);
-  });
-  await expect(inputs.first()).toHaveAttribute('maxlength', String(expected));
+  // 18 caractères doivent rester saisissables quelle que soit la disposition (D2.3)
+  await expect(inputs.first()).toHaveAttribute('maxlength', '18');
   await inputs.first().fill('Wxxxxxxxxxxxxxxxxxxxxxxx');
-  expect((await inputs.first().inputValue()).length).toBe(expected);
-  await expect(page.locator('#name-count-0')).toHaveText(`${expected}/${expected}`);
+  expect((await inputs.first().inputValue()).length).toBe(18);
+  await expect(page.locator('#name-count-0')).toHaveText('18/18');
   await expect(page.locator('#name-count-0')).toHaveClass(/is-full/);
 
   const names = ['Alice', 'Bob', 'Chloé', 'David'];
@@ -283,28 +279,44 @@ test('états vides : les actions sans objet sont désactivées', async ({ page }
   await expect(page.locator('#profiles-help')).toBeHidden();
 });
 
-test('la limite de saisie suit la plus petite carte de la disposition (nameMaxLength)', async ({
+test('18 caractères restent saisissables et la mémoire ne perd jamais un prénom', async ({
   page,
 }) => {
   await openApp(page);
+  const long = 'Christophe-Alexan'; // 17 caractères
+
+  // Saisie à 2 joueurs
+  await page.locator('#players-grid .player-chip[data-val="2"]').click();
+  await page.locator('#names-btn').click();
+  await expect(page.locator('.name-input').first()).toHaveAttribute('maxlength', '18');
+  await page.locator('.name-input').first().fill(long);
+  await page.locator('#names-go-btn').click();
+  await expect(page.locator('#card-0 .pplayer')).toHaveText(long);
+
+  // Passage à 12 joueurs : la case rouvre avec le prénom ENTIER, seul un avertissement apparaît
+  await page.getByRole('button', { name: /Reset/ }).click();
+  await page.getByRole('button', { name: 'Confirmer' }).click();
   await page.locator('#players-grid .player-chip[data-val="12"]').click();
   await page.locator('#names-btn').click();
-  const expected = await page.evaluate(async () => {
+  await expect(page.locator('.name-input').first()).toHaveValue(long);
+  const shown = await page.evaluate(async () => {
     const { nameMaxLength } = await import('/js/core/layout.js');
     return nameMaxLength(12, window.innerWidth, window.innerHeight);
   });
-  await expect(page.locator('.name-input').first()).toHaveAttribute('maxlength', String(expected));
-  const hint = page.locator('#names-limit');
-  if (expected < 18) {
-    await expect(hint).toBeVisible();
-    await expect(hint).toContainText(`${expected} caractères`);
-  } else {
-    await expect(hint).toBeHidden();
+  if (shown < long.length) {
+    await expect(page.locator('#names-limit')).toBeVisible();
+    await expect(page.locator('#names-limit')).toContainText('abrégé');
+    await expect(page.locator('#name-count-0')).toHaveClass(/is-clipped/);
   }
-  // Un prénom accepté à la saisie tient sur la carte : aucun rognage silencieux en jeu
-  await page.locator('.name-input').first().fill('W'.repeat(24));
-  const typed = await page.locator('.name-input').first().inputValue();
-  expect(typed.length).toBe(expected);
+  // Lancer à 12 puis revenir à 2 : le prénom mémorisé est intact, aucun caractère perdu
   await page.locator('#names-go-btn').click();
-  await expect(page.locator('#card-0 .pplayer')).toHaveText(typed);
+  await page.getByRole('button', { name: /Reset/ }).click();
+  await page.getByRole('button', { name: 'Confirmer' }).click();
+  await page.locator('#players-grid .player-chip[data-val="2"]').click();
+  await page.locator('#names-btn').click();
+  await expect(page.locator('.name-input').first()).toHaveValue(long);
+  const stored = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('scoretrack_last_names')),
+  );
+  expect(Object.values(stored.byPreset)[0][0]).toBe(long);
 });

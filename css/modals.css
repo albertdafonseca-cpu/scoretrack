@@ -476,6 +476,9 @@
   font-size: var(--fs-1);
   color: var(--muted2);
   margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .recap-rank-score {
   font-family: var(--score-font);
@@ -485,8 +488,14 @@
   min-width: 56px;
   text-align: right;
 }
+/* La pastille se rétrécit dans le JOURNAL (le détail « 8 taps : −1 −1 … » peut être long) mais
+   jamais dans le classement, où elle porte un mot court et essentiel (« éliminé »). */
 .recap-tag {
-  flex-shrink: 0;
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-family: var(--font-ui);
   font-size: var(--fs-1);
   font-weight: 400;
@@ -495,6 +504,9 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-full);
   padding: 0 6px;
+}
+.recap-rank-name .recap-tag {
+  flex-shrink: 0;
 }
 .recap-spark {
   width: 72px;
@@ -531,6 +543,7 @@
 }
 .recap-action-head {
   grid-area: head;
+  min-width: 0;
   display: flex;
   align-items: baseline;
   gap: var(--sp-2);
@@ -554,6 +567,9 @@
 }
 .recap-action-body {
   grid-area: body;
+  /* Sans `min-width: 0`, une pastille longue (« 8 taps : −1 −1 … ») déborde sa colonne de grille
+     et glisse SOUS le bouton « Revenir ici ». */
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: var(--sp-2);
@@ -697,4 +713,22 @@
 #winner-modal .simple-modal-box {
   position: relative;
   z-index: 1;
+}
+
+/* Feuille joueur : le champ de renommage porte un libellé visible (il avait exactement la même
+   forme que le bouton « Éliminer », sans rien qui le distingue). */
+.player-name-label {
+  display: block;
+  margin-bottom: var(--sp-1);
+  font-family: var(--btn-font);
+  font-size: var(--fs-1);
+  font-weight: 700;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--muted2);
+}
+.player-name-hint {
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
 }

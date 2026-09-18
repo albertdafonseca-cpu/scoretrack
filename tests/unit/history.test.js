@@ -609,27 +609,48 @@ describe('groups / timeline', () => {
     expect(groups(log).map((g) => g.n)).toEqual([1, 2, 3]);
   });
 
-  it('timeline et groups restent linéaires sur un très gros journal', () => {
-    // Journal construit directement : `record` plafonne à MAX_LOG_ENTRIES (politique de taille).
-    const entries = Array.from({ length: 20_000 }, (_, i) => ({
-      id: i + 1,
-      t: T0 + i,
-      playerIdx: 0,
-      delta: 1,
-      from: i,
-      to: i + 1,
-      via: 'keypad',
-      groupId: i + 1,
-    }));
-    const log = { entries, cursor: 20_000, floor: 0 };
-    const t0 = performance.now();
-    const tl = timeline(log);
-    const g = groups(log);
-    const ms = performance.now() - t0;
-    expect(tl).toHaveLength(20_000);
-    expect(g).toHaveLength(20_000);
-    // Linéaire ≈ 15 ms ; la version quadratique dépassait 400 ms à 20 000 entrées.
-    expect(ms).toBeLessThan(150);
+  it('timeline et groups restent linéaires : nombre d’accès mesuré, sans aucune durée', () => {
+    // Le défaut recherché est le motif `entries.find(e => e.id === id)` dans une boucle, qui lit
+    // `id` un nombre quadratique de fois. On compte donc les lectures de `id` plutôt que le temps :
+    // la mesure est exacte et ne dépend ni de la machine ni de la charge.
+    let reads = 0;
+    const build = (n) => ({
+      entries: Array.from({ length: n }, (_, i) => {
+        const e = {
+          t: T0 + i,
+          playerIdx: 0,
+          delta: 1,
+          from: i,
+          to: i + 1,
+          via: 'keypad',
+          groupId: i + 1,
+        };
+        Object.defineProperty(e, 'id', {
+          enumerable: true,
+          get() {
+            reads++;
+            return i + 1;
+          },
+        });
+        return e;
+      }),
+      cursor: n,
+      floor: 0,
+    });
+
+    const counts = [500, 1000, 2000].map((n) => {
+      const log = build(n);
+      reads = 0;
+      expect(timeline(log)).toHaveLength(n);
+      expect(groups(log)).toHaveLength(n);
+      return { n, reads };
+    });
+    // Linéaire : 3 lectures par entrée. Quadratique : n/2 par entrée (500 à 2 000 ici).
+    counts.forEach(({ n, reads: r }) => expect(r).toBeLessThanOrEqual(10 * n));
+    // Doubler la taille double le travail (à ±25 %), il ne le quadruple pas.
+    const ratio = counts[2].reads / counts[1].reads;
+    expect(ratio).toBeGreaterThan(1.5);
+    expect(ratio).toBeLessThan(2.5);
   });
 });
 

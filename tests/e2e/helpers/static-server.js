@@ -26,6 +26,7 @@ const MIME = {
 export async function startStaticServer({ root, port = 0 }) {
   const base = resolve(root);
   let swVersion = null;
+  let swPatch = null;
   const sockets = new Set();
   const requests = [];
   const blocked = new Set();
@@ -48,12 +49,12 @@ export async function startStaticServer({ root, port = 0 }) {
       const info = await stat(file);
       if (!info.isFile()) throw new Error('not a file');
       let body = await readFile(file);
-      if (pathname === '/sw-st.js' && swVersion) {
-        body = Buffer.from(
-          body
-            .toString('utf8')
-            .replace(/const VERSION = '[^']*';/, `const VERSION = '${swVersion}';`),
-        );
+      if (pathname === '/sw-st.js' && (swVersion || swPatch)) {
+        let src = body.toString('utf8');
+        if (swVersion)
+          src = src.replace(/const VERSION = '[^']*';/, `const VERSION = '${swVersion}';`);
+        if (swPatch) src = swPatch(src);
+        body = Buffer.from(src);
       }
       requests.push({ path: pathname, status: 200 });
       res.writeHead(200, {
@@ -104,6 +105,13 @@ export async function startStaticServer({ root, port = 0 }) {
     /** VERSION servie dans sw-st.js (null = fichier du dépôt tel quel). */
     setSwVersion(v) {
       swVersion = v;
+    },
+    /**
+     * Transforme la source de sw-st.js à la volée, sans toucher à sa VERSION : simule un déploiement
+     * qui ne modifie que la logique du service worker. `null` rétablit le fichier du dépôt.
+     */
+    setSwPatch(fn) {
+      swPatch = fn;
     },
     /** Chemins renvoyés en 404 (simulation d'un actif indisponible pendant le précache). */
     setBlocked(paths) {

@@ -95,11 +95,27 @@ const byTheme = themeTokens();
 const family = (v) => v.split(',')[0].replace(/["']/g, '').trim();
 
 describe('tokens.css', () => {
-  it('définit une échelle typographique --fs-1…8 croissante avec un plancher de 12 px (D10)', () => {
-    const sizes = Array.from({ length: 8 }, (_, i) => parseFloat(rootTokens[`fs-${i + 1}`]));
-    expect(sizes.every((s) => Number.isFinite(s))).toBe(true);
-    expect(sizes[0]).toBeGreaterThanOrEqual(12);
-    for (let i = 1; i < sizes.length; i++) expect(sizes[i]).toBeGreaterThan(sizes[i - 1]);
+  it('définit une échelle typographique relative, croissante, avec un plancher de 12 px (D10, D19)', () => {
+    const BASE = 16;
+    const scale = Array.from({ length: 8 }, (_, i) => {
+      const raw = rootTokens[`fs-${i + 1}`];
+      const rem = parseFloat(raw.match(/([\d.]+)rem/)[1]);
+      const floor = raw.match(/([\d.]+)px/);
+      return { raw, rem, px: rem * BASE, floor: floor ? parseFloat(floor[1]) : null };
+    });
+    // Relatif : aucune taille en pixels absolus, sinon le réglage système reste sans effet.
+    for (const [i, s2] of scale.entries()) {
+      expect(s2.rem, `--fs-${i + 1} doit être exprimé en rem`).toBeGreaterThan(0);
+      expect(s2.raw, `--fs-${i + 1} ne doit pas être une taille absolue`).toMatch(/rem/);
+    }
+    // Croissante, et jamais sous 12 px à la base par défaut.
+    for (let i = 1; i < scale.length; i++) expect(scale[i].rem).toBeGreaterThan(scale[i - 1].rem);
+    for (const [i, s2] of scale.entries()) {
+      expect(Math.max(s2.px, s2.floor ?? 0), `--fs-${i + 1} rendu`).toBeGreaterThanOrEqual(12);
+    }
+    // Les trois plus petits échelons portent un plancher explicite : réduire la base système ne
+    // peut pas les faire descendre sous 12 px.
+    for (const i of [0, 1, 2]) expect(scale[i].floor, `--fs-${i + 1} sans plancher`).toBe(12);
   });
 
   it('expose les jetons du contrat (durées, courbes, tap-min, sémantique, focus)', () => {

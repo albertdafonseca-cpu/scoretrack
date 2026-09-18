@@ -1,7 +1,7 @@
 // Écran de jeu (élément A) : identité du DOM, gestes aux frontières, appui long, pavé au clavier,
 // victoire par plafond, annulation/rétablissement, retour à un point, copie du résultat, 12 joueurs.
 import { expect, test } from '@playwright/test';
-import { collectErrors, openApp as openBase } from './helpers.js';
+import { collectErrors, openApp as openBase, renderedContrast } from './helpers.js';
 
 /**
  * Ouvre l'application sans service worker : la bannière « nouvelle version » de l'élément E
@@ -368,6 +368,49 @@ test('récap : classement complet, retour à un point, copie du résultat', asyn
   expect(errors).toEqual([]);
 });
 
+test('journal du récap : aucune intersection avec le bouton « Revenir ici »', async ({ page }) => {
+  const errors = collectErrors(page);
+  await openApp(page);
+  await startGame(page, { players: 3, start: 50, names: ['Alice', 'Bartholomew Longn', 'Chloé'] });
+  // Une action groupée de 8 taps produit la pastille la plus longue (« 8 taps : −1 −1 … »),
+  // exactement celle qui débordait sa colonne et glissait sous le bouton.
+  for (let i = 0; i < 8; i++) await page.locator('#card-1 .tap-half.minus').tap();
+  await expect(page.locator('#sc-1')).toHaveText('42');
+  await page.waitForTimeout(1700);
+  await page.locator('#card-0 .tap-half.plus').tap();
+
+  await page.locator('#bar [data-action="show-recap"]').click();
+  await expect(page.locator('#recap')).toBeVisible();
+  await expect(page.locator('.recap-action')).toHaveCount(2);
+  const overlaps = await page.evaluate(() =>
+    [...document.querySelectorAll('.recap-action')]
+      .map((row, i) => {
+        const btn = row.querySelector('.recap-jump-btn').getBoundingClientRect();
+        const worst = [...row.querySelectorAll('.recap-action-body *, .recap-action-head *')]
+          .map((n) => n.getBoundingClientRect())
+          .map(
+            (r) =>
+              Math.max(0, Math.min(r.right, btn.right) - Math.max(r.left, btn.left)) *
+              Math.max(0, Math.min(r.bottom, btn.bottom) - Math.max(r.top, btn.top)),
+          )
+          .reduce((a, b) => Math.max(a, b), 0);
+        return { row: i, overlap: Math.round(worst) };
+      })
+      .filter((r) => r.overlap > 0),
+  );
+  expect(overlaps, JSON.stringify(overlaps)).toEqual([]);
+
+  // Et aucun texte du journal ne déborde horizontalement de la page.
+  const wide = await page.evaluate(() => {
+    const root = document.getElementById('recap-body');
+    return [...root.querySelectorAll('*')].filter(
+      (n) => n.getBoundingClientRect().right > window.innerWidth + 1,
+    ).length;
+  });
+  expect(wide, 'éléments du récap hors écran').toBe(0);
+  expect(errors).toEqual([]);
+});
+
 test('feuille joueur : renommer (18 caractères) et réintégrer', async ({ page }) => {
   const errors = collectErrors(page);
   await openApp(page);
@@ -500,9 +543,164 @@ test('la bannière système réduit la zone de jeu : aucun recouvrement des cart
   expect(errors).toEqual([]);
 });
 
-test('hauteur de capitale du score : ≥ 96 px à 4 joueurs, ≥ 30 px à 12', async ({
+test('taps SIMULTANÉS : chaque doigt compte (2 puis 3 cartes à la fois)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await openApp(page);
+  await startGame(page, { players: 6, start: 100 });
+  const cdp = await page.context().newCDPSession(page);
+  const center = async (sel) => {
+    const b = await page.locator(sel).boundingBox();
+    return { x: Math.round(b.x + b.width / 2), y: Math.round(b.y + b.height / 2) };
+  };
+  /** Pose tous les doigts, puis les relève : un vrai geste à plusieurs mains autour de la table. */
+  const multiTap = async (points) => {
+    for (let i = 0; i < points.length; i++) {
+      await cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchStart',
+        touchPoints: points.slice(0, i + 1).map((p, k) => ({ ...p, id: k + 1 })),
+      });
+    }
+    await page.waitForTimeout(40);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await page.waitForTimeout(120);
+  };
+
+  // Deux doigts sur deux cartes différentes
+  await multiTap([await center('#card-0 .tap-half.plus'), await center('#card-1 .tap-half.plus')]);
+  await expect(page.locator('#sc-0')).toHaveText('101');
+  await expect(page.locator('#sc-1')).toHaveText('101');
+
+  // Trois doigts sur trois cartes différentes
+  await multiTap([
+    await center('#card-2 .tap-half.plus'),
+    await center('#card-3 .tap-half.plus'),
+    await center('#card-4 .tap-half.minus'),
+  ]);
+  await expect(page.locator('#sc-2')).toHaveText('101');
+  await expect(page.locator('#sc-3')).toHaveText('101');
+  await expect(page.locator('#sc-4')).toHaveText('99');
+  await cdp.detach();
+
+  // Le journal porte bien les cinq actions
+  const entries = await page.evaluate(async () => {
+    const { store } = await import('./js/store.js');
+    return store.game.log.entries.length;
+  });
+  expect(entries, 'entrées de journal pour 5 taps simultanés').toBe(5);
+  expect(errors).toEqual([]);
+});
+
+test('contraste du score et du numéro de joueur sur pixels rendus, 14 thèmes × 3 états (D16)', async ({
   page,
 }, testInfo) => {
+  test.setTimeout(180_000);
+  await openApp(page);
+  await startGame(page, { players: 4, start: 40, names: ['Alice', 'Bruno', 'Chloé', 'David'] });
+  const themes = await page.evaluate(async () =>
+    (await import('./js/core/constants.js')).THEMES.map((t) => t.id),
+  );
+  expect(themes.length, 'thèmes à auditer').toBeGreaterThanOrEqual(14);
+  const failures = [];
+  const rows = [];
+  for (const id of themes) {
+    await page.evaluate(
+      (t) => document.documentElement.setAttribute('data-theme', t === 'cyber' ? '' : t),
+      id,
+    );
+    // Le thème change de police : tant que la nouvelle fonte n'est pas chargée, le texte peut être
+    // rendu invisible (`font-display`), ce qui mesurerait un aplat uniforme au lieu d'un contraste.
+    await page.evaluate(() => document.fonts.ready);
+    await page.waitForTimeout(150);
+    for (const state of ['repos', 'plus', 'minus']) {
+      if (state !== 'repos') {
+        await page.evaluate(
+          (sel) => document.querySelector(`#card-0 .tap-half.${sel}`).classList.add('pressed'),
+          state,
+        );
+      }
+      await page.waitForTimeout(120);
+      const [score, seat] = await renderedContrast(page, ['#sc-0', '#card-0 .pseat']);
+      if (state !== 'repos') {
+        await page.evaluate(
+          (sel) => document.querySelector(`#card-0 .tap-half.${sel}`).classList.remove('pressed'),
+          state,
+        );
+      }
+      rows.push({ id, state, score: score.ratio, seat: seat.ratio });
+      // Le seuil des composants (3:1) ne s'applique pas ici : ce sont des TEXTES.
+      if (!(score.ratio >= 4.5)) failures.push({ id, state, cible: 'score', ratio: score.ratio });
+      if (!(seat.ratio >= 4.5)) failures.push({ id, state, cible: 'numéro', ratio: seat.ratio });
+    }
+  }
+  testInfo.annotations.push({
+    type: 'contraste-rendu',
+    description: rows.map((r) => `${r.id}/${r.state} score ${r.score} siège ${r.seat}`).join(' · '),
+  });
+  // D17 : la mesure doit avoir réellement eu lieu.
+  expect(rows.length).toBe(themes.length * 3);
+  expect(failures, JSON.stringify(failures)).toEqual([]);
+});
+
+test('aucun prénom COURT tronqué, de 1 à 12 joueurs, et écart de taille du score borné', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(180_000);
+  const errors = collectErrors(page);
+  const report = [];
+  const cut = [];
+  for (const players of [1, 2, 4, 5, 7, 9, 11, 12]) {
+    await openApp(page);
+    // Prénoms courts et longs mélangés : le cas « Alice tronqué en Ali… » doit être impossible.
+    const names = Array.from({ length: players }, (_, i) =>
+      i % 2 ? 'Alice' : 'Bartholomew Longn',
+    );
+    await startGame(page, { players, start: 40, names });
+    // Scores à quatre chiffres : le cas courant (rami, canasta, Skyjo cumulé).
+    await page.evaluate(async () => {
+      const g = await import('./js/ui/game.js');
+      const { store } = await import('./js/store.js');
+      store.game.players.forEach((_, i) => g.applyManualDelta(i, 1200));
+    });
+    await page.waitForTimeout(200);
+    const probe = await page.evaluate(() =>
+      [...document.querySelectorAll('.pcard')].map((card) => {
+        const nm = card.querySelector('.pplayer');
+        const sc = card.querySelector('.score');
+        return {
+          id: card.id,
+          name: nm.textContent,
+          cut: nm.scrollWidth > nm.clientWidth + 0.5,
+          fs: parseFloat(getComputedStyle(sc).fontSize),
+        };
+      }),
+    );
+    // Un prénom de 17 caractères ne PEUT pas tenir en entier sur une carte de 90 px avec un
+    // plancher de 12 px : l'ellipse est alors le comportement correct. Ce qui est inacceptable,
+    // c'est qu'un prénom COURT soit rogné — c'était le cas d'« Alice » sur les plus grandes cartes.
+    probe.filter((r) => r.cut && r.name.length <= 8).forEach((r) => cut.push({ players, ...r }));
+    const longCut = probe.filter((r) => r.cut).length;
+    const sizes = probe.map((r) => r.fs);
+    const ratio = Math.max(...sizes) / Math.min(...sizes);
+    report.push(
+      `n=${players} : écart de taille ${ratio.toFixed(2)}× · prénoms longs rognés ${longCut}/${players} · prénoms courts rognés 0`,
+    );
+    expect(ratio, `écart de taille du score à ${players} joueurs`).toBeLessThanOrEqual(1.5);
+    // Cohérence entre le calcul du cœur et ce que le DOM applique réellement.
+    const gap = await page.evaluate(async () => (await import('./js/ui/game.js')).fitCoherence());
+    expect(gap, `écart cœur/rendu à ${players} joueurs`).toBeLessThan(0.2);
+  }
+  testInfo.annotations.push({ type: 'prenoms-et-ecarts', description: report.join(' · ') });
+  expect(cut, JSON.stringify(cut)).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+test('hauteur de capitale du score à 2, 4 et 7 chiffres, au gabarit 390 × 844', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(120_000);
+  // La grille impose 390 × 844 : mesurer sur le gabarit plus court de l'émulation flatterait le
+  // résultat de 9 px à 4 joueurs.
+  await page.setViewportSize({ width: 390, height: 844 });
   const measure = () =>
     [...document.querySelectorAll('.score')].map((sc) => {
       const cs = getComputedStyle(sc);
@@ -510,18 +708,42 @@ test('hauteur de capitale du score : ≥ 96 px à 4 joueurs, ≥ 30 px à 12', a
       ctx.font = `${cs.fontSize} ${cs.fontFamily}`;
       return Math.round(ctx.measureText(sc.textContent).actualBoundingBoxAscent);
     });
-  await openApp(page);
-  await startGame(page, { players: 4, start: 40 });
-  const caps4 = await page.evaluate(measure);
-  await openApp(page);
-  await startGame(page, { players: 12, start: 40 });
-  const caps12 = await page.evaluate(measure);
-  testInfo.annotations.push({
-    type: 'hauteur-de-capitale',
-    description: `4 joueurs : ${caps4.join(', ')} px · 12 joueurs : ${caps12.join(', ')} px`,
-  });
-  expect(Math.min(...caps4)).toBeGreaterThanOrEqual(96);
-  expect(Math.min(...caps12)).toBeGreaterThanOrEqual(30);
+  const lines = [];
+  const caps = {};
+  for (const players of [4, 12]) {
+    await openApp(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await startGame(page, { players, start: 40 });
+    for (const [digits, delta] of [
+      ['2', 0],
+      ['4', 1200],
+      ['7', 1234467],
+    ]) {
+      if (delta) {
+        await page.evaluate(async (d) => {
+          const g = await import('./js/ui/game.js');
+          const { store } = await import('./js/store.js');
+          store.game.players.forEach((_, i) => g.applyManualDelta(i, d));
+        }, delta);
+        await page.waitForTimeout(200);
+      }
+      const values = await page.evaluate(measure);
+      caps[`${players}-${digits}`] = Math.min(...values);
+      lines.push(
+        `${players} joueurs / ${digits} chiffres : ${Math.min(...values)}–${Math.max(...values)} px`,
+      );
+    }
+  }
+  testInfo.annotations.push({ type: 'hauteur-de-capitale', description: lines.join(' · ') });
+  // Seuils de la grille (D2.1) : 96 px à 4 joueurs, 30 px à 12, sur le score courant.
+  expect(caps['4-2'], '4 joueurs, 2 chiffres').toBeGreaterThanOrEqual(96);
+  expect(caps['4-4'], '4 joueurs, 4 chiffres').toBeGreaterThanOrEqual(96 * 0.75);
+  expect(caps['12-2'], '12 joueurs, 2 chiffres').toBeGreaterThanOrEqual(30);
+  expect(caps['12-4'], '12 joueurs, 4 chiffres').toBeGreaterThanOrEqual(30);
+  // Le score à 7 chiffres à 12 joueurs ne tient PAS le seuil de 30 px : c'est une limite
+  // géométrique documentée (carte de 130 × 146 px), pas une régression — on la verrouille ici pour
+  // que toute amélioration future soit visible, et que toute dégradation échoue.
+  expect(caps['12-7'], '12 joueurs, 7 chiffres').toBeGreaterThanOrEqual(19);
 });
 
 test('un tap réel = UN seul changement de score (tactile, souris, clavier)', async ({ page }) => {

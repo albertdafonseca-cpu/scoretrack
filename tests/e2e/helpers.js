@@ -127,18 +127,16 @@ export async function themeIds(page) {
 }
 
 /**
- * Contraste approché sur les PIXELS RÉELLEMENT RENDUS (D16), pour les nœuds qu'axe laisse
- * indéterminés (halos `text-shadow`, fonds en dégradé). Une capture de la page est décodée dans
- * un canevas, puis, pour chaque sélecteur, la luminance des pixels de sa boîte est triée : le
- * 1ᵉʳ et le 99ᵉ centile approchent le cœur des glyphes et le fond. La valeur est indicative à
- * ±0,3 sur du texte fin ; elle sert à détecter un vrai échec, pas à certifier une réussite au 1/100.
+ * Contraste d'un texte : couleur de premier plan DÉCLARÉE (`getComputedStyle().color` — c'est ce
+ * que WCAG 1.4.3 évalue) contre fond RÉELLEMENT RENDU (D16) : une capture de la page est décodée
+ * dans un canevas et le fond est la couleur dominante (mode de l'histogramme) de la boîte de
+ * l'élément, ce qui reste juste sous un dégradé, une texture ou un halo. Aucune approximation sur
+ * le texte : les pixels de glyphe ne servent plus à estimer le premier plan.
+ * Renvoie `{ sel, ratio, fontSize, large }` ou `{ sel, skipped }` pour un nœud non mesurable.
  */
 export async function renderedContrast(page, selectors) {
-  // Une capture prise avant la fin du chargement des polices mesurerait une police de secours :
-  // la valeur changerait d'une exécution à l'autre.
+  // Une capture prise avant la fin du chargement des polices mesurerait une police de secours.
   await page.evaluate(() => document.fonts.ready);
-  // Capture pleine page à la résolution de l'appareil : réduire l'image ferait fondre le cœur des
-  // glyphes fins dans le fond et sous-estimerait le contraste.
   const shot = (await page.screenshot({ scale: 'device', fullPage: true })).toString('base64');
   return page.evaluate(
     async ({ shot, selectors }) => {
@@ -153,50 +151,98 @@ export async function renderedContrast(page, selectors) {
       canvas.height = img.height;
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       ctx.drawImage(img, 0, 0);
-      const channel = (v) => {
+      const chan = (v) => {
         const s = v / 255;
         return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+      };
+      const lum = (r, g, b) => 0.2126 * chan(r) + 0.7152 * chan(g) + 0.0722 * chan(b);
+      const parseColor = (css) => {
+        const n = css.match(/[\d.]+/g);
+        if (!n) return null;
+        const v = n.slice(0, 3).map(Number);
+        const alpha = n.length > 3 ? Number(n[3]) : 1;
+        if (alpha < 1) return null; // couleur translucide : le fond échantillonné suffit mal
+        return css.startsWith('color(') ? v.map((x) => x * 255) : v;
       };
       return selectors.map((sel) => {
         const el = document.querySelector(sel);
         if (!el || el.offsetParent === null) return { sel, skipped: 'invisible' };
-        // Les contrôles désactivés sont exemptés du critère de contraste (WCAG 1.4.3).
         if (el.closest('[disabled], [aria-disabled="true"]')) return { sel, skipped: 'désactivé' };
+        const cs = getComputedStyle(el);
+        const fg = parseColor(cs.color);
+        if (!fg) return { sel, skipped: 'couleur non résolue' };
         const r = el.getBoundingClientRect();
-        // Le pourtour (coins arrondis, halo, ombre portée) est ignoré : seule la zone intérieure,
-        // où le texte repose sur son propre fond, est échantillonnée. Coordonnées document.
         const dpr = window.devicePixelRatio || 1;
-        const inset = Math.ceil(Math.min(r.width, r.height) * 0.12 * dpr);
-        const x = Math.max(0, Math.round((r.left + window.scrollX) * dpr) + inset);
-        const y = Math.max(0, Math.round((r.top + window.scrollY) * dpr) + inset);
-        const w = Math.min(Math.round(r.width * dpr) - 2 * inset, canvas.width - x);
-        const h = Math.min(Math.round(r.height * dpr) - 2 * inset, canvas.height - y);
-        if (w < 4 || h < 4) return { sel, skipped: 'hors cadre' };
+        const x = Math.max(0, Math.round((r.left + window.scrollX) * dpr));
+        const y = Math.max(0, Math.round((r.top + window.scrollY) * dpr));
+        const w = Math.round(r.width * dpr);
+        const h = Math.round(r.height * dpr);
+        if (w < 4 || h < 4) return { sel, skipped: 'boîte trop petite' };
         if (x + w > canvas.width || y + h > canvas.height) return { sel, skipped: 'hors capture' };
         const data = ctx.getImageData(x, y, w, h).data;
-        const lums = [];
+        // Fond = couleur la plus fréquente de la boîte, PIXELS DE GLYPHE EXCLUS : sur un grand
+        // titre au halo, le texte peut occuper la majorité de la boîte et fausserait le mode.
+        const hist = new Map();
         for (let i = 0; i < data.length; i += 4) {
-          lums.push(
-            0.2126 * channel(data[i]) +
-              0.7152 * channel(data[i + 1]) +
-              0.0722 * channel(data[i + 2]),
-          );
+          const d =
+            (data[i] - fg[0]) ** 2 + (data[i + 1] - fg[1]) ** 2 + (data[i + 2] - fg[2]) ** 2;
+          if (d < 60 * 60) continue; // proche de la couleur du texte : c'est un glyphe
+          const key = ((data[i] >> 3) << 10) | ((data[i + 1] >> 3) << 5) | (data[i + 2] >> 3);
+          const cur = hist.get(key);
+          if (cur) {
+            cur.n++;
+            cur.r += data[i];
+            cur.g += data[i + 1];
+            cur.b += data[i + 2];
+          } else hist.set(key, { n: 1, r: data[i], g: data[i + 1], b: data[i + 2] });
         }
-        lums.sort((a, b) => a - b);
-        const at = (p) => lums[Math.min(lums.length - 1, Math.floor(p * (lums.length - 1)))];
-        const dark = at(0.01);
-        const light = at(0.99);
-        const fontSize = parseFloat(getComputedStyle(el).fontSize);
-        const weight = Number(getComputedStyle(el).fontWeight) || 400;
-        const large = fontSize >= 24 || (fontSize >= 18.66 && weight >= 700);
+        let best = null;
+        for (const bucket of hist.values()) if (!best || bucket.n > best.n) best = bucket;
+        if (!best) return { sel, skipped: 'fond indiscernable du texte' };
+        const bg = [best.r / best.n, best.g / best.n, best.b / best.n];
+        const [hi, lo] = [lum(fg[0], fg[1], fg[2]), lum(bg[0], bg[1], bg[2])].sort((a, b) => b - a);
+        const fontSize = parseFloat(cs.fontSize);
+        const weight = Number(cs.fontWeight) || 400;
         return {
           sel,
           fontSize,
-          large,
-          ratio: Number(((light + 0.05) / (dark + 0.05)).toFixed(2)),
+          large: fontSize >= 24 || (fontSize >= 18.66 && weight >= 700),
+          ratio: Number(((hi + 0.05) / (lo + 0.05)).toFixed(2)),
         };
       });
     },
     { shot, selectors },
   );
+}
+
+/**
+ * Cibles recouvertes : pour chaque contrôle visible, le point central doit appartenir au contrôle
+ * lui-même (WCAG 2.5.8 / 2.4.11). Un panneau surplombant ferait échouer ce contrôle, là où une
+ * comparaison de bords ne voit rien.
+ */
+export async function obstructedTargets(page, rootSelector = 'body') {
+  return page.evaluate((rootSelector) => {
+    const root = document.querySelector(rootSelector);
+    const sel = 'button, [role="button"], [role="switch"], [role="radio"], input, a[href]';
+    return Array.from(root.querySelectorAll(sel))
+      .filter((n) => {
+        const cs = getComputedStyle(n);
+        return cs.visibility !== 'hidden' && cs.display !== 'none' && n.offsetParent !== null;
+      })
+      .map((n) => {
+        const r = n.getBoundingClientRect();
+        const cx = r.left + r.width / 2;
+        const cy = r.top + r.height / 2;
+        const vw = document.documentElement.clientWidth;
+        const vh = document.documentElement.clientHeight;
+        if (cx < 0 || cy < 0 || cx > vw || cy > vh) return null; // hors écran : non concerné
+        const hit = document.elementFromPoint(cx, cy);
+        if (hit && (hit === n || n.contains(hit) || hit.contains(n))) return null;
+        return {
+          el: n.id || n.getAttribute('aria-label') || n.className,
+          covertBy: hit ? hit.id || hit.className || hit.nodeName : 'rien',
+        };
+      })
+      .filter(Boolean);
+  }, rootSelector);
 }

@@ -10,15 +10,19 @@ import { byId, el, qsa, show, hide, showPage, icon } from './dom.js';
 import { lastNamesFor, rememberLastNames } from './settings.js';
 import { currentPresetKey } from './setup.js';
 
-/** Plafond absolu de saisie ; la limite réelle vient de `nameMaxLength` (js/core/layout.js). */
+/** Longueur maximale de saisie (D2.3) : toujours atteignable, quel que soit le nombre de joueurs. */
 export const NAME_MAX_LEN = 18;
 
-/** Limite en vigueur pour la configuration et l'écran courants (source unique : nameMaxLength). */
-let currentMaxLen = NAME_MAX_LEN;
+/**
+ * Longueur au-delà de laquelle la plus petite carte de la disposition courante devra abréger le
+ * prénom (`nameMaxLength`, js/core/layout.js). C'est un AVERTISSEMENT d'affichage : la saisie et
+ * la mémoire conservent toujours le prénom entier — tronquer effacerait des données (D5).
+ */
+let displayMaxLen = NAME_MAX_LEN;
 
-/** Longueur maximale affichable sur la plus petite carte de la disposition courante. */
-export function currentNameMaxLength() {
-  return currentMaxLen;
+/** Longueur affichable sans abréviation sur la plus petite carte de la disposition courante. */
+export function currentDisplayMaxLength() {
+  return displayMaxLen;
 }
 
 let lastFocusedInput = null;
@@ -40,7 +44,7 @@ function fillName(name) {
     announce('Toutes les cases sont remplies', 'assertive');
     return;
   }
-  target.value = name.slice(0, currentMaxLen);
+  target.value = name.slice(0, NAME_MAX_LEN);
   refreshNameActions();
   const idx = inputs.indexOf(target);
   announce(`${name} placé en joueur ${idx + 1}`);
@@ -172,7 +176,7 @@ export function refreshNameActions() {
 
 /** Prénoms saisis, dans l'ordre des cases (chaîne vide si absent). */
 export function collectNames() {
-  return nameInputs().map((i) => i.value.trim().slice(0, currentMaxLen));
+  return nameInputs().map((i) => i.value.trim().slice(0, NAME_MAX_LEN));
 }
 
 /** Prénoms saisis, mémorisés pour le préréglage courant (bouton « Lancer » de la page Joueurs). */
@@ -187,7 +191,7 @@ export function quickStartNames() {
   return lastNamesFor(currentPresetKey(), store.config.numPlayers);
 }
 
-function nameRow(i, value, maxLen) {
+function nameRow(i, value) {
   const id = `name-${i}`;
   const countId = `name-count-${i}`;
   const color = COLORS[i % 12];
@@ -206,21 +210,21 @@ function nameRow(i, value, maxLen) {
     placeholder: `Joueur ${i + 1}`,
     'aria-label': `Prénom du joueur ${i + 1}`,
     'aria-describedby': countId,
-    maxLength: maxLen,
+    maxLength: NAME_MAX_LEN,
     autocomplete: 'off',
     autocapitalize: 'words',
     enterkeyhint: 'next',
     value,
   });
   // Compteur de caractères : la limite se voit, rien n'est tronqué en silence.
-  const count = el('span', {
-    className: 'name-count',
-    id: countId,
-    text: `${value.length}/${maxLen}`,
-  });
+  const count = el('span', { className: 'name-count', id: countId });
   const updateCount = () => {
-    count.textContent = `${inp.value.length}/${maxLen}`;
-    count.classList.toggle('is-full', inp.value.length >= maxLen);
+    const len = inp.value.length;
+    count.textContent = `${len}/${NAME_MAX_LEN}`;
+    count.classList.toggle('is-full', len >= NAME_MAX_LEN);
+    // Signale l'abréviation à venir sur la carte, sans jamais amputer la saisie.
+    count.classList.toggle('is-clipped', len > displayMaxLen);
+    count.title = len > displayMaxLen ? `Abrégé à ${displayMaxLen} caractères sur la carte` : '';
   };
   inp.addEventListener('focus', () => {
     lastFocusedInput = inp;
@@ -248,17 +252,15 @@ export function showNamesScreen() {
   const n = store.config.numPlayers;
   // La limite de saisie est celle de la plus petite carte de la disposition : un prénom accepté
   // ici est toujours affichable en jeu (source unique : js/core/layout.js).
-  currentMaxLen = nameMaxLength(n, window.innerWidth, window.innerHeight);
-  const remembered = lastNamesFor(currentPresetKey(), n).map((v) => v.slice(0, currentMaxLen));
+  displayMaxLen = nameMaxLength(n, window.innerWidth, window.innerHeight);
+  const remembered = lastNamesFor(currentPresetKey(), n);
   const hint = byId('names-limit');
   hint.textContent =
-    currentMaxLen < NAME_MAX_LEN
-      ? `À ${n} joueurs sur cet écran, les prénoms sont limités à ${currentMaxLen} caractères pour rester lisibles sur les cartes.`
+    displayMaxLen < NAME_MAX_LEN
+      ? `À ${n} joueurs sur cet écran, un prénom de plus de ${displayMaxLen} caractères sera abrégé sur la carte ; il reste mémorisé en entier.`
       : '';
-  hint.hidden = currentMaxLen >= NAME_MAX_LEN;
-  list.replaceChildren(
-    ...Array.from({ length: n }, (_, i) => nameRow(i, remembered[i], currentMaxLen)),
-  );
+  hint.hidden = displayMaxLen >= NAME_MAX_LEN;
+  list.replaceChildren(...Array.from({ length: n }, (_, i) => nameRow(i, remembered[i])));
   renderProfileChips();
   refreshNameActions();
   showPage('names-page');
