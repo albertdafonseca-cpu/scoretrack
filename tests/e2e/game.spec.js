@@ -652,13 +652,33 @@ test('contraste sur pixels rendus : 14 thèmes × 7 états × 3 textes de carte 
     }
   }
   const worst = rows.reduce((a, r) => Math.min(a, r.score, r.seat, r.name), Infinity);
+  const worstName = rows.reduce((a, r) => Math.min(a, r.name), Infinity);
   testInfo.annotations.push({
     type: 'contraste-rendu',
-    description: `${rows.length} mesures (14 thèmes × 7 états × 3 textes) · pire rapport ${worst}`,
+    description: `${rows.length} mesures (14 thèmes × 7 états × 3 textes) · pire rapport ${worst} · pire prénom ${worstName}`,
   });
   // D17 : la mesure doit avoir réellement eu lieu, sur TOUS les états.
   expect(rows.length).toBe(themes.length * STATES.length);
   expect(failures, JSON.stringify(failures)).toEqual([]);
+
+  // INVARIANT de construction : aucun état transitoire ne doit dégrader le fond d'un texte.
+  // C'est lui qui donne la marge, et non une valeur choisie au cas par cas : le renfort de teinte
+  // est cantonné sous la bande d'identité et hors du chiffre, donc les rapports mesurés au repos
+  // valent aussi en butée, en flash et sous le doigt. Une régression le fera échouer ici.
+  const drops = [];
+  for (const id of themes) {
+    const rest = rows.find((r) => r.id === id && r.state === 'repos');
+    for (const r of rows.filter((x) => x.id === id && x.state !== 'repos')) {
+      for (const cible of ['score', 'seat', 'name']) {
+        if (r[cible] < rest[cible] - 0.3) {
+          drops.push({ id, state: r.state, cible, repos: rest[cible], etat: r[cible] });
+        }
+      }
+    }
+  }
+  expect(drops, JSON.stringify(drops)).toEqual([]);
+  // Et la marge du prénom, point le plus sensible relevé par l'audit visuel, est nette.
+  expect(worstName, 'marge du prénom').toBeGreaterThanOrEqual(6);
 });
 
 test('le nom de joueur est une cible tactile d’au moins 44 × 44 px', async ({ page }, testInfo) => {

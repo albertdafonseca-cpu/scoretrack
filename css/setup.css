@@ -116,8 +116,9 @@
 }
 .logo-name {
   font-family: var(--btn-font);
-  /* Borné : à 200 % de texte système, le mot-symbole doit rester dans le cadre (D19). */
-  font-size: min(var(--fs-7, 24px), 9vw);
+  /* Le mot-symbole suit l'échelle (la hiérarchie doit tenir à 200 % de texte système, D19) ;
+     le débordement est évité par le repli du mot, pas par un plafond qui l'écraserait. */
+  font-size: var(--fs-7);
   max-width: 100%;
   overflow-wrap: anywhere;
   text-align: center;
@@ -549,8 +550,7 @@
 }
 .settings-title {
   font-family: var(--btn-font);
-  /* Borné comme le mot-symbole : à 200 % de texte système, le titre reste dans le cadre (D19). */
-  font-size: min(var(--fs-5, 18px), 7vw);
+  font-size: var(--fs-5);
   min-width: 0;
   overflow-wrap: anywhere;
   font-weight: 700;
@@ -661,6 +661,12 @@
   color: var(--text);
 }
 
+/* Sauvegarde illisible : la boîte réservée sert à l'expliquer, l'accent devient un avertissement. */
+.restore-banner.is-broken {
+  border-color: var(--warn, var(--loss));
+  background: color-mix(in srgb, var(--warn, var(--loss)) 10%, var(--surface));
+}
+
 /* Action destructrice armée : attend une seconde confirmation. */
 .armed {
   border-color: var(--loss, var(--red)) !important;
@@ -674,7 +680,7 @@
 /* ── JOUEURS ── */
 .names-title {
   font-family: var(--btn-font);
-  font-size: min(var(--fs-5, 18px), 7vw);
+  font-size: var(--fs-5);
   max-width: 100%;
   overflow-wrap: anywhere;
   font-weight: 700;

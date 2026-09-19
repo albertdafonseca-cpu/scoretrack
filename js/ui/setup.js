@@ -3,7 +3,7 @@
 import { GAME_PRESETS } from '../core/constants.js';
 import { fmtNum } from '../core/format.js';
 import { KEYS, parseGame } from '../core/save-schema.js';
-import { readJSON } from '../platform/storage.js';
+import { dismissCorruptSave, has, readJSON, SAVE_CORRUPT_KEY } from '../platform/storage.js';
 import { store } from '../store.js';
 import { announce, rovingGroup, syncRovingTabs } from './a11y.js';
 import { byId, qsa, show, hide } from './dom.js';
@@ -293,9 +293,38 @@ function releaseReservedBox() {
   if (activated) document.documentElement.removeAttribute('data-has-save');
 }
 
+/**
+ * Occupe la place déjà réservée par un message : la sauvegarde existait au premier rendu mais ne
+ * peut pas être reprise (somme de contrôle fausse, version inconnue, mise en quarantaine par le
+ * stockage). Laisser la boîte vide ferait un trou de 160 px, l'effondrer décalerait la page.
+ */
+function showUnreadableSave(banner) {
+  byId('restore-title-text').textContent = 'Sauvegarde illisible';
+  byId('restore-preview').textContent = "La partie enregistrée n'a pas pu être relue.";
+  byId('restore-when').textContent = '';
+  byId('restore-when').removeAttribute('datetime');
+  byId('resume-btn').hidden = true;
+  banner.classList.add('is-broken', 'is-visible');
+  show(banner);
+  announce('La partie enregistrée est illisible', 'assertive');
+}
+
 export function setRestoreBannerVisible(visible) {
   const banner = byId('restore-banner');
   if (!visible) {
+    const activated = navigator.userActivation ? navigator.userActivation.hasBeenActive : true;
+    // Avant tout geste : le stockage a pu mettre la sauvegarde en quarantaine avant d'arriver
+    // ici ; la place réservée sert alors à l'expliquer plutôt qu'à rester vide.
+    if (
+      !activated &&
+      document.documentElement.hasAttribute('data-has-save') &&
+      has(SAVE_CORRUPT_KEY)
+    ) {
+      showUnreadableSave(banner);
+      return;
+    }
+    // Après un geste (« Effacer »), on solde aussi la quarantaine : plus rien à expliquer.
+    if (activated) dismissCorruptSave();
     hide(banner);
     banner.classList.remove('is-visible');
     releaseReservedBox();
@@ -303,11 +332,21 @@ export function setRestoreBannerVisible(visible) {
   }
   const parsed = parseGame(readJSON(KEYS.save, null));
   if (!parsed.ok) {
+    // La sauvegarde a passé le filtre du pré-rendu mais le cœur la rejette (somme de contrôle,
+    // version inconnue…). Plutôt que de laisser un vide de 160 px, ou de décaler la page en
+    // effondrant la boîte, la place réservée sert à l'expliquer.
+    if (document.documentElement.hasAttribute('data-has-save')) {
+      showUnreadableSave(banner);
+      return;
+    }
     hide(banner);
     banner.classList.remove('is-visible');
     releaseReservedBox();
     return;
   }
+  byId('restore-title-text').textContent = 'Partie en cours';
+  byId('resume-btn').hidden = false;
+  banner.classList.remove('is-broken');
   byId('restore-preview').textContent = savePreviewText(parsed.game.players);
   const when = byId('restore-when');
   const ts = parsed.game.ts > 0 ? parsed.game.ts : null;

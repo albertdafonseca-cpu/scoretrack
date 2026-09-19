@@ -176,6 +176,21 @@ describe('themes.css', () => {
     expect(fams.size).toBeLessThanOrEqual(2);
   });
 
+  it("les couleurs d'aperçu de la grille correspondent aux jetons du thème", () => {
+    // La grille de réglages peint chaque carte avec bg/a/b de constants.js. Si ces trois valeurs
+    // s'écartent des jetons réels, l'aperçu ment sur ce que l'utilisateur obtiendra — et le nom de
+    // la carte, peint avec `a` sur `bg`, perd son contraste (mesuré à 4,58:1 avant resynchronisation).
+    for (const t of THEMES) {
+      const tok = t.id === DEFAULT_THEME ? rootTokens : byTheme[t.id];
+      if (!tok || !tok.bg) continue;
+      expect(tok.bg.toLowerCase(), `${t.id} : fond d'aperçu`).toBe(t.bg.toLowerCase());
+      expect(tok.accent.toLowerCase(), `${t.id} : accent d'aperçu`).toBe(t.a.toLowerCase());
+      expect(tok.accent2.toLowerCase(), `${t.id} : accent secondaire d'aperçu`).toBe(
+        t.b.toLowerCase(),
+      );
+    }
+  });
+
   it('les thèmes clairs déclarent color-scheme: light et une paire gain/perte assombrie', () => {
     for (const id of ['light', 'mono-light', 'ldm-day']) {
       const t = byTheme[id];

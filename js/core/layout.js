@@ -268,6 +268,14 @@ export function scoreWidth(line, fontSize, withSeparators = true) {
  * restante sous le nom, sa largeur par la largeur disponible (une carte latérale est large et
  * basse : c'est ce que l'ancienne formule, fondée sur la seule plus petite dimension, ratait).
  *
+ * Limite assumée, mesurée sur 390×844 pour toute la matrice 1 à 12 joueurs × 1 à 7 chiffres : un
+ * seul cas reste sous les 30 px de capitale, 11 joueurs à 7 chiffres (29 px, soit 1 px de moins,
+ * 3 %). La grille 2×6 y donne la carte la plus étroite du jeu — 122 px de largeur lisible contre
+ * 146 à 12 joueurs — et les deux lignes sont déjà utilisées. Une troisième ligne porterait le cas à
+ * 33 px : arbitrage de l'auditeur, elle N'EST PAS ajoutée (plus d'un million de points répartis
+ * sur onze joueurs ne se rencontre pas en usage réel, et un troisième niveau alourdirait la
+ * logique, les tests et le rendu pour un gain nul en pratique). Le cas est verrouillé par un test.
+ *
  * La fonction choisit aussi la MISE EN LIGNES, plutôt que de laisser l'interface la deviner :
  *   - `lines: 2` quand couper le score aux milliers (voir `scoreRows`) fait gagner au moins 5 %
  *     de hauteur de glyphe — à 12 joueurs, un score à 7 chiffres passe ainsi de 22 à 32 px de

@@ -215,8 +215,8 @@ test('captures des 14 thèmes : écran de setup et écran de jeu à 4 joueurs', 
     body: JSON.stringify(report, null, 2),
     contentType: 'application/json',
   });
-  // Mesures informatives (les feuilles setup/game/modals appartiennent à d'autres éléments) :
-  // le mode strict impose ≤ 2 familles et ≥ 11 px sur chaque écran.
+  // Hiérarchie typographique : au plus deux familles par écran, et aucun texte sous le plancher
+  // de 12 px fixé par D10 — le même seuil que celui gardé par tests/e2e/a11y.spec.js.
   {
     for (const r of report) {
       expect(
@@ -224,7 +224,7 @@ test('captures des 14 thèmes : écran de setup et écran de jeu à 4 joueurs', 
         `${r.theme}/${r.screen} : ${r.families.join(', ')}`,
       ).toBeLessThanOrEqual(2);
       if (r.minFont)
-        expect(r.minFont, `${r.theme}/${r.screen} : police < 11 px`).toBeGreaterThanOrEqual(11);
+        expect(r.minFont, `${r.theme}/${r.screen} : police < 12 px`).toBeGreaterThanOrEqual(12);
     }
   }
 });

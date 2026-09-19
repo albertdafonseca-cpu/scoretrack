@@ -77,23 +77,24 @@
   --shadow-3: 0 12px 32px rgba(0, 0, 0, 0.45);
 
   /* ── Palette Paul Tol (12 couleurs joueurs, = COLORS de js/core/constants.js) ──
-     --tol-9 était #0077BB : trop proche de --tol-1 #4477AA (ΔE2000 4,4 en vision normale, 2,0 en
-     tritanopie — le minimum de toute la palette). Remplacé par l'indigo Tol « muted » #332288 :
-     la paire 1/9 passe à 27,5 en vision normale et ne descend jamais sous 20,1 sous simulation,
-     et le minimum global de la palette monte de 2,0 à 3,2. (Le teal #44AA99 envisagé au tour 1
-     était une erreur de ma part : il est DÉJÀ --tol-11, l'utiliser créerait un doublon exact.) */
-  --tol-1: #4477aa;
-  --tol-2: #ee6677;
-  --tol-3: #ccbb44;
-  --tol-4: #aa3377;
-  --tol-5: #228833;
-  --tol-6: #66ccee;
-  --tol-7: #bbbbbb;
-  --tol-8: #ee7733;
-  --tol-9: #332288;
+     Mêmes teintes, ORDRE D'ATTRIBUTION optimisé : à n joueurs seules les n premières sont en jeu.
+     Mesure `npm run audit:cvd` (Machado 2009) : l'écart minimal ΔE2000 sous les trois dichromaties
+     tient la porte « ≥ 14 » jusqu'à 6 joueurs au lieu de 4 (2 j. 40,2 · 3 j. 29,9 · 4 j. 20,1 ·
+     5 j. 15,7 · 6 j. 15,1 · 7 j. 11,2). L'indigo Tol « muted » #332288 (ici --tol-2) remplace
+     #0077BB, trop proche de #4477AA (--tol-4) : ΔE2000 4,4 en vision normale, 2,0 en tritanopie.
+     L'ordre doit rester identique à COLORS, index par index (tests/unit/themes.test.js). */
+  --tol-1: #ee6677;
+  --tol-2: #332288;
+  --tol-3: #66ccee;
+  --tol-4: #4477aa;
+  --tol-5: #ddcc77;
+  --tol-6: #bbbbbb;
+  --tol-7: #aa3377;
+  --tol-8: #44aa99;
+  --tol-9: #228833;
   --tol-10: #ee3377;
-  --tol-11: #44aa99;
-  --tol-12: #ddcc77;
+  --tol-11: #ccbb44;
+  --tol-12: #ee7733;
 
   /* ── Sémantique daltonien-safe (fond sombre) ──
      gain = Tol bright cyan #66CCEE éclairci (écart de luminance ≥ 20 % avec la perte sous les

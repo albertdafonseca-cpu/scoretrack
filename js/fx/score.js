@@ -76,13 +76,14 @@ export function showDeltaBubble(node, sum, onClose) {
   const wasHidden = node.hidden;
   if (wasHidden) node.hidden = false;
   node.style.opacity = '1';
-  node.style.transform = 'none';
   if (wasHidden && !reducedMotion()) {
+    // `translate`/`scale` indépendants plutôt que `transform` : le centrage horizontal de la bulle
+    // est porté par `transform: translateX(-50%)` en CSS, qu'une animation écraserait.
     animate(
       node,
       [
-        { transform: 'translateY(0.3em) scale(0.7)', opacity: 0 },
-        { transform: 'translateY(0) scale(1)', opacity: 1 },
+        { translate: '0 0.3em', scale: '0.7', opacity: 0 },
+        { translate: '0 0', scale: '1', opacity: 1 },
       ],
       { duration: 160, easing: spring() },
     );

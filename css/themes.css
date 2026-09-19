@@ -80,6 +80,8 @@
   --chip-bg: #1e1800;
   --chip-on: #ccbb44;
   --chip-on-text: #000000;
+  /* Jaune du score légèrement éclairci : à #ffdc00 il valait 4,69:1 sur la carte verte, sans marge. */
+  --score-color: #ffe233;
   --bg-grad:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect y='0' width='4' height='2' fill='%23ffdc00' opacity='0.07'/%3E%3C/svg%3E"),
     linear-gradient(180deg, #1a1400 0%, #0a0800 60%);
@@ -303,8 +305,9 @@
   --surface: #d8e2ff;
   --surface2: #c8d4ff;
   --border: rgba(60, 80, 200, 0.2);
-  --accent: #2f4fc4;
-  --accent2: #2b47b8;
+  /* Bleu assombri : à #2f4fc4 le score tombait à 4,62:1 sur la carte 1, sans marge. À #2b48b4 : 5,22. */
+  --accent: #2b48b4;
+  --accent2: #2743a6;
   --text: #111133;
   --font-display: 'Inter', 'Inter fallback', sans-serif;
   --font-score: 'Inter', 'Inter fallback', sans-serif;
@@ -355,8 +358,11 @@
   --surface: #ddd5c0;
   --surface2: #cfc6ae;
   --border: rgba(120, 85, 0, 0.35);
-  --accent: #7a5500;
-  --accent2: #6e4c00;
+  /* Or assombri : à #7a5500 le titre tombait à 4,59:1 sur --surface, c'est-à-dire pile sur le
+     seuil ; D21 traite une valeur sans marge comme un défaut. À #664600 : 5,88 sur --surface et
+     4,9 sur le fond de modale, le point le plus sombre du thème. */
+  --accent: #664600;
+  --accent2: #5e4000;
   --text: #2e2418;
   --font-display: 'Cinzel', 'Cinzel fallback', Georgia, serif;
   --font-score: 'Cinzel', 'Cinzel fallback', Georgia, serif;
@@ -368,7 +374,9 @@
   --card-base: #f0e9dc;
   --score-color: #664700;
   --card-text: #2e2418;
-  --card-sign: rgba(46, 36, 24, 0.6);
+  /* Opacité relevée de 0,6 à 0,8 : à 0,6 les signes + et − tombaient à 3,12:1 sur les cartes les
+     plus claires du thème, soit le seuil composant sans marge. À 0,8 : 4,88 au pire. */
+  --card-sign: rgba(46, 36, 24, 0.8);
   --bg-grad:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M16 2l14 14-14 14L2 16z' fill='none' stroke='%237a5500' stroke-width='0.6' opacity='0.12'/%3E%3C/svg%3E"),
     linear-gradient(160deg, #ede6d8 0%, #f5f0e8 60%, #ede8df 100%);
@@ -389,8 +397,8 @@
   --surface: light-dark(#d8e2ff, #071a24);
   --surface2: light-dark(#c8d4ff, #0a2030);
   --border: light-dark(rgba(60, 80, 200, 0.2), rgba(0, 255, 200, 0.15));
-  --accent: light-dark(#2f4fc4, #00ffe0);
-  --accent2: light-dark(#2b47b8, #00bfff);
+  --accent: light-dark(#2b48b4, #00ffe0);
+  --accent2: light-dark(#2743a6, #00bfff);
   --text: light-dark(#111133, #e0fff8);
   --muted: light-dark(
     color-mix(in oklab, #111133 62%, #f0f4ff),

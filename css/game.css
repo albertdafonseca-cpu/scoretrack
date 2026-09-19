@@ -199,8 +199,11 @@
 .tap-half::after {
   inset: 0;
 }
+/* Le renfort de teinte démarre BIEN SOUS la bande d'identité (nom + numéro), qui occupe le haut
+   de la carte : le fond du prénom ne change donc jamais d'un état à l'autre, et son contraste
+   garde la même marge en butée, en flash et sous le doigt qu'au repos. */
 .tap-half::before {
-  inset: 32% 0 0;
+  inset: 42% 0 0;
 }
 .tap-half.plus::after {
   box-shadow: inset 0 0 0 4px var(--gain);
@@ -406,11 +409,14 @@
   color: var(--score-crit);
   text-shadow: 0 2px 8px rgb(0 0 0 / 95%);
 }
-/* Bulle de delta cumulé : le signe porte l'information autant que la couleur (D1). */
+/* Bulle de delta cumulé, sous le score : le signe porte l'information autant que la couleur (D1). */
 .delta-bubble {
   position: absolute;
-  top: 0;
-  right: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 88%;
+  white-space: nowrap;
   font-family: var(--score-font);
   font-variant-numeric: tabular-nums;
   font-size: var(--fs-3);

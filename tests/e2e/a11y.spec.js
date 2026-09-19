@@ -206,6 +206,62 @@ test('contraste des pixels rendus là où axe reste indéterminé, sur tous les 
   expect(failures, JSON.stringify(failures, null, 2)).toEqual([]);
 });
 
+test('la hiérarchie typographique tient à 100 % comme à 200 % de texte système', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  const readSizes = () =>
+    page.evaluate(() => {
+      const px = (sel) => {
+        const el = document.querySelector(sel);
+        return el ? parseFloat(getComputedStyle(el).fontSize) : null;
+      };
+      return {
+        appTitle: px('#app-title'),
+        sectionLabel: px('#lbl-presets'),
+        cta: px('#go-btn'),
+        ghost: px('.setup-btn-row .ghost-btn .btn-text'),
+      };
+    });
+
+  const ordered = (s, name) => {
+    // Un titre doit rester plus grand qu'un libellé de bouton : c'est l'intention de D19, que la
+    // seule absence de troncature ne garantit pas.
+    expect(s.appTitle, `${name} : titre > libellé secondaire`).toBeGreaterThan(s.ghost);
+    expect(s.appTitle, `${name} : titre > action principale`).toBeGreaterThan(s.cta);
+    expect(s.cta, `${name} : action principale ≥ intitulé de section`).toBeGreaterThanOrEqual(
+      s.sectionLabel,
+    );
+  };
+
+  await applyCondition(page, { width: 390, height: 844 }, 16);
+  await openApp(page);
+  const base = await readSizes();
+  ordered(base, '100 %');
+
+  await applyCondition(page, { width: 390, height: 844 }, 32);
+  await page.reload();
+  await expect(page.locator('#setup-page')).toBeVisible();
+  const doubled = await readSizes();
+  ordered(doubled, '200 %');
+
+  // Chaque niveau grandit réellement avec le texte système : un plafond qui figerait les titres
+  // inverserait la hiérarchie sans rien tronquer.
+  for (const key of Object.keys(base)) {
+    expect(doubled[key] / base[key], `${key} suit l'échelle`).toBeGreaterThan(1.5);
+  }
+
+  // Et le titre de la page Joueurs reste plus grand que ses boutons d'action.
+  await page.locator('#names-btn').click();
+  const names = await page.evaluate(() => ({
+    title: parseFloat(getComputedStyle(document.querySelector('#names-title')).fontSize),
+    action: parseFloat(
+      getComputedStyle(document.querySelector('.names-action-btn .btn-text')).fontSize,
+    ),
+  }));
+  expect(names.title).toBeGreaterThan(names.action);
+});
+
 test('la coche des cartes de thème contraste sur le fond qu’elle marque, sur tous les thèmes', async ({
   page,
 }) => {

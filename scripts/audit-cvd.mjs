@@ -36,12 +36,10 @@ const PAIR_MIN_LUM = 0.2;
  * Un dichromate ne perçoit que deux axes chromatiques : douze teintes n'y sont pas séparables deux
  * à deux, quelle que soit la palette. Mesure de la palette Tol dans l'ordre en place,
  * ΔE2000 minimal du préfixe de n couleurs (celles en jeu à n joueurs), pire des trois simulations :
- *   n=2 25,1 · n=3 15,3 · n=4 14,2 · n=5…7 8,6 · n=8 3,2 · n≥9 3,2
- * Réordonner la palette gagnerait deux joueurs sans changer une seule teinte — mesuré :
- *   EE6677, 332288, 66CCEE, 4477AA, DDCC77, BBBBBB, AA3377, 44AA99, 228833, EE3377, CCBB44, EE7733
- *   → n=2 40,2 · n=3 29,9 · n=4 20,1 · n=5 15,7 · n=6 15,1 · n=7 11,2
- * L'ordre appartient à COLORS (js/core/constants.js, élément D) ; tant qu'il n'a pas bougé, la
- * porte reste à SEPARABLE_MAX = 4. Elle passera à 6 le jour où l'ordre changera.
+ * L'ordre a été refait (palette et jetons réordonnés ensemble) et la mesure d'aujourd'hui donne :
+ *   n=2 40,2 · n=3 29,9 · n=4 20,1 · n=5 15,7 · n=6 15,1 · n=7 11,2 · n=8 8,6 · n≥9 6,3
+ * La porte suit donc ce que le produit sait faire : SEPARABLE_MAX = 6. Elle ne doit jamais être
+ * relâchée pour faire passer une régression — c'est elle qui protège l'acquis.
  * D'où le contrat tenu, écrit tel qu'il est atteint :
  *   — jusqu'à SEPARABLE_MAX joueurs, les couleurs en jeu gardent ΔE ≥ SEPARABLE_MIN_DE (porte dure) ;
  *   — au-delà, la couleur cesse d'être un identifiant et D18 prend le relais : chaque carte porte
@@ -50,7 +48,7 @@ const PAIR_MIN_LUM = 0.2;
  * Toute dégradation fait échouer la construction (D13, D17). Ces chiffres ne se relèvent qu'en
  * expliquant pourquoi la palette a bougé.
  */
-const SEPARABLE_MAX = 4;
+const SEPARABLE_MAX = 6;
 const SEPARABLE_MIN_DE = 14;
 const PALETTE_BUDGET = {
   normale: { maxPairs: 2, minDE: 6.5 },

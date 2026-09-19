@@ -1,20 +1,24 @@
 // Données statiques de l'application : thèmes, palette joueurs, préréglages.
 
+/* Les trois couleurs de chaque entrée servent l'aperçu de la grille de thèmes : elles doivent
+   rester égales à --bg, --accent et --accent2 du thème correspondant, sinon l'aperçu ment sur ce
+   que l'utilisateur va obtenir — et le nom de la carte, peint avec, tombe à 4,58:1 au lieu de
+   dépasser le seuil avec marge. Verrouillé index par index par tests/unit/themes.test.js. */
 export const THEMES = [
   { id: 'cyber', name: 'Cyberpunk', bg: '#020d12', a: '#00ffe0', b: '#00bfff' },
-  { id: 'dark', name: 'Dark', bg: '#0a0a0f', a: '#6c63ff', b: '#a78bfa' },
-  { id: 'neon-pink', name: 'Néon Rose', bg: '#0d0010', a: '#ff00cc', b: '#cc00ff' },
-  { id: 'arcade', name: 'Arcade', bg: '#0a0800', a: '#ffdc00', b: '#ff8800' },
+  { id: 'dark', name: 'Dark', bg: '#0a0a0f', a: '#8A83FF', b: '#B5A6FF' },
+  { id: 'neon-pink', name: 'Néon Rose', bg: '#0d0010', a: '#FF33D6', b: '#D966FF' },
+  { id: 'arcade', name: 'Arcade', bg: '#0a0800', a: '#ffdc00', b: '#FFA033' },
   { id: 'nature', name: 'Nature', bg: '#051208', a: '#50c850', b: '#88dd44' },
-  { id: 'sunset', name: 'Sunset', bg: '#120508', a: '#ff6040', b: '#ffaa00' },
-  { id: 'ocean', name: 'Océan', bg: '#020810', a: '#0096ff', b: '#00ccff' },
+  { id: 'sunset', name: 'Sunset', bg: '#120508', a: '#FF7050', b: '#ffaa00' },
+  { id: 'ocean', name: 'Océan', bg: '#020810', a: '#33A6FF', b: '#33D6FF' },
   { id: 'gold', name: 'Or', bg: '#0a0800', a: '#ddb800', b: '#ffee44' },
-  { id: 'sobre', name: 'Sobre', bg: '#1c1c1e', a: '#e8e8e8', b: '#a0a0a0' },
-  { id: 'mono', name: 'Mono sombre', bg: '#080808', a: '#ffffff', b: '#aaaaaa' },
-  { id: 'light', name: 'Clair', bg: '#f0f4ff', a: '#3355cc', b: '#5577ee' },
-  { id: 'mono-light', name: 'Mono clair', bg: '#ffffff', a: '#000000', b: '#444444' },
+  { id: 'sobre', name: 'Sobre', bg: '#1c1c1e', a: '#e8e8e8', b: '#B0B0B5' },
+  { id: 'mono', name: 'Mono sombre', bg: '#080808', a: '#ffffff', b: '#BBBBBB' },
+  { id: 'light', name: 'Clair', bg: '#f0f4ff', a: '#2B48B4', b: '#2743A6' },
+  { id: 'mono-light', name: 'Mono clair', bg: '#F4F4F4', a: '#000000', b: '#333333' },
   { id: 'ldm', name: 'Loi du Milieu · Nuit', bg: '#2e2418', a: '#f0c040', b: '#ffe070' },
-  { id: 'ldm-day', name: 'Loi du Milieu · Jour', bg: '#f5f0e8', a: '#7a5500', b: '#9e7000' },
+  { id: 'ldm-day', name: 'Loi du Milieu · Jour', bg: '#f5f0e8', a: '#664600', b: '#5E4000' },
 ];
 
 /** Thème par défaut : aucun attribut data-theme n'est posé pour lui. */

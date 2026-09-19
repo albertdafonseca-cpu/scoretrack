@@ -240,11 +240,14 @@ function buildCard(pi) {
     'aria-live': 'polite',
   });
   const bubble = el('span', { className: 'delta-bubble', id: `df-${pi}`, hidden: true });
+  // La bulle de delta est posée SOUS le score, pas par-dessus : à 12 joueurs un delta à sept
+  // chiffres recouvrait le chiffre qu'il commente.
   const face = el(
     'div',
     { className: 'card-face' },
     nameBtn,
-    el('div', { className: 'score-wrap' }, score, bubble),
+    el('div', { className: 'score-wrap' }, score),
+    bubble,
   );
   const elimTag = buildElimTag();
   zone.append(minus, plus, face, elimTag);
@@ -979,11 +982,25 @@ export function initGame() {
   wrap.addEventListener('contextmenu', (e) => e.preventDefault());
   initUndoButton();
   window.addEventListener('orientationchange', () => setTimeout(measureAll, 200));
+  // Les tailles de carte dépendent de la police RÉELLEMENT rendue (hauteur d'encre, chasse) : tant
+  // qu'une police de secours est en place, la mesure est fausse. On recalcule dès qu'une fonte
+  // arrive — au premier chargement comme après un changement de thème.
+  if (typeof document.fonts !== 'undefined') {
+    document.fonts.ready.then(() => measureAll()).catch(() => {});
+    if (typeof document.fonts.addEventListener === 'function') {
+      document.fonts.addEventListener('loadingdone', () => measureAll());
+    }
+  }
 }
 
 /** Ferme les groupes ouverts (avant l'ouverture du récapitulatif). */
 export function closeAllOpenGroups() {
   store.game.players.forEach((_, i) => closeGroupFor(i));
+}
+
+/** Recalcule toutes les tailles de carte (changement de police, de thème ou de gabarit). */
+export function remeasure() {
+  measureAll();
 }
 
 /** Indices de test : état courant lisible sans dépendre du DOM. */

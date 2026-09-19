@@ -362,12 +362,29 @@ describe('computeFit : seuils de lisibilité de la grille', () => {
       const cap = fit.scoreSz * CAP_RATIO;
       expect(`${d} chiffres : ${cap >= READABLE_CAP_PX}`).toBe(`${d} chiffres : true`);
     }
-    // Cas documenté où le seuil ne peut pas être tenu sur deux lignes : à 11 joueurs la grille
-    // 2×6 donne la carte la plus étroite du jeu (122 px de largeur lisible contre 146 à 12).
+  });
+
+  it('verrou de la seule limite assumée : 11 joueurs à 7 chiffres, 29 px au lieu de 30', () => {
+    // Inventaire exhaustif des cas sous le seuil, sur toute la matrice 1..12 joueurs × 1..7
+    // chiffres. Il doit rester EXACTEMENT celui-ci : un cas de plus est une régression, un cas de
+    // moins est un progrès à reporter dans l'en-tête de js/core/layout.js et ici.
+    const below = [];
+    for (let n = 1; n <= 12; n++) {
+      const { minCard } = layoutStats(n, VP);
+      for (let d = 1; d <= 7; d++) {
+        const fit = computeFit(minCard, fmtNum(Number('9'.repeat(d))));
+        const cap = fit.scoreSz * CAP_RATIO;
+        if (cap < READABLE_CAP_PX)
+          below.push(`${n} joueurs / ${d} chiffres : ${Math.round(cap)} px`);
+      }
+    }
+    expect(below).toEqual(['11 joueurs / 7 chiffres : 29 px']);
+    // La carte la plus étroite du jeu (grille 2×6) : 122 px de largeur lisible contre 146 à 12
+    // joueurs. Deux lignes sont bien utilisées, le manque est de 1 px sur 30 (3 %).
     const eleven = computeFit(layoutStats(11, VP).minCard, fmtNum(9999999));
     expect(eleven.lines).toBe(2);
-    expect(eleven.scoreSz * CAP_RATIO).toBeLessThan(READABLE_CAP_PX);
-    expect(eleven.scoreSz * CAP_RATIO).toBeGreaterThan(28);
+    expect(Math.round(layoutStats(11, VP).minCard.w)).toBe(122);
+    expect(eleven.scoreSz * CAP_RATIO).toBeGreaterThan(READABLE_CAP_PX * 0.95);
   });
 
   it('scoreRows coupe aux milliers, signe sur la première ligne', () => {

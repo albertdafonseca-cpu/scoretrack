@@ -15,6 +15,54 @@ const USABLE_W = 0.9;
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
+/**
+ * Rapport entre la taille de police de la racine et sa valeur de référence (16 px).
+ *
+ * D19 : l'échelle typographique suit la préférence système. Sur l'écran de jeu, le SCORE est déjà
+ * maximal — il occupe toute la place de sa carte, on ne peut pas l'agrandir. Le BLOC D'IDENTITÉ
+ * (numéro + prénom), lui, ne l'est pas : on lui applique donc la préférence, jusqu'à la limite
+ * géométrique, la réduction par mesure garantissant qu'aucun prénom n'est tronqué pour autant.
+ * Borné à 2 : au-delà, la carte ne contiendrait plus que le prénom.
+ */
+function rootScale() {
+  if (typeof getComputedStyle !== 'function') return 1;
+  const px = parseFloat(getComputedStyle(document.documentElement).fontSize);
+  return Number.isFinite(px) && px > 0 ? clamp(px / 16, 1, 2) : 1;
+}
+
+/** Contexte de mesure partagé (une seule allocation pour toute la partie). */
+let inkCtx = null;
+function measureContext() {
+  if (inkCtx === null && typeof document !== 'undefined') {
+    const canvas = document.createElement('canvas');
+    inkCtx = canvas.getContext ? canvas.getContext('2d') : false;
+  }
+  return inkCtx || null;
+}
+
+/**
+ * Hauteur d'ENCRE réelle d'une ligne de texte, en pixels, pour la police effectivement rendue.
+ *
+ * La boîte de ligne (`line-height`) ne borne PAS l'encre : les chiffres de « Cinzel » ou
+ * d'« Orbitron » débordent de leur cadratin, et `overflow: hidden` les tranchait alors haut et bas
+ * — le « 0 » se lisait comme une ellipse écrasée. On mesure donc le tracé, police comprise, au lieu
+ * de supposer un rapport constant entre corps et hauteur de capitale.
+ * @returns {number} hauteur d'encre, ou 0 si la mesure est indisponible
+ */
+function inkHeight(node, size, text) {
+  const ctx = measureContext();
+  if (!ctx) return 0;
+  const cs = getComputedStyle(node);
+  ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${size}px ${cs.fontFamily}`;
+  let tallest = 0;
+  for (const line of String(text).split('\n')) {
+    const m = ctx.measureText(line || '0');
+    const h = (m.actualBoundingBoxAscent || 0) + (m.actualBoundingBoxDescent || 0);
+    if (h > tallest) tallest = h;
+  }
+  return tallest;
+}
+
 /** Écart relatif entre la taille calculée par le cœur et celle réellement posée (dernier appel). */
 let lastGap = 0;
 
@@ -90,7 +138,8 @@ export function fitCard(parts, box, fit) {
   let nameSz = fit.nameSz;
   if (name) {
     name.style.maxWidth = `${Math.round(availW)}px`;
-    nameSz = shrinkLabel(name, label, fit.nameSz, availW, MIN_NAME_PX, MAX_NAME_PX);
+    const wanted = fit.nameSz * rootScale();
+    nameSz = shrinkLabel(name, label, wanted, availW, MIN_NAME_PX, MAX_NAME_PX * 2);
   }
   if (ghost) ghost.style.height = `${Math.round(nameSz * 1.15)}px`;
 
@@ -103,13 +152,25 @@ export function fitCard(parts, box, fit) {
   const rows = (score.textContent.match(/\n/g) || []).length + 1;
   const space = wrap && wrap.clientHeight > 0 ? wrap.clientHeight : fit.scoreSz;
   const roof = space / (rows * LINE_GAP);
-  const scoreSz = shrinkToWidth(
+  let scoreSz = shrinkToWidth(
     score,
     Math.min(fit.scoreSz, roof),
     availW,
     MIN_SCORE_PX,
     MAX_SCORE_PX,
   );
+
+  // Correction par la HAUTEUR D'ENCRE réellement tracée : sans elle, une police dont les chiffres
+  // débordent du cadratin se faisait rogner en haut et en bas par `overflow: hidden`.
+  const budget = space > 0 ? space : Infinity;
+  for (let pass = 0; pass < 3 && Number.isFinite(budget); pass++) {
+    const ink = inkHeight(score, scoreSz, score.textContent) * rows + (rows - 1) * scoreSz * 0.06;
+    if (ink <= budget || ink === 0) break;
+    const next = clamp((scoreSz * budget) / ink - 0.5, MIN_SCORE_PX, MAX_SCORE_PX);
+    if (next >= scoreSz) break;
+    scoreSz = next;
+    score.style.fontSize = `${scoreSz}px`;
+  }
   // Garde-fou de cohérence entre le cœur et le rendu : si l'écart dépasse 20 %, c'est que la
   // géométrie réelle de la carte contredit le calcul de `computeFit` (rembourrure, police).
   // Le signaler plutôt que de le masquer silencieusement (leçon du padding en pourcentage).

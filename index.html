@@ -132,13 +132,18 @@
                 <circle cx="15" cy="12" r="1.25" fill="currentColor" stroke="none" />
                 <circle cx="17.5" cy="9.5" r="1.25" fill="currentColor" stroke="none" />
               </svg>
-              Partie en cours
+              <span class="btn-text" id="restore-title-text">Partie en cours</span>
             </h2>
             <p class="restore-preview" id="restore-preview"></p>
             <time class="restore-when" id="restore-when"></time>
           </div>
           <div class="restore-banner-btns">
-            <button type="button" class="restore-btn yes" data-action="restore-game">
+            <button
+              type="button"
+              class="restore-btn yes"
+              id="resume-btn"
+              data-action="restore-game"
+            >
               Reprendre
             </button>
             <button

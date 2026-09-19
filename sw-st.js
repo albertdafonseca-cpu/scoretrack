@@ -14,7 +14,7 @@
 // touche jamais le cache que le service worker actif est peut-être en train de servir.
 
 // >>> PRECACHE (généré — ne pas éditer à la main)
-const VERSION = '8f90d535';
+const VERSION = '1d76539c';
 const PRECACHE = [
   './',
   './assets/fonts/bebas-neue-400-latin-ext.woff2',

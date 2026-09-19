@@ -326,7 +326,7 @@ test('18 caractères restent saisissables et la mémoire ne perd jamais un prén
  * d'entrée, pas seulement sur un profil vierge — c'est précisément là qu'un outil de mesure
  * lancé sur un profil neuf ne regarde jamais.
  */
-test('décalage cumulé ≤ 0,1 sur les six chemins d’entrée (D11)', async ({ page }) => {
+test('décalage cumulé ≤ 0,1 sur les sept chemins d’entrée (D11)', async ({ page }) => {
   test.setTimeout(240_000);
   const cases = [
     ['à froid, stockage vide', {}],
@@ -370,4 +370,32 @@ test('un identifiant de thème inconnu est normalisé, rien d’inconnu ne reste
     'aria-checked',
     'true',
   );
+});
+
+test('sauvegarde rejetée par le cœur : la place réservée explique, sans trou ni décalage', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  // Structurellement plausible (le pré-rendu réserve la boîte) mais somme de contrôle fausse :
+  // le cœur la rejette. La boîte ne doit ni rester vide ni s'effondrer.
+  const tampered = JSON.parse(validSave(2));
+  tampered.sum = 'faux';
+  const storage = { scoretrack_save: JSON.stringify(tampered) };
+
+  const cls = await measureLayoutShift(page, { storage });
+  expect(cls, `décalage mesuré : ${cls}`).toBeLessThanOrEqual(0.1);
+
+  await expect(page.locator('#restore-banner')).toBeVisible();
+  await expect(page.locator('#restore-title-text')).toHaveText('Sauvegarde illisible');
+  await expect(page.locator('#restore-preview')).toContainText("n'a pas pu être relue");
+  await expect(page.locator('#resume-btn')).toBeHidden();
+  const box = await page.locator('#restore-banner').boundingBox();
+  expect(box.height).toBeGreaterThan(60); // la place réservée est occupée, pas laissée vide
+
+  // L'utilisateur peut faire le ménage depuis cette même boîte (confirmation en deux temps).
+  const discard = page.locator('#discard-btn');
+  await discard.click();
+  await discard.click();
+  await expect(page.locator('#restore-banner')).toBeHidden();
+  expect(await page.evaluate(() => localStorage.getItem('scoretrack_save'))).toBeNull();
 });

@@ -11,8 +11,9 @@
   "scripts": {
     "dev": "http-server -p 8765 -s .",
     "serve:dist": "http-server -p 8765 -s dist",
-    "lint": "eslint . && prettier --check . && npm run lint:emoji",
+    "lint": "eslint . && prettier --check . && npm run lint:emoji && npm run lint:tokens",
     "lint:emoji": "node scripts/lint-no-emoji.mjs",
+    "lint:tokens": "node scripts/lint-tokens.mjs",
     "format": "prettier --write .",
     "test:unit": "vitest run",
     "test:e2e": "playwright test",

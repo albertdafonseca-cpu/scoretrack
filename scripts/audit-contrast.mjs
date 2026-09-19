@@ -10,11 +10,23 @@
 // C'est la correction du défaut relevé au tour 1 : l'ancienne version lisait `--card-N` nu, une
 // couleur qui n'apparaît nulle part à l'écran, et certifiait « 0 échec » sur une composition fictive.
 //
-// Seuils : 4,5:1 pour tout texte (le score compris, cible du projet, plus exigeant que les 3:1
-// que WCAG 2.x accorde aux grands textes) ; 3:1 pour les objets graphiques porteurs d'information
-// (icônes, signes +/−, courbes du récapitulatif), conformément à WCAG 1.4.11.
-// Exemption assumée : les contrôles `:disabled` (WCAG 1.4.3 « Contrast (Minimum) », exception
-// « Inactive »), mesurés et listés à titre indicatif, jamais comptés en échec.
+// SEUILS APPLIQUÉS PAR CE SCRIPT (décision D20, ratifiée ; ce paragraphe décrit le code, ligne
+// à ligne, et non une intention) :
+//   — 4,5:1 pour tout texte dans un état STABLE, quelle que soit sa taille, score compris ;
+//   — 3:1 pour un texte de 24 px ou plus pendant les quatre états TRANSITOIRES et brefs que sont
+//     `pressé`, `flash-gain`, `flash-perte` et `butée`. C'est le seuil que WCAG 2.x accorde au
+//     grand texte SANS condition : la règle d'ici reste donc plus stricte que la norme, puisqu'elle
+//     exige 4,5:1 dès que l'état se stabilise. Cette tolérance ne s'applique jamais à un état stable ;
+//   — 3:1 pour les objets graphiques porteurs d'information (icônes, signes +/−, courbe du récap),
+//     conformément à WCAG 1.4.11.
+// Exemption assumée : les contrôles `:disabled` (WCAG 1.4.3, exception « Inactive »), mesurés et
+// listés à titre indicatif, jamais comptés en échec.
+//
+// DÉTERMINISME (décision D21) : le fond est échantillonné sur MEDIAN_SHOTS captures successives dont
+// on retient la médiane par canal — une trame de composition transitoire est ainsi écartée par vote.
+// Et tout élément qui passe à moins de MARGIN du seuil est compté en ÉCHEC : sans cette marge, une
+// valeur qui oscille de ±0,1 autour du seuil ferait basculer le verdict de la CI d'un passage à
+// l'autre. Un contraste « juste à la limite » est un défaut de conception, pas un résultat à publier.
 //
 // Usage : node scripts/audit-contrast.mjs [--url http://localhost:8765/] [--out rapport.md]
 //         [--json mesures.json] [--themes cyber,light] [--dpr 3]
@@ -35,6 +47,8 @@ const DPR = Number(opt('--dpr', '3'));
 /** CSS injecté après chargement, pour isoler la contribution d'une couche (analyse « et si ? »).
     N'affecte jamais l'exécution normale : sans `--inject`, rien n'est injecté. */
 const INJECT = opt('--inject', null);
+/** Dossier où déposer les captures masquées réellement analysées (diagnostic). */
+const DEBUG_SHOTS = opt('--debug-shots', null);
 
 /** Thèmes audités : identifiant CSS + schéma de couleurs émulé (pour « auto »). */
 const ALL_THEMES = [
@@ -70,6 +84,10 @@ const LARGE_PX = 24;
  * aucun assouplissement n'est silencieux (D17).
  */
 const TRANSIENT = new Set(['pressé', 'flash-gain', 'flash-perte', 'butée']);
+/** Nombre de captures dont on retient la médiane par canal (D21). */
+const MEDIAN_SHOTS = 3;
+/** Marge exigée au-dessus du seuil : en deçà, le contraste est déclaré insuffisant (D21). */
+const MARGIN = 0.2;
 
 // ── Sondes exécutées dans la page ────────────────────────────────────
 
@@ -182,6 +200,7 @@ function collectForegrounds() {
       const c = num(cs.stroke);
       const a = c[3] * opacity;
       if (a < 0.02) continue;
+      el.dataset.auditId = String(out.length);
       out.push({
         sel: host.dataset.icon
           ? `svg.icon[${host.dataset.icon}]`
@@ -199,9 +218,14 @@ function collectForegrounds() {
     const c = num(cs.color);
     const a = c[3] * opacity;
     if (a < 0.02) continue;
+    // Fond propre de l'élément : s'il est opaque, c'est LUI qui est peint sous son texte, par
+    // définition du modèle de peinture. Il sert alors de témoin pour détecter une capture fautive.
+    const own = num(cs.backgroundColor);
+    el.dataset.auditId = String(out.length);
     out.push({
       sel: `${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}${el.classList.length ? '.' + [...el.classList].join('.') : ''}`,
       rect,
+      ownBg: own[3] >= 0.99 ? [own[0], own[1], own[2]] : null,
       color: [c[0], c[1], c[2]],
       alpha: a,
       kind: 'texte',
@@ -528,28 +552,117 @@ async function main() {
     );
 
   /** Mesure l'écran courant : relève, masque, capture, échantillonne, calcule. */
+  /** Géométrie relue APRÈS masquage : les boîtes décrivent alors exactement les pixels capturés. */
+  const readBoxes = () =>
+    page.evaluate(() => {
+      const out = [];
+      for (const el of document.querySelectorAll('[data-audit-id]')) {
+        const i = Number(el.dataset.auditId);
+        let r;
+        if (el.ownerSVGElement) {
+          r = el.closest('svg').getBoundingClientRect();
+        } else {
+          const range = document.createRange();
+          let box = null;
+          for (const n of el.childNodes) {
+            if (n.nodeType !== 3 || !n.textContent.trim()) continue;
+            range.selectNodeContents(n);
+            for (const cr of range.getClientRects()) {
+              if (cr.width < 0.5 || cr.height < 0.5) continue;
+              box = box
+                ? {
+                    x: Math.min(box.x, cr.x),
+                    y: Math.min(box.y, cr.y),
+                    right: Math.max(box.right, cr.right),
+                    bottom: Math.max(box.bottom, cr.bottom),
+                  }
+                : { x: cr.x, y: cr.y, right: cr.right, bottom: cr.bottom };
+            }
+          }
+          if (!box) continue;
+          r = { x: box.x, y: box.y, width: box.right - box.x, height: box.bottom - box.y };
+        }
+        out[i] = { x: r.x, y: r.y, width: r.width, height: r.height };
+      }
+      return out;
+    });
+
+  const clearTags = () =>
+    page.evaluate(() => {
+      for (const el of document.querySelectorAll('[data-audit-id]')) delete el.dataset.auditId;
+    });
+
+  /** Médiane par canal de plusieurs relevés d'une même zone. */
+  const medianColor = (samples) =>
+    [0, 1, 2].map((c) => {
+      const v = samples.map((s2) => s2[c]).sort((a, b2) => a - b2);
+      return v[(v.length - 1) >> 1];
+    });
+
   async function measure(theme, screen, state) {
     await page.evaluate(settle);
     const fgs = await page.evaluate(collectForegrounds);
-    if (!fgs.length) return;
+    if (!fgs.length) {
+      await clearTags();
+      return;
+    }
     await page.evaluate(hideForegrounds);
     await page.evaluate(settle);
-    const buf = await page.screenshot();
+    // La géométrie est relue une fois le masque posé et les transitions figées : boîtes et pixels
+    // décrivent alors le même instant, ce qui supprime les lectures sur une couche obsolète.
+    const boxes = await readBoxes();
+    const shots = [];
+    for (let k = 0; k < MEDIAN_SHOTS; k++) {
+      const buf = await page.screenshot();
+      if (DEBUG_SHOTS && k === 0) {
+        mkdirSync(DEBUG_SHOTS, { recursive: true });
+        writeFileSync(
+          `${DEBUG_SHOTS}/${theme}-${screen}-${state}`.replace(/[^\w.-]+/g, '_') + '.png',
+          buf,
+        );
+      }
+      shots.push(
+        await page.evaluate(sampleBackgrounds, { b64: buf.toString('base64'), boxes: boxes }),
+      );
+      if (k < MEDIAN_SHOTS - 1) await page.waitForTimeout(40);
+    }
     await page.evaluate(showForegrounds);
-    const bgs = await page.evaluate(sampleBackgrounds, {
-      b64: buf.toString('base64'),
-      boxes: fgs.map((f) => f.rect),
-    });
+    await clearTags();
+
     fgs.forEach((f, i) => {
-      const worstQuad = bgs[i].quads.reduce(
+      if (!boxes[i]) return;
+      const quadCount = Math.min(...shots.map((s2) => s2[i].quads.length));
+      const quads = [];
+      for (let q = 0; q < quadCount; q++) {
+        quads.push(medianColor(shots.map((s2) => s2[i].quads[q])));
+      }
+      let meanBg = medianColor(shots.map((s2) => s2[i].mean));
+      let quadSet = quads;
+      let disputed = false;
+      if (f.ownBg) {
+        // Écart entre ce que la feuille de style peint sous le texte et ce que la capture montre.
+        // Un élément au fond opaque ne peut pas être peint sur autre chose que son propre fond :
+        // si la capture en montre un autre (couche composée en retard, instantané d'arrière-plan
+        // périmé sous une modale), c'est la capture qui est fautive, et le jeton fait foi.
+        const drift = Math.max(...[0, 1, 2].map((c2) => Math.abs(meanBg[c2] - f.ownBg[c2])));
+        if (drift > 12) {
+          disputed = true;
+          meanBg = f.ownBg;
+          quadSet = [f.ownBg];
+        }
+      }
+      const worstQuad = quadSet.reduce(
         (acc, q) => {
           const r = ratio(over(f.color, f.alpha, q), q);
           return r < acc.r ? { r, q } : acc;
         },
-        { r: Infinity, q: bgs[i].mean },
+        { r: Infinity, q: meanBg },
       );
       const large = f.kind === 'texte' && f.fontSize >= LARGE_PX;
       const min = f.kind !== 'texte' || (large && TRANSIENT.has(state)) ? GRAPHIC : TEXT;
+      // Seuil effectif = seuil + marge : une valeur à moins de MARGIN du seuil n'est pas un
+      // résultat publiable, c'est un contraste à reprendre (D21).
+      const ok = f.disabled || worstQuad.r >= min + MARGIN;
       rows.push({
         theme,
         screen,
@@ -560,10 +673,12 @@ async function main() {
         disabled: f.disabled,
         fg: hex(over(f.color, f.alpha, worstQuad.q)),
         bg: hex(worstQuad.q),
-        bgMean: hex(bgs[i].mean),
+        bgMean: hex(meanBg),
         ratio: worstQuad.r,
         min,
-        ok: worstQuad.r >= min || f.disabled,
+        disputed,
+        marginal: !f.disabled && worstQuad.r >= min && worstQuad.r < min + MARGIN,
+        ok,
       });
     });
   }
@@ -645,8 +760,12 @@ async function main() {
   );
   lines.push(
     `Mesures comptées : **${counted.length}** · échecs : **${failing.length}**.`,
-    `Seuils : texte ≥ ${TEXT}:1 · objets graphiques ≥ ${GRAPHIC}:1 · grand texte (≥ ${LARGE_PX} px) ≥ ${GRAPHIC}:1 dans les seuls états transitoires (${[...TRANSIENT].join(', ')}), conformément à WCAG 1.4.3, et ≥ ${TEXT}:1 partout ailleurs.`,
+    `Seuils appliqués (D20) : texte en état stable ≥ ${TEXT}:1 quelle que soit sa taille · objets graphiques ≥ ${GRAPHIC}:1 · texte de ${LARGE_PX} px ou plus ≥ ${GRAPHIC}:1 pendant les seuls états transitoires (${[...TRANSIENT].join(', ')}), seuil que WCAG 2.x accorde au grand texte sans condition — la règle d'ici reste donc plus stricte que la norme.`,
+    `Marge de déterminisme (D21) : un élément doit dépasser son seuil de ${MARGIN} pour être compté conforme ; entre le seuil et le seuil + ${MARGIN}, le contraste est déclaré insuffisant plutôt que publié comme un résultat qui oscillerait d'un passage à l'autre. Le fond est la médiane de ${MEDIAN_SHOTS} captures.`,
     `Exemptées (contrôles \`:disabled\`, WCAG 1.4.3) : ${exempt.length}.`,
+    JSON_OUT
+      ? `Relevé complet : \`${JSON_OUT}\`, ${rows.length} lignes = ${counted.length} comptées + ${exempt.length} exemptées, dont ${failing.length} en échec. Les trois nombres de ce rapport, ceux du fichier de relevé et le code de sortie proviennent du même tableau : ils ne peuvent pas diverger.`
+      : `Relevé complet non écrit (passer \`--json\` pour l'obtenir).`,
     '',
   );
   lines.push(
@@ -675,6 +794,12 @@ async function main() {
       `| ${theme} | ${screen} | ${state} | ${list.length} | ${list.filter((r) => !r.ok).length} | ${worst.ratio.toFixed(2)} | \`${worst.sel}\` |`,
     );
   }
+  const marginals = counted.filter((r) => r.marginal);
+  lines.push(
+    '',
+    `Dont **${marginals.length}** à moins de ${MARGIN} du seuil (marge insuffisante) et **${failing.length - marginals.length}** franchement sous le seuil.`,
+    '',
+  );
   lines.push('', '## Échecs', '');
   if (failing.length) {
     lines.push(
@@ -683,7 +808,7 @@ async function main() {
     );
     for (const r of failing) {
       lines.push(
-        `| ${r.theme} | ${r.screen} | ${r.state} | \`${r.sel}\` | \`${r.fg}\` | \`${r.bg}\` | **${r.ratio.toFixed(2)}** | ${r.min} |`,
+        `| ${r.theme} | ${r.screen} | ${r.state} | \`${r.sel}\` | \`${r.fg}\` | \`${r.bg}\` | **${r.ratio.toFixed(2)}** | ${r.min}${r.marginal ? ` (marge < ${MARGIN})` : ''} |`,
       );
     }
   } else {
@@ -722,7 +847,10 @@ async function main() {
   }
   for (const r of failing.slice(0, 40)) {
     console.log(
-      `ÉCHEC ${r.theme} · ${r.screen}/${r.state} · ${r.sel} : ${r.ratio.toFixed(2)} < ${r.min}`,
+      `ÉCHEC ${r.theme} · ${r.screen}/${r.state} · ${r.sel} : ${r.ratio.toFixed(2)} < ${(r.min + MARGIN).toFixed(2)}` +
+        (r.marginal
+          ? ` (seuil ${r.min} atteint, mais sans la marge de ${MARGIN} exigée par D21)`
+          : ''),
     );
   }
   console.log(`${counted.length} mesures comptées, ${failing.length} échec(s) → ${OUT}`);
