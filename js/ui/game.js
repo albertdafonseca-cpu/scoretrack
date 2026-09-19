@@ -36,7 +36,9 @@ import {
 } from '../core/history.js';
 import {
   BAR_H,
+  CAP_RATIO,
   HEADER_H,
+  READABLE_CAP_PX,
   cardBox,
   computeFit,
   computeLayout,
@@ -357,13 +359,48 @@ function measureCard(card, precomputed, ceiling = Infinity) {
   ref.score.textContent = scoreText(pi);
   const ghost = ref.nameBtn.querySelector('.pplayer-ghost');
   const label = ref.nameBtn.querySelector('.pplayer');
-  fitCard(
+  const applied = fitCard(
     { score: ref.score, name: ref.nameBtn, label, ghost, bubble: ref.bubble, signs: signsOf(card) },
     box,
     fit,
   );
+  appliedSz[pi] = applied.scoreSz;
   scoreLen[pi] = ref.score.textContent;
   fitGap = Math.max(fitGap, lastFitGap());
+}
+
+/** Taille de score réellement posée sur chaque carte à la dernière mesure. */
+const appliedSz = [];
+
+/** Résultat de la pré-passe de calcul, conservé pour pouvoir revenir en arrière. */
+const fits = [];
+
+/**
+ * Deuxième chance de LISIBILITÉ, décidée sur le rendu et non sur un modèle de chasse.
+ *
+ * `computeFit` choisit déjà de retirer les séparateurs de milliers quand la capitale tomberait sous
+ * `READABLE_CAP_PX`, mais il raisonne sur une chasse moyenne. Les quatorze thèmes s'en écartent
+ * beaucoup : « Press Start 2P » (thème arcade) écrit chaque glyphe sur un cadratin plein, soit près
+ * de deux fois la chasse supposée, et le score y tombait à 25 px de capitale à douze joueurs quand
+ * les treize autres thèmes tenaient 31 à 33. On rejoue donc ICI la règle du cœur — la même — sur la
+ * largeur RÉELLEMENT rendue, et on ne garde la version compacte que si elle écrit effectivement
+ * plus gros.
+ */
+function readabilityPass(ceiling) {
+  cards.forEach((card, i) => {
+    if (!card || !boxes[i] || compact[i]) return;
+    const player = store.game.players[i];
+    const before = appliedSz[i];
+    if (!player || !(before > 0) || before * CAP_RATIO >= READABLE_CAP_PX) return;
+    compact[i] = true;
+    scoreLines[i] = 1;
+    measureCard(card, computeFit(boxes[i], String(player.score)), ceiling);
+    if (appliedSz[i] <= before) {
+      compact[i] = false;
+      scoreLines[i] = fits[i] && fits[i].lines > 1 ? fits[i].lines : 1;
+      measureCard(card, fits[i], ceiling);
+    }
+  });
 }
 
 const signsOf = (card) => Array.from(card.querySelectorAll('.tap-sign'));
@@ -398,7 +435,7 @@ function measureAll() {
   fitGap = 0;
   // Pré-passe purement calculatoire : on connaît la taille visée de chaque carte avant d'en poser
   // une seule, ce qui permet de plafonner l'écart entre la plus grande et la plus petite.
-  const fits = [];
+  fits.length = 0;
   cards.forEach((card, i) => {
     if (!card || !boxes[i]) return;
     fits[i] = fitFor(i, boxes[i]);
@@ -406,6 +443,7 @@ function measureAll() {
   const sizes = fits.filter(Boolean).map((f) => f.scoreSz);
   const ceiling = sizes.length ? Math.min(...sizes) * SCORE_RATIO_MAX : Infinity;
   cards.forEach((card, i) => measureCard(card, fits[i], ceiling));
+  readabilityPass(ceiling);
   syncBarLabels();
 }
 

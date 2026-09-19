@@ -289,7 +289,10 @@
   /* Paire assombrie sur fond clair : l'encre posée dessus repasse en blanc. */
   --on-gain: #ffffff;
   --on-loss: #ffffff;
-  --warn: #7a4400;
+  /* Ambre assombri : à #7a4400 le score « bas » mesurait 4,74:1 sur la carte la plus claire du
+     thème parchemin, c'est-à-dire dans la marge de 0,2 exigée par D21 — la valeur oscillait donc
+     d'un passage d'audit à l'autre. À #6e3d00 : 5,40, stable. */
+  --warn: #6e3d00;
   --card-mix: 15%;
   --muted-mix: 78%;
   --card-text: #111111;
@@ -412,7 +415,7 @@
   --on-loss: light-dark(#ffffff, #000000);
   --gain: light-dark(#003d63, #8fe0ff);
   --loss: light-dark(#9a3c00, #ff8844);
-  --warn: light-dark(#7a4400, #ffb454);
+  --warn: light-dark(#6e3d00, #ffb454);
   --font-display: 'Inter', 'Inter fallback', sans-serif;
   --font-score: 'Inter', 'Inter fallback', sans-serif;
   --font-ui: 'Inter', 'Inter fallback', sans-serif;

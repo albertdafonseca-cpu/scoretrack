@@ -97,8 +97,20 @@ test('réactivité : du pointerdown matériel à la trame peinte, p95 < 100 ms',
  * `selector` peut désigner une zone SANS gestionnaire (en-tête) : c'est le témoin qui sépare le
  * coût de l'application du bruit de l'environnement.
  */
-async function frameDeltas(page, cdp, selector, count) {
+async function frameDeltas(page, cdp, selector, count, blockMs = 0) {
   const point = await centerOf(page, selector);
+  // Coût artificiel injecté pour ÉTALONNER l'instrument (voir le test de sensibilité) : une boucle
+  // bloquante sur le fil principal à chaque appui, exactement ce qu'une régression produirait.
+  if (blockMs > 0) {
+    await page.evaluate((ms) => {
+      window.__block = (e) => {
+        if (!e.isTrusted) return;
+        const end = performance.now() + ms;
+        while (performance.now() < end);
+      };
+      document.addEventListener('pointerdown', window.__block, true);
+    }, blockMs);
+  }
   // Chauffe : 8 taps jetés avant toute mesure. Ils paient la compilation à la volée des
   // gestionnaires, la première composition des couches et le premier accès au stockage. Les
   // compter reviendrait à mesurer le démarrage, pas la fluidité en régime établi.
@@ -110,6 +122,7 @@ async function frameDeltas(page, cdp, selector, count) {
   await page.evaluate(() => {
     window.__d = [];
     window.__stop = false;
+    window.__t0 = performance.now();
     let last = performance.now();
     const loop = (now) => {
       window.__d.push(now - last);
@@ -122,12 +135,14 @@ async function frameDeltas(page, cdp, selector, count) {
     await realTap(cdp, point);
     await page.waitForTimeout(50);
   }
-  return page.evaluate(() => {
+  const result = await page.evaluate(() => {
     window.__stop = true;
+    const dur = performance.now() - window.__t0;
     // Les deux premières trames couvrent l'amorçage de la boucle : elles ne mesurent rien.
     const d = window.__d.slice(2).sort((a, b) => a - b);
     const at = (q) => d[Math.min(d.length - 1, Math.floor(d.length * q))];
     return {
+      dur,
       frames: d.length,
       p50: at(0.5),
       p95: at(0.95),
@@ -136,6 +151,33 @@ async function frameDeltas(page, cdp, selector, count) {
       lost: d.filter((x) => x > 1000 / 60 + 4).length,
     };
   });
+  if (blockMs > 0) {
+    await page.evaluate(() => document.removeEventListener('pointerdown', window.__block, true));
+  }
+  return result;
+}
+
+/** Les cartes coûtent-elles plus que le témoin ? Une seule définition, utilisée par tous les tests. */
+function regressions(taps, control) {
+  const out = [];
+  const add = (nom, valeur, plafond) => {
+    if (!(valeur <= plafond)) out.push(`${nom} ${valeur.toFixed(2)} > ${plafond.toFixed(2)}`);
+  };
+  // Tous les seuils sont RELATIFS au témoin mesuré dans la même exécution : une machine hôte
+  // chargée ralentit les deux séries et ne peut donc pas faire virer le test au rouge à tort,
+  // tandis qu'un coût propre à l'application creuse l'écart et le fait virer.
+  add('p50', taps.p50, control.p50 + 1);
+  add('p95', taps.p95, control.p95 + FRAME_MS / 2);
+  add('p99', taps.p99, control.p99 + FRAME_MS);
+  add('taux de trames perdues', taps.lost / taps.frames, control.lost / control.frames + 0.03);
+  // DURÉE de la série. C'est le critère SENSIBLE, et il comble l'angle mort des centiles : un
+  // travail bloquant de l'ordre d'une trame retarde chaque tap sans jamais allonger un intervalle
+  // de trame au-delà du seuil de « trame perdue ». Les deux séries envoient le même nombre de taps
+  // à la même cadence : à coût nul, elles durent le même temps (mesuré : 2 499 ms contre 2 503 ms
+  // à douze joueurs). Plancher de sensibilité ÉTALONNÉ par le test ci-dessous : 16 ms de calcul
+  // bloquant par tap sont détectés (durée +20 %), 8 ms restent sous le bruit (+0,8 %).
+  add('durée de la série', taps.dur / control.dur, 1.12);
+  return out;
 }
 
 for (const players of [4, 12]) {
@@ -156,35 +198,53 @@ for (const players of [4, 12]) {
       type: `trames-${players}j`,
       description:
         `témoin (en-tête) : p50 ${control.p50.toFixed(1)} · p95 ${control.p95.toFixed(1)} · p99 ${control.p99.toFixed(1)} · max ${control.max.toFixed(1)} ms, ${control.lost}/${control.frames} trames perdues — ` +
-        `cartes : p50 ${taps.p50.toFixed(1)} · p95 ${taps.p95.toFixed(1)} · p99 ${taps.p99.toFixed(1)} · max ${taps.max.toFixed(1)} ms, ${taps.lost}/${taps.frames} trames perdues`,
+        `cartes : p50 ${taps.p50.toFixed(1)} · p95 ${taps.p95.toFixed(1)} · p99 ${taps.p99.toFixed(1)} · max ${taps.max.toFixed(1)} ms, ${taps.lost}/${taps.frames} trames perdues — ` +
+        `durée ${Math.round(taps.dur)} ms contre ${Math.round(control.dur)} ms pour le témoin`,
     });
     expect(
       taps.frames,
       'trames mesurées (échantillon suffisant pour un 95e centile)',
     ).toBeGreaterThan(60);
     expect(control.frames, 'trames du témoin').toBeGreaterThan(60);
-    // Assertions ABSOLUES, sans tolérance construite : la cadence médiane doit rester celle de
-    // l'écran, le 95e centile ne doit pas dépasser une trame et demie, le 99e pas trois trames.
     // Le PIRE cas n'est volontairement pas asserté : sur ~180 trames mesurées dans une machine
     // partagée, une seule interruption de l'ordonnanceur hôte le fait bondir sans rien dire de
-    // l'application (mesuré : p99 16,8 ms et max 66,7 ms dans la même série). Il reste consigné
-    // en annotation à chaque exécution — jamais masqué. Deux trames longues, elles, échouent.
-    expect(taps.p50, 'cadence médiane').toBeLessThanOrEqual(FRAME_MS + 1);
-    expect(taps.p95, '95e centile').toBeLessThanOrEqual(FRAME_MS * 1.5);
-    expect(taps.p99, '99e centile').toBeLessThanOrEqual(FRAME_MS * 3);
-    // Taux de trames livrées à l'heure : au moins 95 % pendant 30 taps réels. Une régression qui
-    // coûterait une trame par tap donnerait 30 trames perdues sur ~90, soit 33 %.
-    const rate = taps.lost / taps.frames;
-    expect(
-      rate,
-      `taux de trames perdues (témoin : ${control.lost}/${control.frames})`,
-    ).toBeLessThanOrEqual(0.05);
-    // Le témoin atteste que la machine hôte était saine pendant la mesure : s'il décroche lui aussi,
-    // la mesure ne vaut rien et le test le dit au lieu de se taire.
-    expect(
-      control.lost / control.frames,
-      'témoin : la machine hôte a décroché',
-    ).toBeLessThanOrEqual(0.05);
+    // l'application. Il reste consigné en annotation à chaque exécution — jamais masqué.
+    expect(regressions(taps, control).join(' · '), 'écart aux trames du témoin').toBe('');
     expect(errors).toEqual([]);
   });
 }
+
+/**
+ * ÉTALONNAGE de l'instrument : sans lui, un test de fluidité qui passe ne prouve rien, puisqu'on
+ * ignore ce qu'il est capable de voir. On injecte un coût bloquant CONNU sur le fil principal à
+ * chaque appui — exactement la forme d'une régression — et on exige que la mesure le voie.
+ * Le plancher mesuré est consigné à chaque exécution : c'est lui, et non une promesse de 60 fps,
+ * que le test de fluidité garantit.
+ */
+test('sensibilité de la mesure : 16 ms de calcul bloquant par tap sont détectés', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(180_000);
+  await openApp(page);
+  await startGame(page, { players: 12, start: 100 });
+  const cdp = await page.context().newCDPSession(page);
+  const control = await frameDeltas(page, cdp, '.game-header', 30);
+  const sain = await frameDeltas(page, cdp, '#card-0 .tap-half.plus', 30);
+  const bloque = await frameDeltas(page, cdp, '#card-0 .tap-half.plus', 30, 16);
+  await cdp.detach();
+  testInfo.annotations.push({
+    type: 'plancher-de-sensibilite',
+    description:
+      `témoin ${Math.round(control.dur)} ms · cartes saines ${Math.round(sain.dur)} ms ` +
+      `(rapport ${(sain.dur / control.dur).toFixed(3)}) · cartes + 16 ms de blocage ` +
+      `${Math.round(bloque.dur)} ms (rapport ${(bloque.dur / control.dur).toFixed(3)})`,
+  });
+  // Le code sain passe...
+  expect(regressions(sain, control).join(' · '), 'le code sain doit passer').toBe('');
+  // ...et le même instrument REFUSE le code alourdi. Si cette ligne échoue, le test de fluidité
+  // ci-dessus ne prouve plus rien, et c'est ici qu'on l'apprend.
+  expect(
+    regressions(bloque, control).join(' · '),
+    '16 ms de blocage par tap doivent être détectés',
+  ).not.toBe('');
+});

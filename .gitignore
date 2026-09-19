@@ -10,3 +10,7 @@ dist/
 .env.*
 .idea/
 .vscode/
+
+# Captures de débogage produites par les scripts d'audit (chemins temporaires aplatis)
+_tmp_*
+*.dbg.png

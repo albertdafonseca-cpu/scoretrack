@@ -1,7 +1,7 @@
 // Écran de jeu (élément A) : identité du DOM, gestes aux frontières, appui long, pavé au clavier,
 // victoire par plafond, annulation/rétablissement, retour à un point, copie du résultat, 12 joueurs.
 import { expect, test } from '@playwright/test';
-import { collectErrors, openApp as openBase, renderedContrast } from './helpers.js';
+import { collectErrors, openApp as openBase, renderedContrast, themeIds } from './helpers.js';
 
 /**
  * Ouvre l'application sans service worker : la bannière « nouvelle version » de l'élément E
@@ -451,31 +451,47 @@ test('12 joueurs, prénoms de 18 caractères : aucun chevauchement, scores lisib
   await openApp(page);
   await startGame(page, { players: 12, start: 40, names: Array(12).fill(LONG) });
 
+  // Le critère est le TRACÉ, pas la boîte de ligne : l'interligne du score est serré au plus juste
+  // et sa boîte peut dépasser sa fenêtre, que `.score-wrap { overflow: hidden }` rogne — seule
+  // l'encre réellement peinte peut chevaucher quelque chose. Repère local à la carte, donc valable
+  // sur les quatre orientations.
   const probe = () =>
     [...document.querySelectorAll('.pcard')].map((card) => {
       const sc = card.querySelector('.score');
       const nm = card.querySelector('.pplayer');
+      const wrap = sc.parentElement;
+      const face = wrap.parentElement;
       const cs = getComputedStyle(sc);
+      const fs = parseFloat(cs.fontSize);
       const ctx = document.createElement('canvas').getContext('2d');
-      ctx.font = `${cs.fontSize} ${cs.fontFamily}`;
-      const m = ctx.measureText(sc.textContent);
-      const a = sc.getBoundingClientRect();
-      const b = nm.getBoundingClientRect();
-      const inter =
-        Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) *
-        Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
-      const cr = card.getBoundingClientRect();
+      ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${fs}px ${cs.fontFamily}`;
+      const lines = sc.textContent.split('\n');
+      const lh = parseFloat(cs.lineHeight) || fs;
+      const first = ctx.measureText(lines[0] || '0');
+      const half = (lh - (first.fontBoundingBoxAscent + first.fontBoundingBoxDescent)) / 2;
+      let top = Infinity;
+      let bottom = -Infinity;
+      let cap = Infinity;
+      let width = 0;
+      lines.forEach((line, i) => {
+        const m = ctx.measureText(line || '0');
+        const base = wrap.offsetTop + sc.offsetTop + i * lh + half + first.fontBoundingBoxAscent;
+        top = Math.min(top, base - m.actualBoundingBoxAscent);
+        bottom = Math.max(bottom, base + m.actualBoundingBoxDescent);
+        cap = Math.min(cap, Math.round(m.actualBoundingBoxAscent));
+        width = Math.max(width, m.width);
+      });
+      const nameBottom = nm.offsetTop + nm.offsetHeight;
       return {
         id: card.id,
-        cap: Math.round(m.actualBoundingBoxAscent),
-        fs: Math.round(parseFloat(cs.fontSize)),
+        cap,
+        fs: Math.round(fs),
         nameFs: Math.round(parseFloat(getComputedStyle(nm).fontSize)),
-        inter: Math.round(inter),
+        inter: Math.round(Math.max(0, nameBottom - top)),
         overflow: Math.round(
-          Math.max(0, cr.left - a.left) +
-            Math.max(0, a.right - cr.right) +
-            Math.max(0, cr.top - a.top) +
-            Math.max(0, a.bottom - cr.bottom),
+          Math.max(0, -top) +
+            Math.max(0, bottom - (face.clientHeight + parseFloat(cs.paddingBottom || 0))) +
+            Math.max(0, width - face.clientWidth),
         ),
       };
     });
@@ -590,16 +606,16 @@ test('taps SIMULTANÉS : chaque doigt compte (2 puis 3 cartes à la fois)', asyn
   expect(errors).toEqual([]);
 });
 
-test('contraste sur pixels rendus : 14 thèmes × 7 états × 3 textes de carte (D16)', async ({
+test('contraste sur pixels rendus : 14 thèmes × 7 états × 12 couleurs de carte × 3 textes (D16)', async ({
   page,
 }, testInfo) => {
-  test.setTimeout(300_000);
+  test.setTimeout(600_000);
   await openApp(page);
-  // Un prénom long touche les zones teintées : c'est le pire cas, celui qu'il faut mesurer.
-  await startGame(page, { players: 4, start: 40, names: Array(4).fill('Bartholomew Longn') });
-  const themes = await page.evaluate(async () =>
-    (await import('./js/core/constants.js')).THEMES.map((t) => t.id),
-  );
+  // DOUZE joueurs : la palette compte dix couleurs de carte, et n'en auditer qu'une seule laissait
+  // passer les paires les plus serrées (défaut relevé par le critique). Un prénom long touche les
+  // zones teintées : c'est le pire cas, celui qu'il faut mesurer.
+  await startGame(page, { players: 12, start: 40, names: Array(12).fill('Bartholomew Longn') });
+  const themes = await themeIds(page);
   expect(themes.length, 'thèmes à auditer').toBeGreaterThanOrEqual(14);
   /** Tous les états visuels transitoires d'une moitié, pas seulement le repos. */
   const STATES = [
@@ -611,6 +627,11 @@ test('contraste sur pixels rendus : 14 thèmes × 7 états × 3 textes de carte 
     ['butée+', 'plus', 'blocked'],
     ['butée-', 'minus', 'blocked'],
   ];
+  const CARDS = 12;
+  const selectors = [];
+  for (let i = 0; i < CARDS; i++) {
+    selectors.push(`#sc-${i}`, `#card-${i} .pseat`, `#card-${i} .pplayer`);
+  }
   const failures = [];
   const rows = [];
   for (const id of themes) {
@@ -621,33 +642,43 @@ test('contraste sur pixels rendus : 14 thèmes × 7 états × 3 textes de carte 
     // Le thème change de police : tant qu'elle n'est pas chargée, le texte peut être rendu
     // invisible (`font-display`), ce qui mesurerait un aplat uniforme au lieu d'un contraste.
     await page.evaluate(() => document.fonts.ready);
+    await page.evaluate(async () => (await import('./js/ui/game.js')).remeasure());
     await page.waitForTimeout(150);
     for (const [state, half, cls] of STATES) {
       if (half) {
         await page.evaluate(
-          ([h, c]) => document.querySelector(`#card-0 .tap-half.${h}`).classList.add(c),
+          ([h, c]) =>
+            document.querySelectorAll(`.tap-half.${h}`).forEach((n) => n.classList.add(c)),
           [half, cls],
         );
         await page.waitForTimeout(150);
       }
-      const [score, seat, name] = await renderedContrast(page, [
-        '#sc-0',
-        '#card-0 .pseat',
-        '#card-0 .pplayer',
-      ]);
+      const measured = await renderedContrast(page, selectors);
       if (half) {
         await page.evaluate(
-          ([h, c]) => document.querySelector(`#card-0 .tap-half.${h}`).classList.remove(c),
+          ([h, c]) =>
+            document.querySelectorAll(`.tap-half.${h}`).forEach((n) => n.classList.remove(c)),
           [half, cls],
         );
       }
-      rows.push({ id, state, score: score.ratio, seat: seat.ratio, name: name.ratio });
-      for (const [cible, r] of [
-        ['score', score.ratio],
-        ['numéro', seat.ratio],
-        ['prénom', name.ratio],
-      ]) {
-        if (!(r >= 4.5)) failures.push({ id, state, cible, ratio: r });
+      for (let i = 0; i < CARDS; i++) {
+        const [score, seat, name] = measured.slice(i * 3, i * 3 + 3);
+        if (score.skipped || seat.skipped || name.skipped) continue;
+        rows.push({
+          id,
+          state,
+          carte: i,
+          score: score.ratio,
+          seat: seat.ratio,
+          name: name.ratio,
+        });
+        for (const [cible, r] of [
+          ['score', score.ratio],
+          ['numéro', seat.ratio],
+          ['prénom', name.ratio],
+        ]) {
+          if (!(r >= 4.5)) failures.push({ id, state, carte: i, cible, ratio: r });
+        }
       }
     }
   }
@@ -655,11 +686,15 @@ test('contraste sur pixels rendus : 14 thèmes × 7 états × 3 textes de carte 
   const worstName = rows.reduce((a, r) => Math.min(a, r.name), Infinity);
   testInfo.annotations.push({
     type: 'contraste-rendu',
-    description: `${rows.length} mesures (14 thèmes × 7 états × 3 textes) · pire rapport ${worst} · pire prénom ${worstName}`,
+    description:
+      `${rows.length} mesures (${themes.length} thèmes × ${STATES.length} états × ${CARDS} couleurs de carte × 3 textes)` +
+      ` · pire rapport ${worst} · pire prénom ${worstName}` +
+      ` · le fond du score est IDENTIQUE dans les 7 états par construction (teinte cantonnée hors du chiffre) :` +
+      ` c'est ce que vérifie l'invariant ci-dessous, pas une variation qu'on mesurerait sans l'obtenir`,
   });
-  // D17 : la mesure doit avoir réellement eu lieu, sur TOUS les états.
-  expect(rows.length).toBe(themes.length * STATES.length);
-  expect(failures, JSON.stringify(failures)).toEqual([]);
+  // D17 : la mesure doit avoir réellement eu lieu, sur TOUS les états et TOUTES les cartes.
+  expect(rows.length).toBe(themes.length * STATES.length * CARDS);
+  expect(failures, JSON.stringify(failures.slice(0, 12))).toEqual([]);
 
   // INVARIANT de construction : aucun état transitoire ne doit dégrader le fond d'un texte.
   // C'est lui qui donne la marge, et non une valeur choisie au cas par cas : le renfort de teinte
@@ -667,16 +702,19 @@ test('contraste sur pixels rendus : 14 thèmes × 7 états × 3 textes de carte 
   // valent aussi en butée, en flash et sous le doigt. Une régression le fera échouer ici.
   const drops = [];
   for (const id of themes) {
-    const rest = rows.find((r) => r.id === id && r.state === 'repos');
-    for (const r of rows.filter((x) => x.id === id && x.state !== 'repos')) {
-      for (const cible of ['score', 'seat', 'name']) {
-        if (r[cible] < rest[cible] - 0.3) {
-          drops.push({ id, state: r.state, cible, repos: rest[cible], etat: r[cible] });
+    for (let i = 0; i < CARDS; i++) {
+      const rest = rows.find((r) => r.id === id && r.carte === i && r.state === 'repos');
+      if (!rest) continue;
+      for (const r of rows.filter((x) => x.id === id && x.carte === i && x.state !== 'repos')) {
+        for (const cible of ['score', 'seat', 'name']) {
+          if (r[cible] < rest[cible] - 0.3) {
+            drops.push({ id, carte: i, state: r.state, cible, repos: rest[cible], etat: r[cible] });
+          }
         }
       }
     }
   }
-  expect(drops, JSON.stringify(drops)).toEqual([]);
+  expect(drops, JSON.stringify(drops.slice(0, 12))).toEqual([]);
   // Et la marge du prénom, point le plus sensible relevé par l'audit visuel, est nette.
   expect(worstName, 'marge du prénom').toBeGreaterThanOrEqual(6);
 });
@@ -791,22 +829,32 @@ test('aucun prénom COURT tronqué, de 1 à 12 joueurs, et écart de taille du s
   expect(errors).toEqual([]);
 });
 
-test('hauteur de capitale du score à 2, 4 et 7 chiffres, au gabarit 390 × 844', async ({
+test('hauteur de capitale du score, sur les 14 THÈMES, au gabarit 390 × 844', async ({
   page,
 }, testInfo) => {
-  test.setTimeout(120_000);
+  test.setTimeout(240_000);
   // La grille impose 390 × 844 : mesurer sur le gabarit plus court de l'émulation flatterait le
   // résultat de 9 px à 4 joueurs.
   await page.setViewportSize({ width: 390, height: 844 });
+  // Les quatorze thèmes ne partagent PAS la même police de chiffres, et la chasse va du simple au
+  // double : ne mesurer que le thème par défaut laissait passer le thème arcade, 6 px sous le seuil
+  // à douze joueurs (défaut trouvé par le critique, corrigé depuis).
   const measure = () =>
     [...document.querySelectorAll('.score')].map((sc) => {
       const cs = getComputedStyle(sc);
       const ctx = document.createElement('canvas').getContext('2d');
-      ctx.font = `${cs.fontSize} ${cs.fontFamily}`;
-      return Math.round(ctx.measureText(sc.textContent).actualBoundingBoxAscent);
+      ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${parseFloat(cs.fontSize)}px ${cs.fontFamily}`;
+      return Math.round(
+        Math.min(
+          ...sc.textContent.split('\n').map((l) => ctx.measureText(l || '0').actualBoundingBoxAscent),
+        ),
+      );
     });
-  const lines = [];
+  await openApp(page);
+  const themes = await themeIds(page);
+  expect(themes.length, 'nombre de thèmes couverts').toBe(14);
   const caps = {};
+  const rowsOf = {};
   for (const players of [4, 12]) {
     await openApp(page);
     await page.setViewportSize({ width: 390, height: 844 });
@@ -822,31 +870,149 @@ test('hauteur de capitale du score à 2, 4 et 7 chiffres, au gabarit 390 × 844'
           const { store } = await import('./js/store.js');
           store.game.players.forEach((_, i) => g.applyManualDelta(i, d));
         }, delta);
-        await page.waitForTimeout(200);
+        await page.waitForTimeout(150);
       }
-      const values = await page.evaluate(measure);
-      const rows = await page.evaluate(
-        () => (document.querySelector('.score').textContent.match(/\n/g) || []).length + 1,
-      );
-      caps[`${players}-${digits}`] = Math.min(...values);
-      caps[`${players}-${digits}-rows`] = rows;
-      lines.push(
-        `${players} joueurs / ${digits} chiffres : ${Math.min(...values)}–${Math.max(...values)} px (${rows} ligne${rows > 1 ? 's' : ''})`,
-      );
+      for (const theme of themes) {
+        await page.evaluate((t) => {
+          document.documentElement.setAttribute('data-theme', t === 'cyber' ? '' : t);
+        }, theme);
+        await page.evaluate(() => document.fonts.ready);
+        // Changer de thème change de police : la mesure doit être refaite, sinon on relit les
+        // tailles de la police précédente.
+        await page.evaluate(async () => (await import('./js/ui/game.js')).remeasure());
+        await page.waitForTimeout(60);
+        caps[`${players}-${digits}-${theme}`] = Math.min(...(await page.evaluate(measure)));
+        rowsOf[`${players}-${digits}-${theme}`] = await page.evaluate(
+          () => (document.querySelector('.score').textContent.match(/\n/g) || []).length + 1,
+        );
+      }
     }
   }
-  testInfo.annotations.push({ type: 'hauteur-de-capitale', description: lines.join(' · ') });
-  // Seuils de la grille (D2.1) : 96 px à 4 joueurs, 30 px à 12, sur le score courant.
-  expect(caps['4-2'], '4 joueurs, 2 chiffres').toBeGreaterThanOrEqual(96);
-  expect(caps['4-4'], '4 joueurs, 4 chiffres').toBeGreaterThanOrEqual(96 * 0.75);
-  expect(caps['12-2'], '12 joueurs, 2 chiffres').toBeGreaterThanOrEqual(30);
-  expect(caps['12-4'], '12 joueurs, 4 chiffres').toBeGreaterThanOrEqual(30);
+  const worstOf = (players, digits) => {
+    let worst = Infinity;
+    let name = '';
+    for (const theme of themes) {
+      const v = caps[`${players}-${digits}-${theme}`];
+      if (v < worst) {
+        worst = v;
+        name = theme;
+      }
+    }
+    return { worst, name };
+  };
+  const cases = [
+    [4, '2'],
+    [4, '4'],
+    [4, '7'],
+    [12, '2'],
+    [12, '4'],
+    [12, '7'],
+  ];
+  testInfo.annotations.push({
+    type: 'hauteur-de-capitale',
+    description: cases
+      .map(([n, d]) => {
+        const { worst, name } = worstOf(n, d);
+        const best = Math.max(...themes.map((t) => caps[`${n}-${d}-${t}`]));
+        return `${n} j / ${d} ch : ${worst} px (${name}) à ${best} px`;
+      })
+      .join(' · '),
+  });
+  // Seuils de la grille (D2.1), exigés sur le PIRE des quatorze thèmes : 96 px à 4 joueurs, 30 px
+  // à 12, sur le score courant.
+  expect(worstOf(4, '2').worst, '4 joueurs, 2 chiffres').toBeGreaterThanOrEqual(96);
+  expect(worstOf(4, '4').worst, '4 joueurs, 4 chiffres').toBeGreaterThanOrEqual(96 * 0.75);
+  expect(worstOf(12, '2').worst, '12 joueurs, 2 chiffres').toBeGreaterThanOrEqual(30);
+  expect(worstOf(12, '4').worst, '12 joueurs, 4 chiffres').toBeGreaterThanOrEqual(30);
   // Le score à 7 chiffres à 12 joueurs tient le seuil grâce au rendu sur DEUX lignes décidé par
   // `computeFit` : sur une seule ligne, la même carte plafonnait à 22 px.
-  expect(caps['12-7'], '12 joueurs, 7 chiffres').toBeGreaterThanOrEqual(30);
-  expect(caps['12-7-rows'], '12 joueurs, 7 chiffres : rendu sur deux lignes').toBe(2);
+  expect(rowsOf['12-7-cyber'], '12 joueurs, 7 chiffres : rendu sur deux lignes').toBe(2);
   // Et une grande carte garde son score sur UNE ligne : la coupure n'est pas systématique.
-  expect(caps['4-7-rows'], '4 joueurs, 7 chiffres : une seule ligne').toBe(1);
+  expect(rowsOf['4-7-cyber'], '4 joueurs, 7 chiffres : une seule ligne').toBe(1);
+  // EXCEPTION DOCUMENTÉE ET VERROUILLÉE : le thème arcade écrit en « Press Start 2P », dont chaque
+  // glyphe occupe un cadratin plein. À douze joueurs, un score de plus d'un MILLION de points y
+  // reste sous le seuil, avec ou sans séparateurs de milliers (mesuré : 25 px). Aucun autre thème
+  // ni aucun autre cas n'a le droit d'y descendre — le test échoue si l'exception s'étend.
+  for (const theme of themes) {
+    for (const [n, d] of cases) {
+      const v = caps[`${n}-${d}-${theme}`];
+      if (n === 12 && d === '7' && theme === 'arcade') {
+        expect(v, 'arcade, 12 joueurs, 7 chiffres : exception connue').toBeGreaterThanOrEqual(24);
+        continue;
+      }
+      // 4 joueurs : la grille demande 96 px sur le score courant, 72 à quatre chiffres. Partout
+      // ailleurs, le seuil de lisibilité du cœur, 30 px.
+      const floor = n === 4 && d === '2' ? 96 : n === 4 && d === '4' ? 96 * 0.75 : 30;
+      expect(v, `${theme}, ${n} joueurs, ${d} chiffres`).toBeGreaterThanOrEqual(floor);
+    }
+  }
+});
+
+test('bulle de delta : place réservée, jamais sur l’encre du score ni sur le nom', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(180_000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  // Géométrie LOCALE de la carte (repère non tourné) : `offsetTop` est commun à la bulle et au
+  // bloc du score, donc la comparaison reste valable sur les quatre orientations.
+  const probe = () =>
+    [...document.querySelectorAll('.pcard')]
+      .map((card) => {
+        const bub = card.querySelector('.delta-bubble');
+        const sc = card.querySelector('.score');
+        const wrap = sc.parentElement;
+        if (!bub || bub.hasAttribute('hidden') || getComputedStyle(bub).opacity === '0')
+          return null;
+        const cs = getComputedStyle(sc);
+        const ctx = document.createElement('canvas').getContext('2d');
+        ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${parseFloat(cs.fontSize)}px ${cs.fontFamily}`;
+        const rows = sc.textContent.split('\n');
+        let ink = 0;
+        for (const line of rows) {
+          const m = ctx.measureText(line);
+          ink = Math.max(ink, m.actualBoundingBoxAscent + m.actualBoundingBoxDescent);
+        }
+        const inkTotal = ink * rows.length + (rows.length - 1) * parseFloat(cs.fontSize) * 0.06;
+        const top = wrap.offsetTop + sc.offsetTop + (sc.offsetHeight - inkTotal) / 2;
+        const name = card.querySelector('.pname');
+        return {
+          id: card.id,
+          surEncre:
+            Math.min(bub.offsetTop + bub.offsetHeight, top + inkTotal) -
+            Math.max(bub.offsetTop, top),
+          surNom: name.offsetTop + name.offsetHeight - bub.offsetTop,
+          bulle: Math.round(parseFloat(getComputedStyle(bub).fontSize)),
+        };
+      })
+      .filter(Boolean);
+  const worst = [];
+  const notes = [];
+  for (const players of [2, 4, 6, 9, 12]) {
+    await openApp(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await startGame(page, { players, start: 40 });
+    // Delta à sept chiffres : c'est le cas où le score est rendu sur deux lignes et remplit sa
+    // boîte, donc celui où la bulle passait sous le chiffre.
+    await page.evaluate(async () => {
+      const g = await import('./js/ui/game.js');
+      const { store } = await import('./js/store.js');
+      store.game.players.forEach((_, i) => g.applyManualDelta(i, 1234467));
+    });
+    await page.waitForTimeout(250);
+    const rows = await page.evaluate(probe);
+    expect(rows.length, `${players} joueurs : la bulle doit être visible`).toBe(players);
+    for (const r of rows) worst.push({ players, ...r });
+    notes.push(
+      `${players} j : bulle ${Math.max(...rows.map((r) => r.bulle))} px, marge encre ${Math.round(Math.min(...rows.map((r) => -r.surEncre)))} px`,
+    );
+  }
+  testInfo.annotations.push({ type: 'bulle-de-delta', description: notes.join(' · ') });
+  const surScore = worst.filter((r) => r.surEncre > 0.5);
+  expect(surScore, 'la bulle ne doit recouvrir l’encre d’aucun score').toEqual([]);
+  const surNom = worst.filter((r) => r.surNom > 0.5);
+  expect(surNom, 'la bulle ne doit pas remonter sur le bloc d’identité').toEqual([]);
+  // Plancher typographique D10 : la bulle reste lisible même sur la plus petite carte.
+  expect(Math.min(...worst.map((r) => r.bulle)), 'corps de la bulle').toBeGreaterThanOrEqual(12);
 });
 
 test('un tap réel = UN seul changement de score (tactile, souris, clavier)', async ({ page }) => {

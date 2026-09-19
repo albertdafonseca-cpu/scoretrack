@@ -173,10 +173,19 @@ export async function renderedContrast(page, selectors) {
         if (!fg) return { sel, skipped: 'couleur non résolue' };
         const r = el.getBoundingClientRect();
         const dpr = window.devicePixelRatio || 1;
-        const x = Math.max(0, Math.round((r.left + window.scrollX) * dpr));
-        const y = Math.max(0, Math.round((r.top + window.scrollY) * dpr));
-        const w = Math.round(r.width * dpr);
-        const h = Math.round(r.height * dpr);
+        // On échantillonne la boîte de REMBOURRAGE, bordure exclue : le texte est peint dessus,
+        // pas sur la bordure. Sur un élément petit et cerclé (le numéro de siège fait 20 px de
+        // côté), les pixels lissés de la bordure dominaient l'histogramme et faisaient lire un
+        // « fond » à mi-chemin entre le trait et la carte — un faux défaut à 1,7:1.
+        const bt = parseFloat(cs.borderTopWidth) || 0;
+        const br = parseFloat(cs.borderRightWidth) || 0;
+        const bb = parseFloat(cs.borderBottomWidth) || 0;
+        const bl = parseFloat(cs.borderLeftWidth) || 0;
+        const inset = r.width - bl - br >= 4 && r.height - bt - bb >= 4;
+        const x = Math.max(0, Math.round((r.left + window.scrollX + (inset ? bl : 0)) * dpr));
+        const y = Math.max(0, Math.round((r.top + window.scrollY + (inset ? bt : 0)) * dpr));
+        const w = Math.round((r.width - (inset ? bl + br : 0)) * dpr);
+        const h = Math.round((r.height - (inset ? bt + bb : 0)) * dpr);
         if (w < 4 || h < 4) return { sel, skipped: 'boîte trop petite' };
         if (x + w > canvas.width || y + h > canvas.height) return { sel, skipped: 'hors capture' };
         const data = ctx.getImageData(x, y, w, h).data;

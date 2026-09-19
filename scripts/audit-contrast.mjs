@@ -22,6 +22,14 @@
 // Exemption assumée : les contrôles `:disabled` (WCAG 1.4.3, exception « Inactive »), mesurés et
 // listés à titre indicatif, jamais comptés en échec.
 //
+// PÉRIMÈTRE — la bannière système « nouvelle version » (élément E) est le seul élément retiré des
+// écrans ordinaires : elle n'appartient à aucun écran, n'appartient à aucun thème, et son apparition
+// dépend du calendrier du service worker. La laisser entrer au hasard faisait varier le nombre de
+// lignes d'une exécution à l'autre sans rien apprendre. Elle n'échappe pas pour autant à l'audit :
+// l'écran `bannière système` l'affiche VOLONTAIREMENT, dans ses deux états (version disponible sur
+// l'accueil, version active au-dessus de la barre en partie), et mesure son contraste sur chaque
+// thème. Le script échoue si ces mesures manquent. Elle sort du hasard pour entrer dans le contrôle.
+//
 // DÉTERMINISME (décision D21) : le fond est échantillonné sur MEDIAN_SHOTS captures successives dont
 // on retient la médiane par canal — une trame de composition transitoire est ainsi écartée par vote.
 // Et tout élément qui passe à moins de MARGIN du seuil est compté en ÉCHEC : sans cette marge, une
@@ -95,7 +103,14 @@ const MARGIN = 0.2;
  * Relève chaque élément visible porteur d'information : nœud texte propre, ou forme SVG tracée.
  * Renvoie la couleur effective (alpha × opacity héritée) et la boîte englobante.
  */
-function collectForegrounds() {
+function collectForegrounds({ withBanner = false } = {}) {
+  // La bannière « nouvelle version » de l'élément E est un objet SYSTÈME transitoire : elle
+  // n'appartient à aucun écran, n'appartient à aucun thème, et son apparition dépend du calendrier
+  // du service worker. La laisser entrer au hasard rendrait le nombre de lignes mesurées
+  // irreproductible sans rien apprendre. Elle est donc exclue de tous les écrans, et mesurée sur
+  // chaque thème dans deux états dédiés et déterministes (écran « bannière système », où l'audit
+  // l'affiche lui-même). Hors de ces deux états, sa présence est une anomalie et l'audit l'ignore.
+  const bannerNode = document.getElementById('update-banner');
   // `getComputedStyle` renvoie `oklab(...)` dès qu'un `color-mix(in oklab, …)` est en jeu :
   // toute couleur est donc résolue en octets sRGB par le canvas, seule source fiable.
   const probe = document.createElement('canvas');
@@ -182,6 +197,8 @@ function collectForegrounds() {
     // Technique « réservé aux lecteurs d'écran » : découpé à 1 px, jamais lu à l'œil.
     if (cs.clipPath !== 'none' || cs.clip !== 'auto') continue;
     if (layer && !layer.contains(el)) continue;
+    const inBanner = Boolean(bannerNode && (el === bannerNode || bannerNode.contains(el)));
+    if (inBanner && !withBanner) continue;
     const opacity = effOpacity(el);
     if (opacity < 0.05) continue;
     const disabled = Boolean(el.closest('[disabled], :disabled'));
@@ -210,6 +227,7 @@ function collectForegrounds() {
         alpha: a,
         kind: 'graphique',
         disabled,
+        inBanner,
       });
       continue;
     }
@@ -231,6 +249,7 @@ function collectForegrounds() {
       kind: 'texte',
       fontSize: parseFloat(cs.fontSize),
       disabled,
+      inBanner,
     });
   }
   return out;
@@ -445,6 +464,28 @@ function resetGameStates() {
   for (const s of document.querySelectorAll('.score')) s.classList.remove('low', 'crit');
 }
 
+/** Écran dédié à la bannière système, seul endroit où celle-ci est mesurée. */
+const BANNER_SCREEN = 'bannière système';
+
+/**
+ * Affiche VOLONTAIREMENT la bannière « nouvelle version » dans l'état demandé, sans passer par le
+ * service worker : le module est importé dans la page et sa fonction publique appelée. La bannière
+ * quitte ainsi le hasard pour entrer dans le contrôle — même contenu, même géométrie, même instant
+ * à chaque exécution. Renvoie faux si elle n'est pas réellement visible (le plan est alors signalé
+ * comme non mesuré, jamais ignoré en silence).
+ */
+async function showSystemBanner(page, state) {
+  await page.evaluate(
+    (s) => import('./js/ui/update-banner.js').then((m) => m.showUpdateBanner(s)),
+    state,
+  );
+  await page.waitForTimeout(260);
+  return page.evaluate(() => {
+    const b = document.getElementById('update-banner');
+    return Boolean(b && b.checkVisibility() && !b.classList.contains('hidden'));
+  });
+}
+
 /** Un « plan » = une page réelle à mesurer : comment y arriver, et dans quel état. */
 const PLANS = [
   { screen: 'setup', state: 'repos', go: (p) => gotoSetup(p) },
@@ -500,6 +541,26 @@ const PLANS = [
       await p.waitForTimeout(300);
     },
   },
+  // Les deux états dédiés de la bannière système : sur l'accueil, puis en partie où elle se place
+  // au-dessus de la barre et réserve sa hauteur. Mesurés sur CHAQUE thème, comme tout le reste.
+  {
+    screen: BANNER_SCREEN,
+    state: 'version disponible',
+    banner: true,
+    go: async (p) => {
+      await gotoSetup(p);
+      return showSystemBanner(p, 'available');
+    },
+  },
+  {
+    screen: BANNER_SCREEN,
+    state: 'version active (au-dessus de la barre)',
+    banner: true,
+    go: async (p) => {
+      await startGame(p, 4);
+      return showSystemBanner(p, 'activated');
+    },
+  },
 ];
 
 async function main() {
@@ -536,7 +597,9 @@ async function main() {
     // Le service worker n'est jamais installé pendant l'audit : sa bannière « nouvelle version »
     // apparaît selon un calendrier propre et ferait varier le jeu d'éléments mesurés d'une
     // exécution à l'autre. L'enregistrement échoue proprement, l'application le gère déjà.
-    // Les couleurs de cette bannière (css/system.css) sont auditées sur les écrans stables.
+    // Cette coupure est doublée d'un filtrage explicite dans `collectForegrounds` (une bannière
+    // survivant d'un enregistrement antérieur ne peut donc pas s'inviter), et la bannière est
+    // mesurée à part, sur chaque thème, dans les états dédiés de l'écran `bannière système`.
     await c.route('**/sw-st.js', (route) => route.abort());
     return c;
   };
@@ -599,9 +662,9 @@ async function main() {
       return v[(v.length - 1) >> 1];
     });
 
-  async function measure(theme, screen, state) {
+  async function measure(theme, screen, state, withBanner = false) {
     await page.evaluate(settle);
-    const fgs = await page.evaluate(collectForegrounds);
+    const fgs = await page.evaluate(collectForegrounds, { withBanner });
     if (!fgs.length) {
       await clearTags();
       return;
@@ -671,6 +734,7 @@ async function main() {
         kind: f.kind,
         fontSize: f.fontSize,
         disabled: f.disabled,
+        banner: f.inBanner === true,
         fg: hex(over(f.color, f.alpha, worstQuad.q)),
         bg: hex(worstQuad.q),
         bgMean: hex(meanBg),
@@ -724,7 +788,7 @@ async function main() {
         await setTheme(id);
         await page.waitForTimeout(160);
       }
-      await measure(theme, plan.screen, plan.state);
+      await measure(theme, plan.screen, plan.state, plan.banner === true);
     }
   }
   // L'interface applique-t-elle réellement les classes d'alerte du score ? (revendication à prouver)
@@ -745,6 +809,26 @@ async function main() {
   const failing = counted.filter((r) => !r.ok);
   const exempt = rows.filter((r) => r.disabled);
 
+  // La bannière système étant exclue des écrans ordinaires, il faut prouver qu'elle a bien été
+  // mesurée là où elle est attendue : sur chaque thème, dans ses deux états dédiés. Et un écran
+  // atteint par un geste réel (le pavé numérique) peut échouer à s'ouvrir. Dans les deux cas
+  // l'audit est incomplet : c'est une lacune, pas un détail, et elle fait échouer le script (D17).
+  const bannerRows = counted.filter((r) => r.banner);
+  const bannerStates = new Set(bannerRows.map((r) => `${r.theme} · ${r.state}`));
+  const expected = [];
+  for (const [id, scheme] of THEMES) {
+    const theme = id === 'auto' ? `auto (${scheme})` : id;
+    for (const plan of PLANS) {
+      if (plan.banner) expected.push(`${theme} · ${plan.state}`);
+    }
+  }
+  const gaps = [
+    ...new Set([
+      ...[...skipped].map((sc) => `écran jamais mesuré : ${sc}`),
+      ...expected.filter((k) => !bannerStates.has(k)).map((k) => `bannière non mesurée : ${k}`),
+    ]),
+  ];
+
   const lines = [];
   lines.push('# Rapport de contraste WCAG 2.x — pixels réellement rendus (D16)', '');
   lines.push(
@@ -763,6 +847,10 @@ async function main() {
     `Seuils appliqués (D20) : texte en état stable ≥ ${TEXT}:1 quelle que soit sa taille · objets graphiques ≥ ${GRAPHIC}:1 · texte de ${LARGE_PX} px ou plus ≥ ${GRAPHIC}:1 pendant les seuls états transitoires (${[...TRANSIENT].join(', ')}), seuil que WCAG 2.x accorde au grand texte sans condition — la règle d'ici reste donc plus stricte que la norme.`,
     `Marge de déterminisme (D21) : un élément doit dépasser son seuil de ${MARGIN} pour être compté conforme ; entre le seuil et le seuil + ${MARGIN}, le contraste est déclaré insuffisant plutôt que publié comme un résultat qui oscillerait d'un passage à l'autre. Le fond est la médiane de ${MEDIAN_SHOTS} captures.`,
     `Exemptées (contrôles \`:disabled\`, WCAG 1.4.3) : ${exempt.length}.`,
+    `Bannière système : exclue des écrans ordinaires, car c'est un objet système transitoire qui n'appartient à aucun écran ni à aucun thème et dont l'apparition dépend du calendrier du service worker — la laisser entrer au hasard rendrait le nombre de lignes irreproductible sans rien apprendre. Elle est mesurée à part, sur **chaque thème**, dans ${PLANS.filter((pl) => pl.banner).length} états dédiés que l'audit provoque lui-même (écran « ${BANNER_SCREEN} ») : ${bannerRows.length} mesures de ses propres éléments, dont ${bannerRows.filter((r) => !r.ok).length} en échec, la plus faible à ${bannerRows.length ? Math.min(...bannerRows.map((r) => r.ratio)).toFixed(2) : '—'}:1. Elle sort du hasard pour entrer dans le contrôle ; elle ne sort pas du contrôle.`,
+    gaps.length
+      ? `> **Lacune d'audit.** ${gaps.length} : ${gaps.join(' · ')}. Le script échoue : un écran attendu et non mesuré ne peut pas être déclaré conforme.`
+      : `Aucune lacune : tous les écrans planifiés ont été mesurés, bannière comprise.`,
     JSON_OUT
       ? `Relevé complet : \`${JSON_OUT}\`, ${rows.length} lignes = ${counted.length} comptées + ${exempt.length} exemptées, dont ${failing.length} en échec. Les trois nombres de ce rapport, ceux du fichier de relevé et le code de sortie proviennent du même tableau : ils ne peuvent pas diverger.`
       : `Relevé complet non écrit (passer \`--json\` pour l'obtenir).`,
@@ -853,8 +941,11 @@ async function main() {
           : ''),
     );
   }
-  console.log(`${counted.length} mesures comptées, ${failing.length} échec(s) → ${OUT}`);
-  process.exit(failing.length ? 1 : 0);
+  for (const g of gaps) console.log(`LACUNE ${g}`);
+  console.log(
+    `${counted.length} mesures comptées (dont ${bannerRows.length} sur les éléments de la bannière système), ${failing.length} échec(s), ${gaps.length} lacune(s) → ${OUT}`,
+  );
+  process.exit(failing.length || gaps.length ? 1 : 0);
 }
 
 main().catch((e) => {

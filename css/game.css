@@ -184,9 +184,11 @@
    repeintes) :
    - `::after` porte le LISERÉ intérieur de 4 px, sur toute la moitié : c'est lui qui dit quel côté
      a été touché ;
-   - `::before` porte le renfort de TEINTE, cantonné au tiers extérieur ET démarrant sous la
-     bande d'identité : ni le chiffre (centré) ni le prénom (en haut) ne voient jamais leur fond
-     changer, donc leur contraste mesuré au repos vaut aussi en butée, en flash et sous le doigt. */
+   - `::before` porte le renfort de TEINTE, cantonné au QUART EXTÉRIEUR de la moitié (le dégradé
+     s'annule à 72 % vers le centre) ET démarrant sous la bande d'identité : ni le chiffre (centré)
+     ni le prénom (en haut) ne voient jamais leur fond changer, donc leur contraste mesuré au repos
+     vaut aussi en butée, en flash et sous le doigt. La teinte reste ancrée là où se trouvent le
+     doigt et le signe +/−, c'est-à-dire là où le retour visuel est regardé. */
 .tap-half::after,
 .tap-half::before {
   content: '';
@@ -215,16 +217,16 @@
   box-shadow: inset 0 0 0 4px var(--warn);
 }
 .tap-half.minus::before {
-  background: linear-gradient(to left, transparent 50%, var(--half-press-minus) 100%);
+  background: linear-gradient(to left, transparent 72%, var(--half-press-minus) 100%);
 }
 .tap-half.plus::before {
-  background: linear-gradient(to right, transparent 50%, var(--half-press-plus) 100%);
+  background: linear-gradient(to right, transparent 72%, var(--half-press-plus) 100%);
 }
 .tap-half.minus.blocked::before {
-  background: linear-gradient(to left, transparent 50%, var(--half-blocked) 100%);
+  background: linear-gradient(to left, transparent 72%, var(--half-blocked) 100%);
 }
 .tap-half.plus.blocked::before {
-  background: linear-gradient(to right, transparent 50%, var(--half-blocked) 100%);
+  background: linear-gradient(to right, transparent 72%, var(--half-blocked) 100%);
 }
 .tap-half.pressed::after,
 .tap-half.pressed::before,
@@ -303,7 +305,10 @@
   /* La rembourrure VERTICALE est en pixels : un pourcentage se résout sur la largeur, ce qui
      retirait 26 % de la hauteur d'une carte en bandeau (388 × 90) contre 2,7 % d'une carte
      latérale — le joueur du bas se retrouvait avec un chiffre trois fois plus petit. */
-  padding: 4px 4%;
+  /* `--delta-band` est posée par la mesure (js/fx/layout-fit.js) : c'est la place gardée au bas de
+     la carte pour la bulle de delta cumulé, réservée en PERMANENCE. La bulle apparaît donc sans
+     rien déplacer et sans jamais passer sur le chiffre. */
+  padding: 4px 4% calc(4px + var(--delta-band, 0px));
   pointer-events: none;
   z-index: 2;
 }
@@ -389,6 +394,9 @@
   overflow: hidden;
 }
 .score {
+  /* Positionné : `js/fx/layout-fit.js` recentre le TRACÉ (et non la boîte de ligne) par `top`.
+     `top` et non `transform`, que l'animation du chiffre écraserait. */
+  position: relative;
   font-family: var(--score-font);
   font-variant-numeric: tabular-nums;
   font-size: var(--fs-6);
@@ -409,10 +417,12 @@
   color: var(--score-crit);
   text-shadow: 0 2px 8px rgb(0 0 0 / 95%);
 }
-/* Bulle de delta cumulé, sous le score : le signe porte l'information autant que la couleur (D1). */
+/* Bulle de delta cumulé, sous le score : le signe porte l'information autant que la couleur (D1).
+   Elle vit dans la bande que `--delta-band` réserve en permanence au bas de la carte, donc elle
+   n'entre et ne sort jamais au prix d'un décalage de mise en page. */
 .delta-bubble {
   position: absolute;
-  bottom: 0;
+  bottom: 2px;
   left: 50%;
   transform: translateX(-50%);
   max-width: 88%;
