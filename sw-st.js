@@ -14,7 +14,7 @@
 // touche jamais le cache que le service worker actif est peut-être en train de servir.
 
 // >>> PRECACHE (généré — ne pas éditer à la main)
-const VERSION = 'bcc3b4b4';
+const VERSION = '15dfd233';
 const PRECACHE = [
   './',
   './assets/fonts/bebas-neue-400-latin-ext.woff2',
@@ -27,17 +27,8 @@ const PRECACHE = [
   './assets/fonts/press-start-2p-400-latin-ext.woff2',
   './assets/fonts/press-start-2p-400-latin.woff2',
   './assets/fonts/share-tech-mono-400-latin.woff2',
-  './css/base.css',
   './css/critical.css',
   './css/deferred.css',
-  './css/fonts.css',
-  './css/game.css',
-  './css/modals.css',
-  './css/motion.css',
-  './css/setup.css',
-  './css/system.css',
-  './css/themes.css',
-  './css/tokens.css',
   './icons/apple-touch-icon.png',
   './icons/icon-192.png',
   './icons/icon-512.png',

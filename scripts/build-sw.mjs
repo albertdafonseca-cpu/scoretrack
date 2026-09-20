@@ -34,6 +34,19 @@ const PRECACHE_EXCLUDE = new Set([
   'assets/brand/logo-mono.svg',
   'assets/icons/sprite.svg',
   'icons/favicon-32.png',
+  // Feuilles sources fusionnées par `npm run build:css` en css/critical.css (chargée directement) et
+  // css/deferred.css (chargée en différé) : index.html ne charge plus que ces deux bundles, les sources
+  // ne sont donc jamais demandées à l'exécution. `assertUnreferenced` échoue si l'une redevenait citée
+  // par le balisage ou un module.
+  'css/fonts.css',
+  'css/tokens.css',
+  'css/themes.css',
+  'css/base.css',
+  'css/setup.css',
+  'css/game.css',
+  'css/modals.css',
+  'css/motion.css',
+  'css/system.css',
 ]);
 
 /** Sources inspectées pour vérifier qu'un fichier exclu n'est référencé nulle part. */

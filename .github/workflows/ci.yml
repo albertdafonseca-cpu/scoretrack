@@ -21,14 +21,16 @@ env:
   # Poids maximal du précache du service worker (octets téléchargés à l'installation).
   # Plafond d’expérience (ADR-21), pas un comptage : 900 000 octets = 18,0 s sur le profil « Slow 3G »
   # des outils Chrome (400 kbit/s, RTT 2 s), 9,6 s en 3G Lighthouse (750 kbit/s), 4,4 s en « 4G lente »
-  # Lighthouse (1,6 Mbit/s). Poids mesuré le 19 septembre 2026 à 14 h : 744 335 octets (82,7 %), soit 14,9 s en
-  # Slow 3G. L’alerte se déclenche à 90 % (810 000 octets), au-dessus du poids courant : elle prévient
+  # Lighthouse (1,6 Mbit/s). Poids mesuré le 20 septembre 2026 (E : exclusion des 9 feuilles CSS
+  # sources du précache, gardée dans les deux sens) : 712 174 octets (79,1 %), soit 14,2 s en Slow 3G —
+  # en baisse de 111 840 octets depuis la précédente mesure. L’alerte se déclenche à 90 % (810 000
+  # octets), au-dessus du poids courant : elle prévient
   # d’une dérive, elle n’est pas un bruit permanent.
   PRECACHE_MAX_BYTES: 900000
 
 jobs:
   lint:
-    name: Lint (eslint, prettier, précache SW, emoji, jetons)
+    name: Lint (eslint, prettier, CSS générées, précache SW, emoji, jetons)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -42,6 +44,8 @@ jobs:
         run: npx eslint .
       - name: Prettier
         run: npx prettier --check .
+      - name: Feuilles CSS générées (critique + différée) à jour
+        run: npm run check:css
       - name: Précache du service worker à jour
         run: npm run check:sw
       - name: Aucun emoji système dans l'interface

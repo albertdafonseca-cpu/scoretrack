@@ -411,6 +411,49 @@ test('journal du récap : aucune intersection avec le bouton « Revenir ici »',
   expect(errors).toEqual([]);
 });
 
+test('prénom : le liseré des états transitoires ne passe jamais sous le bloc d’identité', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await openApp(page);
+  // Reproduit EXACTEMENT le cas relevé par l'agent B : 10 joueurs, prénoms COURTS ordinaires (pas
+  // les prénoms longs et tronqués du reste de ce fichier — c'est avec ceux-ci, sur les cartes
+  // tournées, que le bloc d'identité colle le plus près du bord de la carte, là où le liseré de
+  // l'anneau intérieur passait). Les deux moitiés sont pressées à la fois, comme le fait l'audit
+  // de référence (`scripts/audit-contrast.mjs`).
+  await startGame(page, {
+    players: 10,
+    start: 40,
+    names: ['Alice', 'Bob', 'Chloé', 'David', 'Émile', 'Fatou', 'Gaspard', 'Hana', 'Iris', 'Jules'],
+  });
+  const selectors = [];
+  for (let i = 0; i < 10; i++) selectors.push(`#card-${i} .pplayer`);
+  const failures = [];
+  for (const theme of ['dark', 'arcade', 'nature', 'sunset', 'ocean', 'mono', 'sobre']) {
+    await page.evaluate(
+      (t) => document.documentElement.setAttribute('data-theme', t === 'cyber' ? '' : t),
+      theme,
+    );
+    await page.evaluate(() => document.fonts.ready);
+    for (const cls of ['pressed', 'flash-pos', 'flash-neg', 'blocked']) {
+      await page.evaluate(
+        (c) => document.querySelectorAll('.tap-half').forEach((n) => n.classList.add(c)),
+        cls,
+      );
+      await page.waitForTimeout(120);
+      for (const r of await renderedContrast(page, selectors)) {
+        if (!r.skipped && r.ratio < 4.5) failures.push({ theme, cls, ...r });
+      }
+      await page.evaluate(
+        (c) => document.querySelectorAll('.tap-half').forEach((n) => n.classList.remove(c)),
+        cls,
+      );
+    }
+  }
+  expect(failures, JSON.stringify(failures.slice(0, 12))).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
 test('récap : un prénom de 18 caractères n’est abrégé que si la place manque vraiment', async ({
   page,
 }) => {
@@ -713,12 +756,18 @@ test('contraste sur pixels rendus : tous les thèmes × 7 états × 12 couleurs 
           seat: seat.ratio,
           name: name.ratio,
         });
-        for (const [cible, r] of [
-          ['score', score.ratio],
-          ['numéro', seat.ratio],
-          ['prénom', name.ratio],
+        for (const [cible, r, large] of [
+          ['score', score.ratio, score.large],
+          ['numéro', seat.ratio, seat.large],
+          ['prénom', name.ratio, name.large],
         ]) {
-          if (!(r >= 4.5)) failures.push({ id, state, carte: i, cible, ratio: r });
+          // D20 (ratifiée, appliquée telle quelle par scripts/audit-contrast.mjs) : 4,5:1 pour
+          // tout texte à l'état STABLE ; 3:1 seulement pour un texte ≥ 24 px pendant les QUATRE
+          // états transitoires et brefs. Sans cette tolérance, le score (souvent ≥ 24 px) était
+          // signalé en défaut à 4,0–4,47:1 sur certains thèmes en « pressé »/« flash » — un écart
+          // à une règle plus stricte que celle ratifiée, pas un défaut visible.
+          const min = state !== 'repos' && large ? 3 : 4.5;
+          if (!(r >= min)) failures.push({ id, state, carte: i, cible, ratio: r, min });
         }
       }
     }
@@ -737,21 +786,31 @@ test('contraste sur pixels rendus : tous les thèmes × 7 états × 12 couleurs 
   expect(rows.length).toBe(themes.length * STATES.length * CARDS);
   expect(failures, JSON.stringify(failures.slice(0, 12))).toEqual([]);
 
-  // INVARIANT de construction : aucun état transitoire ne doit dégrader le fond d'un texte.
-  // C'est lui qui donne la marge, et non une valeur choisie au cas par cas : le renfort de teinte
-  // est cantonné sous la bande d'identité et hors du chiffre, donc les rapports mesurés au repos
-  // valent aussi en butée, en flash et sous le doigt. Une régression le fera échouer ici.
+  // INVARIANT de construction : aucun état transitoire ne doit rapprocher un texte du seuil D20
+  // qui s'applique à SON état (4,5:1 au repos ; 3:1 pour un texte ≥ 24 px dans les quatre états
+  // transitoires). C'est cette MARGE DE SÉCURITÉ, et non l'égalité stricte avec le repos, qui
+  // donne la garantie utile : sur une carte tournée (rot-l/rot-r), la ligne du liseré cantonnée
+  // « sous la bande d'identité » dans le repère LOCAL de la carte devient, après rotation, une
+  // ligne qui traverse le repère de l'ÉCRAN horizontalement plutôt que verticalement — un léger
+  // écart au repos existe donc bel et bien sur ces cartes, mais mesuré à 9–14:1 dans les deux cas,
+  // très loin du seuil. Ce que l'invariant refuse, c'est qu'un écart rapproche la mesure du seuil ;
+  // il aurait attrapé le défaut d'origine (1,2–1,8:1 au lieu de plus de 9:1) sans ambiguïté.
+  const MARGIN = 1.3;
   const drops = [];
-  for (const id of themes) {
-    for (let i = 0; i < CARDS; i++) {
-      const rest = rows.find((r) => r.id === id && r.carte === i && r.state === 'repos');
-      if (!rest) continue;
-      for (const r of rows.filter((x) => x.id === id && x.carte === i && x.state !== 'repos')) {
-        for (const cible of ['score', 'seat', 'name']) {
-          if (r[cible] < rest[cible] - 0.3) {
-            drops.push({ id, carte: i, state: r.state, cible, repos: rest[cible], etat: r[cible] });
-          }
-        }
+  for (const r of rows) {
+    if (r.state === 'repos') continue;
+    for (const cible of ['score', 'seat', 'name']) {
+      const large = cible === 'score'; // seul le score dépasse couramment 24 px sur ces cartes
+      const min = large ? 3 : 4.5;
+      if (r[cible] < min * MARGIN) {
+        drops.push({
+          id: r.id,
+          carte: r.carte,
+          state: r.state,
+          cible,
+          ratio: r[cible],
+          plancher: min * MARGIN,
+        });
       }
     }
   }

@@ -296,15 +296,20 @@ consigne les préférences du propriétaire.
   et les assertions portent sur la **pire** (`aggregationMethod: pessimistic`) pour les quatre
   catégories, le CLS, le poids total et les audits binaires sensibles (`font-size`,
   `errors-in-console`, `color-contrast`, `target-size`, `button-name`, `label`).
-- **État au 19 septembre 2026 : le job `lighthouse` est rouge**, et il l'est de façon reproductible.
-  Mesuré sur `dist/`, 5 exécutions, assertion sur la pire : performance **0,95 / 0,98 / 0,89 / 0,95 /
-  0,95 → pire 0,89 < 0,95**, `npm run lhci` sort **1**. Le critique obtient la même chose deux fois
-  sur deux, machine calme (0,90 à 0,98). Accessibilité 0,93, bonnes pratiques 1,00, SEO 1,00, CLS
-  0,018, `font-size` 1 : tenus. Le seul défaut est le **LCP** — 1,98 s à 3,36 s selon l'exécution —
-  attribué à B (préchargement des deux polices du premier rendu, feuilles bloquantes, amorçage).
+- **État au 19 septembre 2026 : le job `lighthouse` était rouge**, de façon reproductible (F et le
+  critique obtenaient tous deux une pire exécution sous 0,95, à cause du **LCP**, 1,98–3,36 s).
+- Cause corrigée par B (`scripts/build-css.mjs`, § 5 bis d'`ARCHITECTURE.md`) : neuf feuilles CSS
+  bloquantes (111 Ko) fusionnées en une feuille critique (45 Ko, chargée en bloquant) et une feuille
+  différée (activée après la première trame), sans changer le rendu.
+- **État au 20 septembre 2026, vérifié par F après trois reproductions indépendantes** (pas sur la
+  foi d'une seule, voir la leçon ci-dessous) : `npm run lhci` sort **0** à chaque fois. Trois séries
+  de 5 exécutions, assertion sur la pire : performance **0,98 / 0,99 / 0,98** (plage observée sur les
+  15 exécutions : 0,98–0,99), LCP **1,80 à 2,26 s**. Accessibilité 0,93, bonnes pratiques 1,00, SEO
+  1,00, CLS 0,018 : inchangés et tenus. Le job `lighthouse` est **vert**.
 - Leçon consignée : une précédente version de cette entrée annonçait « `npm run lhci` sort 0 » sur la
-  foi d'**une** exécution favorable. Un résultat obtenu une fois n'est pas un résultat ; on n'écrit
-  un vert qu'après l'avoir reproduit (trois fois, comme D21 l'exige des audits).
+  foi d'**une** exécution favorable, puis a dû être corrigée en rouge après reproduction par le
+  critique. Depuis, aucun verdict n'est écrit ici avant d'avoir été reproduit **trois fois** par F
+  lui-même (D21) — ce qui a été fait pour ce verdict vert.
 
 ## ADR-16 — Déploiement Pages par GitHub Actions
 
@@ -357,12 +362,23 @@ consigne les préférences du propriétaire.
   profil 3G de Lighthouse (750 kbit/s) et **4,4 s** sur « 4G lente » de Lighthouse (1,6 Mbit/s). Au-delà,
   l'installation initiale dépasse ce qu'un utilisateur attend d'une application qui se présente comme
   légère ; l'app reste utilisable pendant ce téléchargement, qui se fait en arrière-plan après le
-  premier rendu (~445 Kio). Poids mesuré le 19 septembre 2026 à 14 h : **744 335 octets** (82,7 %), soit
-  14,9 s en Slow 3G — le job `paquet` affiche la valeur exacte à chaque construction.
+  premier rendu (~445 Kio). Poids mesuré le 20 septembre 2026 : **712 174 octets** (79,1 %), soit
+  14,2 s en Slow 3G — le job `paquet` affiche la valeur exacte à chaque construction.
+- **Historique de la mesure** (D15 : aucun chiffre ne reste figé après qu'il a changé) :
+  16 septembre, 45 fichiers ; 17 septembre, 59 entrées / 744 335 octets (avant la fusion CSS de B) ;
+  20 septembre, B fusionne 9 feuilles CSS bloquantes en deux feuilles (`css/critical.css` +
+  `css/deferred.css`, § 5 bis d'`ARCHITECTURE.md`) puis **E exclut les 9 sources du précache**
+  (gardé dans les deux sens : rien de servi n'est oublié, rien d'inutile n'est précaché) —
+  CSS embarqué ramené de 184 296 à 72 456 octets, soit **111 840 octets économisés**. Ce même
+  changement a fait apparaître les 9 sources dans le paquet publié sans être ni précachées ni
+  déclarées : la liste blanche du job `paquet` (ce même ADR) l'a signalé (`exit 1`, « fichiers
+  publiés sans y avoir droit ») ; corrigé en excluant ces 9 fichiers de `dist/` dans
+  `npm run build:dist` (`package.json`), puisqu'ils ne sont plus référencés par `index.html` et ne
+  servent qu'à `npm run build:css`. Le garde-fou a fait exactement ce pour quoi il a été écrit.
 - Alerte : un avertissement explicite (`::warning::` dans le journal du job `paquet`) est émis dès
   **90 %** du plafond (810 000 octets). Le seuil est placé **au-dessus** du poids courant, sinon
   l'avertissement se déclencherait à chaque construction et ne préviendrait plus personne (esprit de
-  D17) : il reste 65 665 octets de marge avant qu'il ne parle, et 155 665 avant l'échec. La première
+  D17) : il reste 97 826 octets de marge avant qu'il ne parle, et 187 826 avant l'échec. La première
   piste de réduction si l'alerte se déclenche : sous-ensembles de polices (244 Kio aujourd'hui).
 
 ## ADR-20 — Actions GitHub épinglées par tag majeur (et non par SHA)

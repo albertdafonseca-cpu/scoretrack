@@ -113,8 +113,11 @@ export async function undersizedTexts(page, rootSelector, min = 12) {
 
 /** Applique un thème (le thème par défaut n'a pas d'attribut) et attend le recalcul du style. */
 export async function useTheme(page, id) {
-  await page.evaluate((theme) => {
+  await page.evaluate(async (theme) => {
     document.documentElement.setAttribute('data-theme', theme === 'cyber' ? '' : theme);
+    // Les puces transitionnent leur couleur sur --dur-1 (120 ms) : sans attendre la fin, une
+    // mesure de contraste peut lire une couleur intermédiaire et signaler une fausse régression.
+    await Promise.all(document.getAnimations().map((a) => a.finished.catch(() => {})));
   }, id);
 }
 
@@ -128,102 +131,195 @@ export async function themeIds(page) {
 
 /**
  * Contraste d'un texte : couleur de premier plan DÉCLARÉE (`getComputedStyle().color` — c'est ce
- * que WCAG 1.4.3 évalue) contre fond RÉELLEMENT RENDU (D16) : une capture de la page est décodée
- * dans un canevas et le fond est la couleur dominante (mode de l'histogramme) de la boîte de
- * l'élément, ce qui reste juste sous un dégradé, une texture ou un halo. Aucune approximation sur
- * le texte : les pixels de glyphe ne servent plus à estimer le premier plan.
+ * que WCAG 1.4.3 évalue) contre fond RÉELLEMENT RENDU (D16), échantillonné SANS AUCUN GLYPHE dessus.
+ *
+ * MÉTHODE (alignée sur `scripts/audit-contrast.mjs`, qui fait foi en intégration continue) : les
+ * boîtes d'encre sont relevées AVANT de rien masquer (union des `getClientRects()` des nœuds de
+ * texte propres de l'élément, via `Range` — c'est la zone où un glyphe est réellement peint, ni
+ * plus, ni moins) ; tous les premiers plans sont ensuite rendus transparents (`color: transparent`
+ * partout, transitions coupées) et UNE SEULE capture est prise dans cet état : les glyphes ont
+ * disparu, mais la composition du fond — moitiés tactiles teintées, texture, liseré d'état — reste
+ * peinte à l'identique. Le fond mesuré n'est donc jamais un mélange de glyphe et de fond.
+ *
+ * DEUX défauts d'une version antérieure (mode/moyenne sur une capture AVEC le texte visible),
+ * tous deux relevés par l'agent B sur pixels réels, disparaissent avec cette méthode :
+ *   1. le mode de l'histogramme sur toute la boîte REMBOURRÉE ne pouvait pas voir un fond
+ *      DÉCENTRÉ — une bande de 8 px à la jointure des deux moitiés (liseré pressé/butée/flash)
+ *      passait sous le prénom à 1,2–1,8:1 pendant que le reste de la boîte, majoritaire en
+ *      pixels, restait à plus de 9:1 et emportait le mode ;
+ *   2. quadranter la boîte encore visible, même réduite à l'encre, restait CONTAMINÉ par les
+ *      pixels du glyphe lui-même dans les cellules où il est dense (le numéro de siège ne fait que
+ *      quelques pixels de haut) — masquer le texte avant de photographier retire ce mélange à la
+ *      racine plutôt que d'essayer de l'estimer.
+ * La boîte d'encre est découpée en 2 × 2 quadrants (même grille que le script de référence) et
+ * c'est le PIRE quadrant (moyenne de ses pixels, désormais tous des pixels de fond) qui fait foi.
+ * Un élément sans texte propre (icône, pastille) retombe sur sa boîte de rembourrage, bordure
+ * exclue.
  * Renvoie `{ sel, ratio, fontSize, large }` ou `{ sel, skipped }` pour un nœud non mesurable.
  */
 export async function renderedContrast(page, selectors) {
   // Une capture prise avant la fin du chargement des polices mesurerait une police de secours.
   await page.evaluate(() => document.fonts.ready);
-  const shot = (await page.screenshot({ scale: 'device', fullPage: true })).toString('base64');
-  return page.evaluate(
-    async ({ shot, selectors }) => {
-      const img = await new Promise((res, rej) => {
-        const i = new Image();
-        i.onload = () => res(i);
-        i.onerror = rej;
-        i.src = `data:image/png;base64,${shot}`;
-      });
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
-      ctx.drawImage(img, 0, 0);
-      const chan = (v) => {
-        const s = v / 255;
-        return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
-      };
-      const lum = (r, g, b) => 0.2126 * chan(r) + 0.7152 * chan(g) + 0.0722 * chan(b);
-      const parseColor = (css) => {
-        const n = css.match(/[\d.]+/g);
-        if (!n) return null;
-        const v = n.slice(0, 3).map(Number);
-        const alpha = n.length > 3 ? Number(n[3]) : 1;
-        if (alpha < 1) return null; // couleur translucide : le fond échantillonné suffit mal
-        return css.startsWith('color(') ? v.map((x) => x * 255) : v;
-      };
-      return selectors.map((sel) => {
-        const el = document.querySelector(sel);
-        if (!el || el.offsetParent === null) return { sel, skipped: 'invisible' };
-        if (el.closest('[disabled], [aria-disabled="true"]')) return { sel, skipped: 'désactivé' };
-        const cs = getComputedStyle(el);
-        const fg = parseColor(cs.color);
-        if (!fg) return { sel, skipped: 'couleur non résolue' };
+  // 1. Couleur déclarée + boîte d'encre de chaque sélecteur, PENDANT que le texte est encore là.
+  const meta = await page.evaluate((selectors) => {
+    const parseColor = (css) => {
+      const n = css.match(/[\d.]+/g);
+      if (!n) return null;
+      const v = n.slice(0, 3).map(Number);
+      const alpha = n.length > 3 ? Number(n[3]) : 1;
+      if (alpha < 1) return null; // couleur translucide : le fond échantillonné suffit mal
+      return css.startsWith('color(') ? v.map((x) => x * 255) : v;
+    };
+    return selectors.map((sel) => {
+      const el = document.querySelector(sel);
+      if (!el || el.offsetParent === null) return { sel, skipped: 'invisible' };
+      if (el.closest('[disabled], [aria-disabled="true"]')) return { sel, skipped: 'désactivé' };
+      const cs = getComputedStyle(el);
+      const fg = parseColor(cs.color);
+      if (!fg) return { sel, skipped: 'couleur non résolue' };
+      // Boîte d'ENCRE réelle du texte propre de l'élément (union des rects de ses nœuds de texte
+      // directs, via Range) : elle délimite où un glyphe est effectivement peint, ni plus (la
+      // boîte rembourrée déborde souvent dans des marges sans encre) ni moins (elle couvre les
+      // plusieurs lignes d'un score coupé, pas seulement la première).
+      let ink = null;
+      const range = document.createRange();
+      for (const node of el.childNodes) {
+        if (node.nodeType !== 3 || !node.textContent.trim()) continue;
+        range.selectNodeContents(node);
+        for (const cr of range.getClientRects()) {
+          if (cr.width < 0.5 || cr.height < 0.5) continue;
+          ink = ink
+            ? {
+                left: Math.min(ink.left, cr.left),
+                top: Math.min(ink.top, cr.top),
+                right: Math.max(ink.right, cr.right),
+                bottom: Math.max(ink.bottom, cr.bottom),
+              }
+            : { left: cr.left, top: cr.top, right: cr.right, bottom: cr.bottom };
+        }
+      }
+      const dpr = window.devicePixelRatio || 1;
+      let box;
+      if (ink) {
+        box = ink;
+      } else {
+        // Pas de nœud de texte propre (icône, pastille de couleur) : repli sur la boîte de
+        // REMBOURRAGE, bordure exclue — sur un élément petit et cerclé (le numéro de siège fait
+        // 20 px de côté), les pixels lissés de la bordure dominaient l'histogramme et faisaient
+        // lire un « fond » à mi-chemin entre le trait et la carte, un faux défaut à 1,7:1.
         const r = el.getBoundingClientRect();
-        const dpr = window.devicePixelRatio || 1;
-        // On échantillonne la boîte de REMBOURRAGE, bordure exclue : le texte est peint dessus,
-        // pas sur la bordure. Sur un élément petit et cerclé (le numéro de siège fait 20 px de
-        // côté), les pixels lissés de la bordure dominaient l'histogramme et faisaient lire un
-        // « fond » à mi-chemin entre le trait et la carte — un faux défaut à 1,7:1.
         const bt = parseFloat(cs.borderTopWidth) || 0;
         const br = parseFloat(cs.borderRightWidth) || 0;
         const bb = parseFloat(cs.borderBottomWidth) || 0;
         const bl = parseFloat(cs.borderLeftWidth) || 0;
         const inset = r.width - bl - br >= 4 && r.height - bt - bb >= 4;
-        const x = Math.max(0, Math.round((r.left + window.scrollX + (inset ? bl : 0)) * dpr));
-        const y = Math.max(0, Math.round((r.top + window.scrollY + (inset ? bt : 0)) * dpr));
-        const w = Math.round((r.width - (inset ? bl + br : 0)) * dpr);
-        const h = Math.round((r.height - (inset ? bt + bb : 0)) * dpr);
-        if (w < 4 || h < 4) return { sel, skipped: 'boîte trop petite' };
-        if (x + w > canvas.width || y + h > canvas.height) return { sel, skipped: 'hors capture' };
-        const data = ctx.getImageData(x, y, w, h).data;
-        // Fond = couleur la plus fréquente de la boîte, PIXELS DE GLYPHE EXCLUS : sur un grand
-        // titre au halo, le texte peut occuper la majorité de la boîte et fausserait le mode.
-        const hist = new Map();
-        for (let i = 0; i < data.length; i += 4) {
-          const d =
-            (data[i] - fg[0]) ** 2 + (data[i + 1] - fg[1]) ** 2 + (data[i + 2] - fg[2]) ** 2;
-          if (d < 60 * 60) continue; // proche de la couleur du texte : c'est un glyphe
-          const key = ((data[i] >> 3) << 10) | ((data[i + 1] >> 3) << 5) | (data[i + 2] >> 3);
-          const cur = hist.get(key);
-          if (cur) {
-            cur.n++;
-            cur.r += data[i];
-            cur.g += data[i + 1];
-            cur.b += data[i + 2];
-          } else hist.set(key, { n: 1, r: data[i], g: data[i + 1], b: data[i + 2] });
-        }
-        let best = null;
-        for (const bucket of hist.values()) if (!best || bucket.n > best.n) best = bucket;
-        if (!best) return { sel, skipped: 'fond indiscernable du texte' };
-        const bg = [best.r / best.n, best.g / best.n, best.b / best.n];
-        const [hi, lo] = [lum(fg[0], fg[1], fg[2]), lum(bg[0], bg[1], bg[2])].sort((a, b) => b - a);
-        const fontSize = parseFloat(cs.fontSize);
-        const weight = Number(cs.fontWeight) || 400;
-        return {
-          sel,
-          fontSize,
-          large: fontSize >= 24 || (fontSize >= 18.66 && weight >= 700),
-          ratio: Number(((hi + 0.05) / (lo + 0.05)).toFixed(2)),
+        box = {
+          left: r.left + (inset ? bl : 0),
+          top: r.top + (inset ? bt : 0),
+          right: r.right - (inset ? br : 0),
+          bottom: r.bottom - (inset ? bb : 0),
+        };
+      }
+      const x = Math.max(0, Math.round((box.left + window.scrollX) * dpr));
+      const y = Math.max(0, Math.round((box.top + window.scrollY) * dpr));
+      const w = Math.round((box.right - box.left) * dpr);
+      const h = Math.round((box.bottom - box.top) * dpr);
+      if (w < 2 || h < 2) return { sel, skipped: 'boîte trop petite' };
+      const fontSize = parseFloat(cs.fontSize);
+      const weight = Number(cs.fontWeight) || 400;
+      return {
+        sel,
+        fg,
+        x,
+        y,
+        w,
+        h,
+        fontSize,
+        large: fontSize >= 24 || (fontSize >= 18.66 && weight >= 700),
+      };
+    });
+  }, selectors);
+  // 2. Premier plan transparent PARTOUT (glyphes et icônes), transitions coupées pour ne pas
+  //    capturer un fondu à mi-chemin, puis DEUX trames avant la photo pour que ce soit peint.
+  await page.evaluate(() => {
+    const style = document.createElement('style');
+    style.id = '__contrast-hide';
+    style.textContent = `
+      *, *::before, *::after {
+        color: transparent !important;
+        text-shadow: none !important;
+        transition: none !important;
+        animation: none !important;
+      }
+      svg * { stroke: transparent !important; fill: transparent !important; }
+    `;
+    document.head.appendChild(style);
+    return new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  });
+  const shot = (await page.screenshot({ scale: 'device', fullPage: true })).toString('base64');
+  await page.evaluate(() => document.getElementById('__contrast-hide')?.remove());
+  // 3. Fond composé, texte absent : le PIRE quadrant de la boîte d'encre fait foi.
+  return page.evaluate(
+    ({ shot, meta }) => {
+      const img = new Image();
+      img.src = `data:image/png;base64,${shot}`;
+      return new Promise((resolve) => {
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          ctx.drawImage(img, 0, 0);
+          const chan = (v) => {
+            const s = v / 255;
+            return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+          };
+          const lum = (r, g, b) => 0.2126 * chan(r) + 0.7152 * chan(g) + 0.0722 * chan(b);
+          resolve(
+            meta.map((m) => {
+              if (m.skipped) return m;
+              const { sel, fg, x, y, w, h, fontSize, large } = m;
+              if (x + w > canvas.width || y + h > canvas.height) {
+                return { sel, skipped: 'hors capture' };
+              }
+              // 2 × 2, comme scripts/audit-contrast.mjs : c'est la grille de référence.
+              const fgLum = lum(fg[0], fg[1], fg[2]);
+              let worst = null;
+              for (let cy = 0; cy < 2; cy++) {
+                for (let cx = 0; cx < 2; cx++) {
+                  const cw = Math.max(1, Math.floor(w / 2));
+                  const ch = Math.max(1, Math.floor(h / 2));
+                  const ox = x + cx * cw;
+                  const oy = y + cy * ch;
+                  if (ox + cw > canvas.width || oy + ch > canvas.height) continue;
+                  const px = ctx.getImageData(ox, oy, cw, ch).data;
+                  let sr = 0;
+                  let sg = 0;
+                  let sb = 0;
+                  let n = 0;
+                  for (let i = 0; i < px.length; i += 4) {
+                    sr += px[i];
+                    sg += px[i + 1];
+                    sb += px[i + 2];
+                    n++;
+                  }
+                  if (n === 0) continue;
+                  const bgLum = lum(sr / n, sg / n, sb / n);
+                  const [hi, lo] = [fgLum, bgLum].sort((a, b) => b - a);
+                  const ratio = (hi + 0.05) / (lo + 0.05);
+                  if (worst === null || ratio < worst) worst = ratio;
+                }
+              }
+              if (worst === null) return { sel, skipped: 'fond indiscernable du texte' };
+              return { sel, fontSize, large, ratio: Number(worst.toFixed(2)) };
+            }),
+          );
         };
       });
     },
-    { shot, selectors },
+    { shot, meta },
   );
 }
-
 /**
  * Cibles recouvertes : pour chaque contrôle visible, le point central doit appartenir au contrôle
  * lui-même (WCAG 2.5.8 / 2.4.11). Un panneau surplombant ferait échouer ce contrôle, là où une

@@ -71,7 +71,14 @@
   --surface2: #2a2200;
   --border: rgba(255, 220, 0, 0.2);
   --accent: #ffdc00;
-  --accent2: #ffa033;
+  /* Orange éclairci : à #ffa033, les libellés de réglages (« Nombre de joueurs », « Points
+     maximum », « Données », « Confidentialité ») mesuraient 3,70–4,19:1 sur les PIXELS RÉELLEMENT
+     RENDUS, contre 9,86 calculé sur fond plat — l'écart vient du halo (`text-shadow` de la même
+     teinte) qui se mélange au fond texturé sous les glyphes, pas d'une approximation de mesure. Le
+     halo partage le jeton du texte : l'éclaircir remonte l'un ET l'autre, sans les rapprocher, car
+     le texte reste largement le plus clair des deux. Mesuré, sur les mêmes libellés : 8,00–8,52 à
+     #ffa033, 10,19–10,80 à #ffc266, marge tenue au pire quadrant, thème inchangé au coup d'œil. */
+  --accent2: #ffc266;
   --text: #fff8e0;
   --font-display: 'Press Start 2P', 'Press Start 2P fallback', monospace;
   --font-score: 'Press Start 2P', 'Press Start 2P fallback', monospace;

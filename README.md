@@ -45,7 +45,7 @@ celles que le manifeste présente à l'installation._
 - **Ordinateur / Chrome, Edge** : icône d'installation à droite de la barre d'adresse.
 
 Première ouverture en ligne obligatoire : le service worker télécharge l'application complète
-(**≈ 744 Ko** au 19 septembre 2026 — 59 entrées, dont 238 Ko de polices auto-hébergées). Le chiffre
+(**≈ 712 Ko** au 20 septembre 2026 — 52 entrées, dont 238 Ko de polices auto-hébergées). Le chiffre
 exact est recalculé, borné et affiché à chaque exécution du job `paquet` de la CI. Ensuite
 l'application fonctionne sans réseau.
 

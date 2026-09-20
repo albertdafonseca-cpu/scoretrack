@@ -182,13 +182,19 @@
 }
 /* États pressé / flash / butée, en DEUX couches animées en opacité seule (composées, jamais
    repeintes) :
-   - `::after` porte le LISERÉ intérieur de 4 px, sur toute la moitié : c'est lui qui dit quel côté
-     a été touché ;
+   - `::after` porte le LISERÉ intérieur de 4 px, cantonné SOUS la bande d'identité comme
+     `::before` ci-dessous : c'est lui qui dit quel côté a été touché ;
    - `::before` porte le renfort de TEINTE, cantonné au QUART EXTÉRIEUR de la moitié (le dégradé
      s'annule à 72 % vers le centre) ET démarrant sous la bande d'identité : ni le chiffre (centré)
      ni le prénom (en haut) ne voient jamais leur fond changer, donc leur contraste mesuré au repos
      vaut aussi en butée, en flash et sous le doigt. La teinte reste ancrée là où se trouvent le
-     doigt et le signe +/−, c'est-à-dire là où le retour visuel est regardé. */
+     doigt et le signe +/−, c'est-à-dire là où le retour visuel est regardé.
+
+   DÉFAUT CORRIGÉ (mesuré par l'agent B, pixels réels) : `::after` couvrait TOUTE la moitié, donc
+   son bord INTÉRIEUR (la jointure entre les deux moitiés) longeait le bas du prénom sur les huit
+   pixels centraux de la carte — blanc sur ambre entre 1,2:1 et 1,8:1 en butée. Le liseré est donc
+   cantonné à la même bande que la teinte : il ne passe plus JAMAIS sous le bloc d'identité, sur
+   aucun de ses quatre côtés. */
 .tap-half::after,
 .tap-half::before {
   content: '';
@@ -198,12 +204,10 @@
   opacity: 0;
   transition: opacity var(--dur-1) var(--ease-out);
 }
-.tap-half::after {
-  inset: 0;
-}
-/* Le renfort de teinte démarre BIEN SOUS la bande d'identité (nom + numéro), qui occupe le haut
-   de la carte : le fond du prénom ne change donc jamais d'un état à l'autre, et son contraste
-   garde la même marge en butée, en flash et sous le doigt qu'au repos. */
+/* Le liseré ET le renfort de teinte démarrent BIEN SOUS la bande d'identité (nom + numéro), qui
+   occupe le haut de la carte : le fond du prénom ne change donc jamais d'un état à l'autre, et son
+   contraste garde la même marge en butée, en flash et sous le doigt qu'au repos. */
+.tap-half::after,
 .tap-half::before {
   inset: 42% 0 0;
 }

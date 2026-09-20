@@ -70,6 +70,11 @@ const PAIR_MIN_LUM = 0.2;
  */
 const SEPARABLE_MAX = 6;
 const SEPARABLE_MIN_DE = 15;
+/** Marge de déterminisme (D21), la même que scripts/audit-contrast.mjs : sous le seuil + MARGIN, un
+    ΔE est déclaré insuffisant plutôt que publié comme un résultat qui oscillerait d'une mesure à
+    l'autre — un gris qui régresserait à sa valeur d'origine (ΔE 15,1) passait silencieusement à
+    0,1 au-dessus du seuil brut ; il échoue désormais, comme il doit. */
+const MARGIN = 0.2;
 const PALETTE_BUDGET = {
   normale: { maxPairs: 2, minDE: 6.5 },
   protanopie: { maxPairs: 9, minDE: 5.1 },
@@ -168,15 +173,15 @@ function auditPrefixes(hexes, lines) {
     lines.push(
       `| ${n} | ${mins.map((v) => v.toFixed(1)).join(' | ')} | ${
         gated
-          ? m >= SEPARABLE_MIN_DE
-            ? `OK (≥ ${SEPARABLE_MIN_DE})`
+          ? m >= SEPARABLE_MIN_DE + MARGIN
+            ? `OK (≥ ${SEPARABLE_MIN_DE} + ${MARGIN})`
             : '**ÉCHEC**'
           : 'D18 (siège + nom)'
       } |`,
     );
   }
   lines.push('');
-  return { ok: worst >= SEPARABLE_MIN_DE, worst };
+  return { ok: worst >= SEPARABLE_MIN_DE + MARGIN, worst };
 }
 
 function auditPair([gainHex, lossHex], label, lines) {
@@ -378,8 +383,8 @@ async function main() {
   );
   lines.push(
     subset.ok
-      ? `- Séparabilité jusqu'à ${SEPARABLE_MAX} joueurs : ΔE minimal ${subset.worst.toFixed(1)} ≥ ${SEPARABLE_MIN_DE} sous les trois simulations (OK).`
-      : `- Séparabilité jusqu'à ${SEPARABLE_MAX} joueurs : **ÉCHEC** (ΔE minimal ${subset.worst.toFixed(1)} < ${SEPARABLE_MIN_DE}).`,
+      ? `- Séparabilité jusqu'à ${SEPARABLE_MAX} joueurs : ΔE minimal ${subset.worst.toFixed(1)} ≥ ${SEPARABLE_MIN_DE} + ${MARGIN} (marge D21) sous les trois simulations (OK).`
+      : `- Séparabilité jusqu'à ${SEPARABLE_MAX} joueurs : **ÉCHEC** (ΔE minimal ${subset.worst.toFixed(1)} < ${(SEPARABLE_MIN_DE + MARGIN).toFixed(1)}, seuil ${SEPARABLE_MIN_DE} + marge D21 ${MARGIN}).`,
   );
   lines.push(
     regressions.length

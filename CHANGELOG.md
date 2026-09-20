@@ -61,6 +61,18 @@ Refonte complète de la qualité sur la base de l'audit de septembre 2026 (voir
   GitHub Pages par workflow, Dependabot, `.editorconfig`.
 - Documentation : README, CONTRIBUTING, SECURITY, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`,
   `docs/EXPLOITATION.md`, `docs/SECURITE.md`, `docs/AUDIT-2026-09.md`.
+- `css/critical.css` et `css/deferred.css` (`scripts/build-css.mjs`, `npm run build:css` /
+  `check:css`) : les neuf feuilles sources sont fusionnées en une feuille critique (chargée en
+  bloquant, nécessaire au premier écran) et une feuille différée (activée après la première
+  trame). Corrige le job `lighthouse`, rouge depuis le 19 septembre à cause du délai d'affichage
+  du plus grand élément (LCP 1,98–3,36 s pour neuf feuilles bloquantes de 111 Ko) : ramené à
+  1,80–2,26 s, performance 0,98–0,99 sur trois séries de 5 exécutions pessimistes reproduites
+  indépendamment. Les neuf sources restent la vérité et gardent leurs propriétaires ; les deux
+  fichiers générés ne sont jamais modifiés à la main (`docs/ARCHITECTURE.md` § 5 bis).
+- Les neuf feuilles CSS sources ne sont plus précachées ni publiées, n'étant plus référencées
+  par rien d'exécuté (`scripts/build-sw.mjs`, `PRECACHE_EXCLUDE` ; `npm run build:dist`) :
+  CSS embarqué ramené de 184 296 à 72 456 octets, précache total ramené à 712 174 octets
+  (52 entrées), soit 111 840 octets économisés (`docs/DECISIONS.md`, ADR-21).
 
 ### Modifié
 
@@ -75,20 +87,16 @@ Refonte complète de la qualité sur la base de l'audit de septembre 2026 (voir
 
 ### Connu et non livré (au 19 septembre 2026)
 
-Deux travaux d'intégration continue sont **rouges** sur l'arbre courant et le restent tant que les
-lignes ci-dessous n'ont pas disparu ; ils ne sont pas rendus verts par un réglage.
+Un travail d'intégration continue est **rouge** sur l'arbre courant et le reste tant que la ligne
+ci-dessous n'a pas disparu ; il n'est pas rendu vert par un réglage.
 
 - **Contraste (job `design`)** : `npm run audit:contrast` sort 1 — 40 écarts sur 18 502 mesures,
   tous sur le prénom du joueur (`span.pplayer`) pendant les états transitoires (appui, flash,
   butée), rapports de 4,10 à 4,69 pour 4,70 exigé, dans sept thèmes (`dark`, `nature`, `arcade`,
   `sunset`, `ocean`, `mono`, `sobre`). Appartient à B ; non corrigé. `docs/DECISIONS.md` D13.
-- **Performance (job `lighthouse`)** : rouge de façon reproductible — pire des 5 exécutions 0,89
-  (0,89 à 0,98) pour un seuil de 0,95, à cause du délai d'affichage du plus grand élément (LCP
-  1,98 s à 3,36 s). Le budget n'est pas relâché ; correction attribuée à B (préchargement des
-  polices du premier rendu, feuilles bloquantes, amorçage). ADR-15.
-- Fragilité de la mesure de performance : même après correction du LCP, la mesure reste sensible à
-  la charge de la machine ; un vert n'est tenu pour acquis qu'après trois passages consécutifs en
-  agrégation pessimiste (D21).
+- Fragilité de la mesure de performance : même corrigée (voir « Ajouté », 20 septembre), la mesure
+  reste sensible à la charge de la machine ; un vert n'est tenu pour acquis qu'après trois passages
+  consécutifs en agrégation pessimiste (D21).
 - `exportDiagnostics()` (version du service worker, navigateur, quota, journal d'erreurs) n'est
   relié à aucun bouton de l'interface : l'accès se fait par la console, voir
   `docs/EXPLOITATION.md` § 5.

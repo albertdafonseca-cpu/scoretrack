@@ -178,6 +178,35 @@ flowchart TD
 - Icônes : SVG inline `currentColor` via `icons.js` ; les emojis présents dans `index.html` sont
   des textes de secours remplacés au chargement (`hydrateIcons`).
 
+## 5 bis. CSS critique et différée (générées, jamais éditées à la main)
+
+`index.html` ne charge pas les neuf feuilles sources de `css/` une par une : il charge deux
+fichiers **générés** par `scripts/build-css.mjs` à partir d'elles.
+
+| Fichier            | Contenu                                                          | Chargement                                                                       |
+| ------------------ | ---------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `css/critical.css` | `fonts.css`, `tokens.css`, `themes.css`, `base.css`, `setup.css` | `<link rel="stylesheet">`, bloquant                                              |
+| `css/deferred.css` | `game.css`, `modals.css`, `motion.css`, `system.css`             | `media="print" data-deferred`, activée après la première trame par `js/start.js` |
+
+Règle : les neuf feuilles sources restent la vérité et gardent leurs propriétaires (B, A, C, E,
+assets) ; `css/critical.css` et `css/deferred.css` sont des **artefacts, jamais modifiés à la
+main**. `npm run build:css` les régénère (minifiés, reproductibles à l'octet : même entrée, même
+ordre de cascade, aucune date ni aléa) ; `npm run check:css` échoue si elles ne correspondent plus
+aux sources — comme `check:sw` pour le précache, dans le même job `lint` de la CI.
+
+Pourquoi : neuf feuilles bloquantes (111 Ko) coûtaient 2,1–2,5 s de premier rendu et 2,6–3,3 s
+d'affichage du plus grand élément (LCP). La feuille critique (45 Ko) suffit au premier écran ; le
+reste est différé. Mesuré par B, reproduit par F (3 séries de 5 exécutions Lighthouse, agrégation
+pessimiste) : performance **0,98–0,99**, LCP **1,80–2,26 s**, budget (≥ 0,95) tenu — voir ADR-15
+pour l'historique de la mesure et sa méthode de reproduction.
+
+Seuls les deux fichiers générés sont servis. Les neuf sources ne sont ni précachées (E les a
+exclues de `PRECACHE_EXCLUDE` dans `scripts/build-sw.mjs`, dans les deux sens : le précache
+échoue si l'une d'elles y réapparaît, et si `critical.css`/`deferred.css` en dérivait moins que
+prévu) ni publiées (`npm run build:dist` les retire de `dist/css/` après l'avoir copié : elles
+ne sont référencées par rien d'exécuté). Gain mesuré le 20 septembre 2026 : CSS embarqué ramené
+de 184 296 à 72 456 octets, soit 111 840 octets économisés sur le précache (ADR-21).
+
 ## 6. Décisions structurantes (rappel)
 
 | N°  | Décision                                                                           |
@@ -196,21 +225,23 @@ Le journal complet, avec contexte et conséquences, est dans [DECISIONS.md](DECI
 
 ## 7. Outillage
 
-| Commande                 | Rôle                                                                                        |
-| ------------------------ | ------------------------------------------------------------------------------------------- |
-| `npm run dev`            | serveur statique local sur la racine (port 8765)                                            |
-| `npm run lint`           | ESLint + Prettier + anti-emoji                                                              |
-| `npm run build:sw`       | régénère `PRECACHE`/`VERSION` de `sw-st.js` (obligatoire après tout ajout de fichier servi) |
-| `npm run check:sw`       | vérifie que `sw-st.js` est à jour                                                           |
-| `npm run test:unit`      | vitest (`tests/unit`, logique pure)                                                         |
-| `npm run test:e2e`       | Playwright, Chromium émulant un iPhone 13 tactile                                           |
-| `npm run check`          | lint + check:sw + unit + e2e — obligatoire avant tout commit                                |
-| `npm run build:dist`     | construit `dist/` : le dépôt moins l'outillage, exactement ce qui est publié                |
-| `npm run serve:dist`     | sert `dist/` sur le port 8765 (pour les audits ci-dessous)                                  |
-| `npm run lhci`           | Lighthouse CI sur `dist/` + budget de `lighthouserc.json`                                   |
-| `npm run audit:contrast` | contraste AA des 14 thèmes (serveur local requis) — échoue en cas de régression             |
-| `npm run audit:cvd`      | lisibilité en protanopie, deutéranopie, tritanopie — idem                                   |
-| `npm run audit`          | `npm audit --omit=dev` (aucune dépendance de production)                                    |
+| Commande                 | Rôle                                                                                                              |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`            | serveur statique local sur la racine (port 8765)                                                                  |
+| `npm run lint`           | ESLint + Prettier + anti-emoji                                                                                    |
+| `npm run build:css`      | régénère `css/critical.css` et `css/deferred.css` depuis les 9 sources — obligatoire après toute modification CSS |
+| `npm run check:css`      | vérifie que les deux feuilles générées sont à jour                                                                |
+| `npm run build:sw`       | régénère `PRECACHE`/`VERSION` de `sw-st.js` (obligatoire après tout ajout de fichier servi)                       |
+| `npm run check:sw`       | vérifie que `sw-st.js` est à jour                                                                                 |
+| `npm run test:unit`      | vitest (`tests/unit`, logique pure)                                                                               |
+| `npm run test:e2e`       | Playwright, Chromium émulant un iPhone 13 tactile                                                                 |
+| `npm run check`          | lint + check:sw + unit + e2e — obligatoire avant tout commit                                                      |
+| `npm run build:dist`     | construit `dist/` : le dépôt moins l'outillage, exactement ce qui est publié                                      |
+| `npm run serve:dist`     | sert `dist/` sur le port 8765 (pour les audits ci-dessous)                                                        |
+| `npm run lhci`           | Lighthouse CI sur `dist/` + budget de `lighthouserc.json`                                                         |
+| `npm run audit:contrast` | contraste AA des 14 thèmes (serveur local requis) — échoue en cas de régression                                   |
+| `npm run audit:cvd`      | lisibilité en protanopie, deutéranopie, tritanopie — idem                                                         |
+| `npm run audit`          | `npm audit --omit=dev` (aucune dépendance de production)                                                          |
 
 La CI (`.github/workflows/ci.yml`) exécute ces mêmes vérifications en sept jobs parallèles ; le job
 `paquet` construit `dist/`, vérifie qu'aucun fichier d'outillage n'y figure, que chaque entrée du
@@ -223,13 +254,13 @@ Mesures du 19 septembre 2026, prises sur le paquet `dist/` de l'arbre de travail
 indique la commande qui les reproduit : elles bougent à chaque livraison et doivent être relancées
 avant publication (D15).
 
-| Élément                       | Valeur                                                                                                | Comment la reproduire                                         |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| Coquille `index.html`         | 38 630 octets (37,7 Kio)                                                                              | `stat -c%s index.html`                                        |
-| Paquet publié `dist/`         | 69 fichiers, 1,07 Mio                                                                                 | `npm run build:dist && du -sb dist`                           |
-| Précache du service worker    | 59 entrées (58 fichiers distincts), 744 335 octets à 14 h, soit 82,7 % du plafond de 900 000 (ADR-21) | job `paquet` de la CI                                         |
-| dont polices auto-hébergées   | 244 132 octets (238 Kio)                                                                              | `du -cb assets/fonts/*.woff2`                                 |
-| Chargement initial de la page | 444 Kio (454 801 octets, identique sur les 5 exécutions)                                              | audit Lighthouse `total-byte-weight` (plafond 512 000 octets) |
+| Élément                       | Valeur                                                                                         | Comment la reproduire                                         |
+| ----------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Coquille `index.html`         | 38 630 octets (37,7 Kio)                                                                       | `stat -c%s index.html`                                        |
+| Paquet publié `dist/`         | 69 fichiers, 1,07 Mio                                                                          | `npm run build:dist && du -sb dist`                           |
+| Précache du service worker    | 52 entrées (51 fichiers distincts), 712 174 octets, soit 79,1 % du plafond de 900 000 (ADR-21) | job `paquet` de la CI                                         |
+| dont polices auto-hébergées   | 244 132 octets (238 Kio)                                                                       | `du -cb assets/fonts/*.woff2`                                 |
+| Chargement initial de la page | 444 Kio (454 801 octets, identique sur les 5 exécutions)                                       | audit Lighthouse `total-byte-weight` (plafond 512 000 octets) |
 
 Le précache et le chargement initial diffèrent : la page n'a besoin que d'une partie des fichiers
 pour s'afficher, le service worker télécharge le reste en arrière-plan pour le mode hors ligne.

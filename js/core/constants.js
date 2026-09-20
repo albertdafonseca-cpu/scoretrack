@@ -8,7 +8,7 @@ export const THEMES = [
   { id: 'cyber', name: 'Cyberpunk', bg: '#020d12', a: '#00ffe0', b: '#00bfff' },
   { id: 'dark', name: 'Dark', bg: '#0a0a0f', a: '#8A83FF', b: '#B5A6FF' },
   { id: 'neon-pink', name: 'Néon Rose', bg: '#0d0010', a: '#FF33D6', b: '#D966FF' },
-  { id: 'arcade', name: 'Arcade', bg: '#0a0800', a: '#ffdc00', b: '#FFA033' },
+  { id: 'arcade', name: 'Arcade', bg: '#0a0800', a: '#ffdc00', b: '#ffc266' },
   { id: 'nature', name: 'Nature', bg: '#051208', a: '#50c850', b: '#88dd44' },
   { id: 'sunset', name: 'Sunset', bg: '#120508', a: '#FF7050', b: '#ffaa00' },
   { id: 'ocean', name: 'Océan', bg: '#020810', a: '#33A6FF', b: '#33D6FF' },
