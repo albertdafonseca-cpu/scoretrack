@@ -17,8 +17,6 @@ export interface LastAdjustPrev {
 
 declare global {
   interface Window {
-    /** jsPDF (UMD) chargé depuis le CDN ; absent hors ligne au premier lancement */
-    jspdf?: { jsPDF: any };
     /** recalcul des tailles de texte après ouverture du tiroir de la barre */
     _barInit?: () => void;
     _lastAdjustPrev?: LastAdjustPrev;

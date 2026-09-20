@@ -389,3 +389,36 @@ jamais réutilisée même si une décision est amendée.)
   Correctif possible dans `tsconfig.test.json` (élément A) ou
   `src/globals.d.ts` (élément B), ni l'un ni l'autre dans mon périmètre.
   Voir `docs/audit/DECISIONS-D.md` §7.
+- **D23** — Intégration : le bloc mort Google Fonts (`FONT_CSS_URLS`,
+  `FONT_HOSTS`, la branche `fetch` associée) laissé dans `src/sw-worker.ts`
+  par l'élément E a été retiré. Ce bloc contactait réellement
+  `fonts.googleapis.com` à chaque installation du service worker — un vrai
+  P0 (confidentialité), trouvé indépendamment par les critiques des
+  éléments E et F au round 1 (aucun test Playwright classique ne le
+  détecte : les fetch émis depuis un service worker n'apparaissent pas dans
+  `page.on('request')`/`context.route()`). Ajout de
+  `tests/sw-worker.test.ts` : inspection de source (aucun hôte tiers connu
+  référencé) + exécution réelle du fichier compilé dans un bac à sable
+  minimal, qui échoue si l'installation demande une URL absolue. Les deux
+  angles ont été mutation-testés (bloc réintroduit temporairement →
+  échec confirmé des deux tests → restauré, `git diff` vide).
+- **D24** — Intégration : le poids initial de `dist/app.js` (1,6 Mo, dont
+  jsPDF ~800 Ko) relevé en P1 par le critique de l'élément E n'est **pas**
+  résolu par un chargement différé (`import()` dynamique). Étudié et rejeté
+  après mesure : la chaîne de build actuelle (`build.mjs`, esbuild, format
+  IIFE, un seul fichier de sortie) ne permet pas de découpage de code réel
+  sans passer en modules ES avec `splitting: true` (changement de
+  l'architecture de build, hors de portée d'un correctif d'intégration).
+  Une alternative testée en pensée — charger `recap-pdf.ts`/jsPDF depuis un
+  second fichier injecté par balise `<script>` au moment du clic — a été
+  écartée : `e2e/pdf-export-offline.spec.ts` (déjà vert, contrat déjà
+  vérifié par la critique de l'élément E) part hors ligne immédiatement
+  après le tout premier chargement de la page, avant toute activation du
+  service worker — un chargement différé par le réseau échouerait alors à
+  coup sûr, un régression jugée pire que le poids actuel du bundle. Décision
+  assumée : garder l'import statique de jsPDF (voir commentaire dans
+  `src/recap-pdf.ts`), au prix du poids de bundle, pour préserver la
+  garantie d'export PDF hors ligne dès la première visite. Un futur tour
+  pourrait rouvrir ce compromis en migrant tout le build vers l'ESM avec
+  découpage de code ET un précache de service worker qui couvre le nouveau
+  chunk avant la première coupure réseau — hors de portée ici.

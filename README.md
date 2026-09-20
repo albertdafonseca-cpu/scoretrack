@@ -27,7 +27,7 @@ build effectué (il référence `dist/app.js`).
 | `npm run lint` | `eslint .` (analyse de syntaxe TypeScript, flat config). |
 | `npm run test` | Tests unitaires Vitest (`tests/**/*.test.ts`), un seul passage. |
 | `npm run test:watch` | Tests unitaires Vitest en mode watch. |
-| `npm run test:e2e` | Test de bout en bout Playwright (`e2e/**/*.spec.ts`) sur `dist/index.html` — nécessite un `npm run build` préalable. |
+| `npm run test:e2e` | Test de bout en bout Playwright (`e2e/**/*.spec.ts`) sur `dist/index.html` — relance automatiquement `npm run build` avant (`pretest:e2e`), pour ne jamais tester un `dist/` périmé. |
 | `npm run check` | `npm run typecheck && npm run build`. |
 | `npm run ci` | `npm run lint && npm run typecheck && npm run test && npm run build` — la séquence exécutée par la CI GitHub Actions (`.github/workflows/ci.yml`). |
 
@@ -54,13 +54,17 @@ connues de cette configuration.
   - `dice3d/` — moteur de dés 3D (géométrie, matériaux) ; `dice-ui.ts` — feuille
     du lanceur de dés.
   - `i18n.ts`, `i18n/translations.ts` — internationalisation (18 langues).
-  - `recap-pdf.ts` — export PDF du récapitulatif (jsPDF, chargé depuis un CDN).
+  - `recap-pdf.ts` — export PDF du récapitulatif (jsPDF, dépendance npm
+    bundlée par esbuild, plus de chargement CDN).
   - `sw.ts` (enregistrement) / `sw-worker.ts` (le worker, compilé séparément
     vers `dist/sw.js`) — service worker, mode hors ligne.
   - `animations.ts`, `icons.ts`, `splash.ts`, `dom.ts`, `types.ts`,
     `globals.d.ts` — animations, icônes générées en canvas, écran de
     lancement, aides DOM, types partagés.
 - `index.html` — page unique de l'application.
+- `fonts/` — polices auto-hébergées (woff2), copiées vers `dist/fonts/` au
+  build ; `index.html` les référence via `./fonts/fonts.css` (plus d'appel à
+  Google Fonts).
 - `dist/` — sortie de build, non versionnée (`.gitignore`) : c'est le
   répertoire déployé.
 - `tests/` — tests unitaires Vitest.
