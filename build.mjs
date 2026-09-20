@@ -50,6 +50,29 @@ if (watch) {
   const ctxSw = await esbuild.context(swOptions);
   await Promise.all([ctx.watch(), ctxSw.watch()]);
 } else {
-  await esbuild.build(options);
-  await esbuild.build(swOptions);
+  // Les deux cibles (app.js et sw.js) sont indépendantes : on les construit
+  // toutes les deux même si l'une échoue (Promise.allSettled), pour rapporter
+  // en un seul passage TOUTES les erreurs plutôt que de s'arrêter à la
+  // première rencontrée. Si au moins une cible échoue, on l'annonce
+  // explicitement et on sort avec un code non nul (process.exit(1)) : un
+  // build.mjs qui laisserait passer un code de sortie 0 après un échec
+  // masquerait silencieusement une régression auprès de Vercel (qui ne
+  // bloquerait alors pas le déploiement) et de quiconque enchaîne ce script
+  // sans lire sa sortie (ex. `npm run build && npm run deploy`).
+  const targets = [
+    { label: 'src/main.ts -> dist/app.js', promise: esbuild.build(options) },
+    { label: 'src/sw-worker.ts -> dist/sw.js', promise: esbuild.build(swOptions) },
+  ];
+  const results = await Promise.allSettled(targets.map((t) => t.promise));
+  const failures = results
+    .map((result, i) => ({ result, label: targets[i].label }))
+    .filter(({ result }) => result.status === 'rejected');
+  if (failures.length) {
+    for (const { result, label } of failures) {
+      console.error(`\n✘ Échec du build (${label}) :`);
+      console.error(result.reason?.message ?? result.reason);
+    }
+    console.error(`\n${failures.length}/${targets.length} cible(s) de build en échec — dist/ n'est pas fiable, arrêt (code 1).`);
+    process.exit(1);
+  }
 }

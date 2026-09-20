@@ -159,3 +159,39 @@ jamais réutilisée même si une décision est amendée.)
   Chromium préinstallé et l'ajouter alourdirait une CI que la mission veut
   minimale. Reste disponible en local/manuel pour tout élément qui en a
   besoin ; à intégrer en CI plus tard si un élément le juge utile.
+- **D4** — Élément F : `.gitignore` complété avec `test-results/` et
+  `playwright-report/` (Playwright, dette signalée par l'élément A dans
+  `docs/audit/DECISIONS-A.md`), `coverage/` (Vitest, par anticipation),
+  `.vercel/` (CLI Vercel) et `.DS_Store`. Voir `docs/audit/DECISIONS-F.md` §1.
+- **D5** — Élément F : `README.md` créé (absent auparavant) — installation,
+  scripts npm réels, déploiement, structure des dossiers, rien de non
+  vérifié. Voir `docs/audit/DECISIONS-F.md` §2.
+- **D6** — Élément F : `build.mjs` — mesuré réellement qu'un échec d'une des
+  deux cibles esbuild (`src/main.ts`→`dist/app.js`, `src/sw-worker.ts`→
+  `dist/sw.js`) faisait déjà sortir le script avec un code non nul dans les
+  deux sens (pas de masquage silencieux constaté). Corrigé malgré tout pour
+  plus de robustesse : les deux cibles sont désormais construites en
+  parallèle (`Promise.allSettled`) pour rapporter toutes les erreurs en un
+  passage (au lieu de s'arrêter à la première), avec message explicite par
+  cible en échec et `process.exit(1)` explicite. Revérifié réellement après
+  correctif (erreur de syntaxe temporaire injectée puis restaurée, `git
+  diff` vide confirmé). Voir `docs/audit/DECISIONS-F.md` §3.
+- **D7** — Élément F : `vercel.json` — ajout d'en-têtes de sécurité HTTP
+  (X-Content-Type-Options, X-Frame-Options, Referrer-Policy,
+  Permissions-Policy, Content-Security-Policy) calibrés sur les origines
+  externes réellement contactées (`fonts.googleapis.com`/`fonts.gstatic.com`,
+  `cdnjs.cloudflare.com` pour jsPDF, `data:`/`blob:` pour les icônes/manifeste
+  générés par `src/icons.ts`). CSP validée réellement (serveur HTTP local +
+  Playwright avec écouteur `securitypolicyviolation`), pas seulement écrite :
+  0 violation après ajustement. `'unsafe-inline'` conservé en `script-src`/
+  `style-src` tant que les 65 `onclick` inline et le `<style>` inline
+  d'`index.html` existent (P1 #4, hors de mon périmètre) — défense en
+  profondeur complémentaire au correctif d'échappement HTML attendu de
+  l'élément B (P0 #2), pas un substitut. `DECISIONS-B.md` n'existait pas
+  encore au moment de cette décision. Voir `docs/audit/DECISIONS-F.md` §4
+  pour le détail et la recommandation de resserrement une fois E/D auront
+  retiré les dépendances CDN.
+- **D8** — Élément F : absence de licence dans `package.json` (P1 documenté
+  au constat initial) — recommandation seulement, non appliquée : hors de
+  mon périmètre d'édition (`package.json` = élément A). Voir
+  `docs/audit/DECISIONS-F.md` §5.
