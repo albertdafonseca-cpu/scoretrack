@@ -1,5 +1,6 @@
 import { t } from './i18n';
-import { elimPoints, fmtNum, lastLoser, players, singleWinner } from './game';
+import { cancelElim, cancelEndgame, closeScoreModal, elimPoints, fmtNum, lastLoser, players, singleWinner } from './game';
+import { closeDice } from './dice-ui';
 import { $, $opt } from './dom';
 import type { Player } from './types';
 
@@ -861,4 +862,104 @@ window._stopWinAnim=function(): void {
   _resetTexts();
   if(window._afterWinAnim) window._afterWinAnim();
 };
+})();
+
+// ── Accessibilité clavier des boîtes de dialogue (audit AAA, critique
+// round 1, défauts P1-2) ───────────────────────────────────────────
+// Les rôles `dialog`/`alertdialog` posés par cet élément sur 7 boîtes
+// (index.html) n'avaient aucune gestion clavier : le focus ne se déplaçait
+// jamais dans la boîte à son ouverture, `Tab` traversait l'écran masqué
+// derrière l'overlay (aucun piège de focus), et `Échap` ne fermait rien
+// (patron ARIA APG « Dialog (Modal) » non respecté). Corrigé ici sans
+// toucher `game.ts`/`dice-ui.ts` (hors périmètre) : chaque fermeture
+// réutilise tel quel l'export déjà existant de ces modules (mêmes
+// fonctions que les boutons ✕/Annuler déjà en place), jamais un nouveau
+// mécanisme. Toutes ces boîtes s'ouvrent/se ferment en retirant/ajoutant la
+// classe `.hidden` (mécanisme déjà en place partout ailleurs dans l'app) :
+// un `MutationObserver` sur cet attribut suffit à détecter l'ouverture,
+// sans dépendre de qui l'a déclenchée (bouton, geste tactile, etc.).
+(function initDialogA11y(){
+  interface DialogSpec {
+    id: string;
+    /** Reproduit une fermeture déjà existante ailleurs dans l'app (bouton
+     *  Annuler/Fermer/Retour) ; absent = pas de fermeture par Échap
+     *  (ex. `winner-modal`, qui impose un choix, comme au clavier avant ce
+     *  correctif — aucun bouton « Annuler » n'existe pour cette boîte). */
+    close?: () => void;
+  }
+
+  // `reset-modal`/`recap` : pas de fonction exportée dédiée, seulement déjà
+  // un retrait direct de la classe `.hidden` posé sur leurs propres
+  // boutons (`btn-back-reset` dans index.html, `recap-close-btn` dans
+  // `game.ts`) — on reproduit exactement le même geste, pas un nouveau.
+  const DIALOGS: DialogSpec[] = [
+    { id: 'dice-overlay', close: closeDice },
+    { id: 'score-modal', close: closeScoreModal },
+    { id: 'winner-modal' },
+    { id: 'reset-modal', close: () => $opt('reset-modal')?.classList.add('hidden') },
+    { id: 'elim-modal', close: cancelElim },
+    { id: 'endgame-modal', close: cancelEndgame },
+    { id: 'recap', close: () => $opt('recap')?.classList.add('hidden') },
+  ];
+
+  function isOpen(el: HTMLElement): boolean {
+    return !el.classList.contains('hidden');
+  }
+
+  const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]), '
+    + 'select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+  function focusableIn(container: HTMLElement): HTMLElement[] {
+    return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
+      .filter(el => el.offsetParent !== null);
+  }
+
+  function currentOpenDialog(): { el: HTMLElement; spec: DialogSpec } | null {
+    for (const spec of DIALOGS) {
+      const el = $opt(spec.id);
+      if (el && isOpen(el)) return { el, spec };
+    }
+    return null;
+  }
+
+  // Piège de focus + Échap : un seul écouteur global (capture, pour agir
+  // avant tout gestionnaire de la page masquée derrière l'overlay), actif
+  // uniquement quand une des 7 boîtes est réellement ouverte.
+  document.addEventListener('keydown', (e) => {
+    const open = currentOpenDialog();
+    if (!open) return;
+    if (e.key === 'Escape') {
+      if (open.spec.close) { e.preventDefault(); open.spec.close(); }
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    const items = focusableIn(open.el);
+    if (items.length === 0) return;
+    const first = items[0];
+    const last = items[items.length - 1];
+    const active = document.activeElement as HTMLElement | null;
+    const inside = !!active && open.el.contains(active);
+    if (e.shiftKey) {
+      if (!inside || active === first) { e.preventDefault(); last.focus(); }
+    } else {
+      if (!inside || active === last) { e.preventDefault(); first.focus(); }
+    }
+  }, true);
+
+  // Focus déplacé dans la boîte à l'ouverture (patron ARIA APG standard) :
+  // un `MutationObserver` par boîte, réagit dès que `.hidden` disparaît,
+  // quel que soit ce qui a déclenché l'ouverture.
+  for (const spec of DIALOGS) {
+    const el = $opt(spec.id);
+    if (!el) continue;
+    let wasOpen = isOpen(el);
+    new MutationObserver(() => {
+      const nowOpen = isOpen(el);
+      if (nowOpen && !wasOpen) {
+        const items = focusableIn(el);
+        (items[0] || el).focus();
+      }
+      wasOpen = nowOpen;
+    }).observe(el, { attributes: true, attributeFilter: ['class'] });
+  }
 })();

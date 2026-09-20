@@ -415,3 +415,187 @@ avec mon travail, vérifié ligne par ligne.
    (`src/globals.d.ts` non inclus dans ce programme) ; deux correctifs
    indépendants possibles, ni l'un ni l'autre dans mon périmètre (voir
    `DECISIONS-B.md` §4 pour le détail).
+
+---
+
+## 10. Round 2 — réponse à `docs/audit/D-critique-round1.md` (verdict : AAA non, 2 P1 + 1 P2)
+
+Le P0 relevé par le critique (`src/sw-worker.ts` contactait encore
+`fonts.googleapis.com`) est hors de mon périmètre et avait déjà été corrigé
+par l'orchestrateur (commit `eb73132`) avant que je ne commence ce round —
+rien à faire de mon côté dessus, vérifié par `grep -rn
+"fonts.googleapis\|fonts.gstatic" src/sw-worker.ts` (aucun résultat).
+
+### 10.1 — P1-1 : focus visible absent sur `.go-btn` — cause exacte diagnostiquée
+
+**Root cause mesurée** (pas une hypothèse — voir la méthode ci-dessous),
+confirmant et expliquant l'observation du critique
+(`getComputedStyle(el).outlineWidth === "0px"` alors que
+`el.matches(':focus-visible') === true`) :
+
+`.go-btn{...transition:all 0.18s;...}` (déjà présent avant ce round, non
+lié à `:focus-visible`) inclut `outline-width`/`outline-color`/
+`outline-offset`/`box-shadow` dans son `transition:all`, puisque ce sont
+des propriétés animables. À l'ouverture du focus, le nouvel `outline` de
+`:focus-visible` ne se peint donc qu'au terme d'un **fondu de 180 ms**, pas
+instantanément — invisible sur toute capture prise sans délai après `Tab`
+(exactement ce que faisait le critique, et ce que faisait mon propre script
+de diagnostic au premier essai, avec le même résultat trompeur `0px`).
+
+Démontré par isolation (résultats intermédiaires, reproductibles) :
+- Un bouton **fraîchement créé** (`document.createElement('button')`,
+  classe `.go-btn`, aucun lien avec le DOM existant) donne exactement le
+  même `outlineWidth: "0px"` au focus → ce n'est pas un état corrompu du
+  nœud original, c'est la classe CSS elle-même.
+- Remplacer la règle par des valeurs littérales (`outline:2.5px solid
+  #66CCEE`, sans aucun `var()`) donne **le même résultat** → ce n'est pas
+  un problème de substitution de variable CSS.
+- Lire `getComputedStyle(el).outlineWidth` **400 ms après** le focus (donc
+  après la fin de la transition de 180 ms) donne `"2px"`, la bonne couleur
+  (`rgb(153, 101, 169)` = `--accent`) et le bon décalage (`2px`) → confirme
+  que l'anneau finit bien par apparaître, juste pas instantanément.
+
+**Correctif** : `transition-duration:0s;` ajouté dans la règle
+`:focus-visible` elle-même (`index.html`). La spécification CSS
+Transitions résout la durée/les propriétés animées d'après le **style
+calculé après le changement d'état** — fixer la durée à 0 dans la règle
+`:focus-visible` (même spécificité `(0,1,0)` que `.go-btn`, mais déclarée
+après dans la feuille, donc gagnante à égalité) rend l'apparition du focus
+instantanée, sans toucher aux transitions normales (hover/active) des
+composants dans leurs autres états.
+
+**Preuve à l'écran, pas seulement dans le CSS** : captures avant/après
+focus recadrées avec une marge suffisante pour ne pas rogner l'anneau
+(erreur initiale de ma part : un premier essai de capture cadrait
+exactement sur la boîte englobante du bouton, coupant l'`outline` qui
+peint à l'extérieur) — anneau clairement visible sur `#btn-privacy-accept`
+et `#go-btn` (ce dernier atteint par de **vraies pressions clavier `Tab`**,
+pas un `.focus()` programmatique qui ne restaure pas forcément la modalité
+« clavier » de `:focus-visible` après un clic souris précédent — piège de
+mesure identifié en cours de route, contourné dans le test final).
+
+**Test e2e ajouté** (`e2e/accessibility-basics.spec.ts`, « anneau de focus
+réellement rendu (round 2)... ») : lit `outlineWidth` immédiatement après
+le focus (aucun délai), sur les deux boutons, avec de vraies pressions
+`Tab`. Mutation testée : `transition-duration:0s` retiré → le test échoue
+(`Expected: > 0, Received: 0`) ; remis → vert.
+
+### 10.2 — P1-2 : gestion clavier des boîtes de dialogue (focus à l'ouverture, piège de focus, Échap)
+
+Implémenté dans `src/animations.ts` (nouvelle fonction auto-exécutée
+`initDialogA11y`, aucun changement d'interface publique), **sans toucher
+`game.ts`/`dice-ui.ts`** : les fermetures réutilisent tel quel les exports
+déjà existants de ces modules, importés normalement (comme le fait déjà le
+reste d'`animations.ts` pour `elimPoints`/`fmtNum`/etc.) —
+`closeScoreModal`/`cancelElim`/`cancelEndgame` de `game.ts`,
+`closeDice` de `dice-ui.ts`. Pour `reset-modal`/`recap`, qui n'ont pas de
+fonction de fermeture dédiée exportée, Échap reproduit exactement le même
+geste déjà utilisé par leurs propres boutons existants
+(`classList.add('hidden')`, identique à `btn-back-reset` dans `index.html`
+et à l'`onclick` de `recap-close-btn` posé par `game.ts`) — aucun nouveau
+mécanisme inventé, conformément à la consigne.
+
+Les 7 boîtes de dialogue s'ouvrent/se ferment toutes en retirant/ajoutant
+la classe `.hidden` (mécanisme déjà en place partout dans l'app) : un
+`MutationObserver` par boîte sur l'attribut `class` détecte l'ouverture
+quel que soit ce qui l'a déclenchée (bouton, geste tactile, appel direct),
+sans dépendre d'un point d'entrée unique.
+
+Comportement implémenté, par boîte :
+- **Focus déplacé à l'ouverture** vers le premier élément interactif de la
+  boîte (patron ARIA APG « Dialog (Modal) »), avec repli sur la boîte
+  elle-même (`tabindex="-1"` ajouté aux 7 conteneurs dans `index.html`, au
+  cas où aucun élément interactif ne serait trouvé).
+- **Piège de focus** : `Tab`/`Shift+Tab` ne font jamais sortir le focus de
+  la boîte ouverte tant qu'elle l'est (un seul écouteur `keydown` global en
+  phase de capture, actif seulement si une des 7 boîtes est ouverte).
+- **Échap ferme la boîte**, sauf `winner-modal` (aucune fonction
+  « Annuler » n'existe pour cette boîte — elle impose un choix parmi trois
+  actions positives, comme c'était déjà le cas au clavier avant ce
+  correctif ; ajouter un mécanisme de fermeture inédit ici aurait été
+  inventer quelque chose qui n'existe nulle part ailleurs dans l'app,
+  contrairement à la consigne).
+
+**Vérifié réellement, pas seulement lu dans le code**, sur les deux boîtes
+demandées a minima (`#score-modal` ouvert comme un vrai appui long sur une
+carte le ferait — `openScoreModal(0)` — et `#dice-overlay` ouvert comme un
+vrai clic sur le bouton flottant — `openDice()`) :
+- focus dans la boîte à l'ouverture : confirmé (`document.activeElement`
+  est un `<button>` contenu dans la boîte) ;
+- 20 pressions `Tab` consécutives : le focus ne sort jamais de la boîte
+  (`everLeftDuringTab === false`) ;
+- `Échap` : la boîte repasse `hidden` immédiatement.
+
+**Non-régression du geste de fermeture par glissement du lanceur de dés**
+(CLAUDE.md, seuils 120px/0,3px·ms) : aucun risque par construction — ce
+geste est géré par `touchstart`/`touchmove`/`touchend` dans `dice-ui.ts`
+(non modifié, `git diff --stat src/dice-ui.ts` vide), mon écouteur
+`keydown` ne fait jamais `preventDefault()` en dehors des touches `Tab`/
+`Échap` et ne s'abonne à aucun événement tactile. `src/game.ts`,
+`src/dom.ts`, `src/globals.d.ts`, `src/dice3d/*` également intacts
+(`git diff --stat` vide sur les cinq).
+
+**Tests e2e ajoutés** (`e2e/accessibility-basics.spec.ts`, deux tests, un
+par boîte) : focus à l'ouverture, piège de focus sur 20 `Tab`, fermeture
+par Échap. Mutation testée : `initDialogA11y` neutralisé (`return;` en
+tête de fonction) → le test échoue dès la première assertion (« le focus
+devrait se déplacer dans #score-modal à son ouverture », `Received:
+false`) ; restauré → vert, `git diff --stat src/animations.ts` confirmé
+identique à l'état voulu après restauration.
+
+### 10.3 — P2 : contraste chip off/on du thème `mono-light`
+
+Mesuré indépendamment (avant correctif) : **2,93:1**, confirmant
+exactement la valeur du critique. `--chip-on` du thème `mono-light`
+(`index.html`) passait de `#4477AA` à **`#0050d0`** — la valeur de
+`--accent` déjà utilisée ailleurs par ce même thème (cohérence visuelle,
+pas une couleur inventée), qui porte le contraste chip-bg/chip-on à
+**4,28:1** (calculé) tout en gardant `--chip-on-text` (blanc) largement
+lisible dessus (6,87:1). Seul `mono-light` a été touché (`light-blue` et
+`sépia`, qui partageaient la même ancienne valeur `#4477AA` mais mesuraient
+déjà 3,16:1/3,21:1 selon le critique, sont restés inchangés).
+
+**Mesuré sur les pixels réellement rendus**, pas une valeur théorique :
+nouveau test e2e qui applique le thème (`window.ScoreTrack.game.applyTheme
+('mono-light')`), lit `getComputedStyle(...).backgroundColor` de deux
+sondes `.objectif-chip`/`.objectif-chip.on` réellement insérées dans le
+DOM, et calcule le ratio de contraste WCAG (luminance relative) à partir
+de ces couleurs RGB réelles. **Piège de mesure rencontré et corrigé en
+cours de route** : `.objectif-chip{transition:all 0.15s}` (même famille de
+défaut que §10.1) faisait lire l'état de départ de la transition si la
+classe `.on` était ajoutée après coup dans le même tick — corrigé en
+créant chaque sonde avec sa classe finale dès sa création, puis en
+attendant la fin de la transition (200 ms) avant de lire
+`backgroundColor`.
+
+Mutation testée : `--chip-on` remis à `#4477AA` → le test échoue en
+affichant exactement **2,93:1** (`contraste chip off/on mono-light mesuré :
+2.93:1`), reproduisant au chiffre près la mesure du critique ; restauré →
+vert (ratio mesuré ≥ 3, confirmé par le test).
+
+### 10.4 — Vérifications réelles (round 2)
+
+| Commande | Résultat |
+|---|---|
+| `npx tsc --noEmit` (tsconfig.json) | Vert, 0 erreur |
+| `npx tsc --noEmit -p tsconfig.sw.json` | Vert, 0 erreur |
+| `npm run lint` | 0 erreur (565 avertissements pré-existants `no-var`, hors de mon périmètre) |
+| `npm run test` (Vitest) | 87/87 verts (9 fichiers) |
+| `npm run build` | Vert |
+| `npx playwright test` | 12/12 verts (3 nouveaux tests de ce round + les 9 déjà existants, tous rejoués) |
+
+`git diff --stat` limité à `index.html`, `src/animations.ts` et
+`e2e/accessibility-basics.spec.ts` pour ce round — confirmé qu'aucun
+fichier hors périmètre n'a été touché (`game.ts`, `dom.ts`,
+`globals.d.ts`, `dice3d/*`, `dice-ui.ts`, `sw*.ts`, `recap-pdf.ts`,
+`package.json`, `tsconfig*`, `build.mjs`, `vercel.json`, `main.ts` tous
+absents du diff).
+
+### 10.5 — Dette restante inchangée
+
+Les points 1 à 5 de la section précédente restent valables tels quels
+(build.mjs/cpSync déjà résolu depuis par l'intégration `2456730` — voir
+§1 —, refonte onclick, émojis, axe-core, `tsconfig.test.json`/
+`globals.d.ts`). Rien de nouveau n'a été identifié comme dette lors de ce
+round 2 : les 3 défauts du critique sont tous corrigés et prouvés par
+mutation testing.

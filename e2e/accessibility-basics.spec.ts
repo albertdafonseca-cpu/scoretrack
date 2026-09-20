@@ -220,4 +220,198 @@ test.describe('Accessibilité de base (index.html, élément D)', () => {
       await server.close();
     }
   });
+
+  test('anneau de focus réellement rendu (round 2) sur les boutons d\'action principaux', async ({ page }) => {
+    // Round 1 (critique indépendant) : `:focus-visible` matchait bien
+    // l'élément mais `getComputedStyle(el).outlineWidth` valait 0px à
+    // l'écran sur #btn-privacy-accept/#go-btn (classe .go-btn). Cause
+    // diagnostiquée : `.go-btn{transition:all 0.18s}` s'applique aussi à
+    // `outline`/`box-shadow`, qui ne se peignaient donc qu'au terme d'un
+    // fondu de 180 ms — invisible sur une capture prise juste après Tab.
+    // Corrigé par `transition-duration:0s` dans la règle `:focus-visible`
+    // elle-même (la spec CSS Transitions résout la durée depuis le style
+    // calculé APRÈS le changement d'état). Ce test lit `outlineWidth`
+    // immédiatement après le focus, sans délai, pour ne jamais retomber
+    // dans le même piège de mesure que le round 1.
+    const server = await startStaticServer();
+    try {
+      await page.goto(server.url);
+
+      // #btn-privacy-accept : quelques Tab depuis le tout premier chargement
+      // (le sélecteur de langue de la page de confidentialité le précède
+      // dans l'ordre de tabulation).
+      let privacyLanded = '';
+      for (let i = 0; i < 10 && privacyLanded !== 'btn-privacy-accept'; i++) {
+        await page.keyboard.press('Tab');
+        privacyLanded = (await page.evaluate(() => document.activeElement?.id)) || '';
+      }
+      const privacyInfo = await page.evaluate(() => {
+        const el = document.activeElement as HTMLElement | null;
+        return {
+          id: el?.id,
+          matchesFocusVisible: el ? el.matches(':focus-visible') : false,
+          outlineWidth: el ? getComputedStyle(el).outlineWidth : '0px',
+        };
+      });
+      expect(privacyInfo.id).toBe('btn-privacy-accept');
+      expect(privacyInfo.matchesFocusVisible).toBe(true);
+      expect(parseFloat(privacyInfo.outlineWidth)).toBeGreaterThan(0);
+
+      // #go-btn : après un clic souris (sélection du préréglage), de vraies
+      // pressions Tab clavier (pas .focus() programmatique, qui ne restaure
+      // pas la modalité clavier de :focus-visible après un clic souris).
+      await page.locator('#btn-privacy-accept').click();
+      await page.locator('.preset-card').first().click();
+      await expect(page.locator('#go-btn')).toBeEnabled();
+      let landedId = '';
+      for (let i = 0; i < 40 && landedId !== 'go-btn'; i++) {
+        await page.keyboard.press('Tab');
+        landedId = (await page.evaluate(() => document.activeElement?.id)) || '';
+      }
+      expect(landedId).toBe('go-btn');
+      const goInfo = await page.evaluate(() => {
+        const el = document.getElementById('go-btn') as HTMLElement;
+        return {
+          matchesFocusVisible: el.matches(':focus-visible'),
+          outlineWidth: getComputedStyle(el).outlineWidth,
+        };
+      });
+      expect(goInfo.matchesFocusVisible).toBe(true);
+      expect(parseFloat(goInfo.outlineWidth)).toBeGreaterThan(0);
+    } finally {
+      await server.close();
+    }
+  });
+
+  test('#score-modal : focus déplacé à l\'ouverture, piège de focus, Échap ferme', async ({ page }) => {
+    // Round 1 (critique indépendant) : role="dialog" posé sans aucune
+    // gestion clavier (patron ARIA APG « Dialog (Modal) » non respecté).
+    // Corrigé dans src/animations.ts (initDialogA11y), sans toucher
+    // game.ts (closeScoreModal y est importé et réutilisé tel quel).
+    const server = await startStaticServer();
+    try {
+      await page.goto(server.url);
+      await page.locator('#btn-privacy-accept').click();
+      await page.locator('.preset-card').first().click();
+      await page.locator('#go-btn').click();
+      await page.locator('#names-go-btn').click();
+      await page.locator('.pcard .score').first().waitFor();
+      await page.evaluate(() => {
+        (window as unknown as { ScoreTrack: { game: { openScoreModal: (i: number) => void } } })
+          .ScoreTrack.game.openScoreModal(0);
+      });
+      await page.waitForTimeout(150);
+
+      const focusedInside = await page.evaluate(() => document.getElementById('score-modal')!.contains(document.activeElement));
+      expect(focusedInside, 'le focus devrait se déplacer dans #score-modal à son ouverture').toBe(true);
+
+      let everLeftDuringTab = false;
+      for (let i = 0; i < 20; i++) {
+        await page.keyboard.press('Tab');
+        const inside = await page.evaluate(() => document.getElementById('score-modal')!.contains(document.activeElement));
+        if (!inside) { everLeftDuringTab = true; break; }
+      }
+      expect(everLeftDuringTab, 'Tab ne devrait jamais faire sortir le focus de #score-modal tant qu\'il est ouvert').toBe(false);
+
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(100);
+      const closed = await page.evaluate(() => document.getElementById('score-modal')!.classList.contains('hidden'));
+      expect(closed, 'Échap devrait fermer #score-modal').toBe(true);
+    } finally {
+      await server.close();
+    }
+  });
+
+  test('#dice-overlay : focus déplacé à l\'ouverture, piège de focus, Échap ferme', async ({ page }) => {
+    const server = await startStaticServer();
+    try {
+      await page.goto(server.url);
+      await page.locator('#btn-privacy-accept').click();
+      await page.locator('.preset-card').first().click();
+      await page.locator('#go-btn').click();
+      await page.locator('#names-go-btn').click();
+      await page.locator('.pcard .score').first().waitFor();
+      await page.evaluate(() => {
+        (window as unknown as { ScoreTrack: { diceUi: { openDice: () => void } } })
+          .ScoreTrack.diceUi.openDice();
+      });
+      await page.waitForTimeout(150);
+
+      const focusedInside = await page.evaluate(() => document.getElementById('dice-overlay')!.contains(document.activeElement));
+      expect(focusedInside, 'le focus devrait se déplacer dans #dice-overlay à son ouverture').toBe(true);
+
+      let everLeftDuringTab = false;
+      for (let i = 0; i < 20; i++) {
+        await page.keyboard.press('Tab');
+        const inside = await page.evaluate(() => document.getElementById('dice-overlay')!.contains(document.activeElement));
+        if (!inside) { everLeftDuringTab = true; break; }
+      }
+      expect(everLeftDuringTab, 'Tab ne devrait jamais faire sortir le focus de #dice-overlay tant qu\'il est ouvert').toBe(false);
+
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(100);
+      const closed = await page.evaluate(() => document.getElementById('dice-overlay')!.classList.contains('hidden'));
+      expect(closed, 'Échap devrait fermer #dice-overlay').toBe(true);
+    } finally {
+      await server.close();
+    }
+  });
+
+  test('contraste chip off/on du thème mono-light >= 3:1 (WCAG 1.4.11)', async ({ page }) => {
+    // Round 1 (critique indépendant) : mesuré à 2.93:1 sur les pixels
+    // réellement rendus (chip sélectionnée/non sélectionnée du thème
+    // "mono-light", seule information non textuelle du réglage). Corrigé
+    // en réutilisant --accent du thème (#0050d0, déjà utilisé ailleurs
+    // dans ce thème) comme --chip-on. Mesuré ici sur le DOM réellement
+    // rendu (luminance relative WCAG à partir de getComputedStyle), pas
+    // une valeur théorique lue dans le CSS source.
+    const server = await startStaticServer();
+    try {
+      await page.goto(server.url);
+      await page.locator('#btn-privacy-accept').click();
+      await page.evaluate(() => {
+        (window as unknown as { ScoreTrack: { game: { applyTheme: (id: string) => void } } })
+          .ScoreTrack.game.applyTheme('mono-light');
+      });
+      await page.waitForTimeout(100);
+
+      // `.objectif-chip{transition:all 0.15s}` : les deux sondes doivent
+      // porter leur classe finale dès leur création (pas un ajout de
+      // `.on` après coup dans le même tick), sans quoi la lecture de
+      // `background-color` intercepte l'état de départ de la transition
+      // au lieu de la couleur réellement affichée à l'écran — même piège
+      // de mesure que le focus visible (round 1, P1-1) sur `.go-btn`.
+      const ratio = await page.evaluate(async () => {
+        function relLum(rgb: string): number {
+          const m = rgb.match(/\d+(\.\d+)?/g);
+          if (!m) return 0;
+          const [r, g, b] = m.slice(0, 3).map(Number).map((c) => {
+            const s = c / 255;
+            return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+          });
+          return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        }
+        function makeProbe(cls: string): HTMLDivElement {
+          const probe = document.createElement('div');
+          probe.className = cls;
+          probe.style.position = 'fixed';
+          probe.style.top = '-999px';
+          document.body.appendChild(probe);
+          return probe;
+        }
+        const off = makeProbe('objectif-chip');
+        const on = makeProbe('objectif-chip on');
+        await new Promise((r) => setTimeout(r, 200)); // laisse la transition CSS se terminer
+        const bgColor = getComputedStyle(off).backgroundColor;
+        const onColor = getComputedStyle(on).backgroundColor;
+        off.remove(); on.remove();
+        const l1 = relLum(bgColor), l2 = relLum(onColor);
+        const [hi, lo] = l1 > l2 ? [l1, l2] : [l2, l1];
+        return (hi + 0.05) / (lo + 0.05);
+      });
+      expect(ratio, `contraste chip off/on mono-light mesuré : ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(3);
+    } finally {
+      await server.close();
+    }
+  });
 });

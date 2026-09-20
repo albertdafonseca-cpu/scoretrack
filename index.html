@@ -94,7 +94,7 @@
   --border:rgba(0,0,0,0.12);--accent:#0050d0;--accent2:#0070e0;
   --green:#006600;--red:#cc0000;--text:#111111;--muted:#aaaaaa;--muted2:#666666;
   --btn-font:'SuperFortune',sans-serif;--score-font:'SuperFortune',sans-serif;--radius:0px;
-  --chip-bg:#cccccc;--chip-text:#666666;--chip-on:#4477AA;--chip-on-text:#ffffff;
+  --chip-bg:#cccccc;--chip-text:#666666;--chip-on:#0050d0;--chip-on-text:#ffffff;
   --bg-grad:linear-gradient(180deg,#ffffff 0%,#ececec 100%);
   --modal-bg:rgba(0,0,0,0.55);--modal-glow:0 -8px 24px rgba(0,0,0,0.12);}
 [data-theme="sobre"]{
@@ -1365,7 +1365,21 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
    sur le seul bouton où deux états opposés (Gain/Perte) sont visibles
    simultanément et ne se distinguaient jusqu'ici que par la couleur
    (D-CLAUDE-2 / D-PREF-1 : jamais la couleur seule). */
-:focus-visible{outline:2.5px solid var(--accent,#66CCEE);outline-offset:2px;box-shadow:0 0 0 4px color-mix(in srgb,var(--accent,#66CCEE) 35%,transparent);}
+:focus-visible{outline:2.5px solid var(--accent,#66CCEE);outline-offset:2px;box-shadow:0 0 0 4px color-mix(in srgb,var(--accent,#66CCEE) 35%,transparent);
+  /* Cause exacte diagnostiquée (critique round 1, P1-1) : de nombreux boutons
+     (`.go-btn` notamment) portent `transition:all 0.18s`, qui s'applique aussi
+     à `outline`/`box-shadow` puisque `all` les inclut ; l'anneau de focus
+     n'apparaissait donc qu'au terme d'un fondu de 180 ms au lieu d'être
+     instantané, ce que deux captures d'écran prises immédiatement après Tab
+     ne pouvaient jamais distinguer d'une absence totale de focus visible. La
+     spécification CSS Transitions résout la durée/les propriétés animées
+     d'après le style calculé APRÈS le changement d'état : fixer ici
+     `transition-duration:0s` (même spécificité que `.go-btn`, mais cette
+     règle est déclarée après dans la feuille donc l'emporte à égalité de
+     spécificité) rend l'apparition du focus instantanée sans toucher aux
+     transitions normales (hover/active) des composants, qui restent
+     inchangées en dehors de l'état focus. */
+  transition-duration:0s;}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
   clip:rect(0,0,0,0);white-space:nowrap;border:0;}
 .sign-btn.active::after{content:' \2713';} /* coche : le signe actif ne repose plus que sur la couleur */
@@ -1566,7 +1580,7 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
 <div id="dice-fab" class="hidden" onclick="openDice()">🎲</div>
 
 <!-- Overlay lanceur de dés -->
-<div id="dice-overlay" class="hidden" onclick="if(event.target===this)closeDice()" role="dialog" aria-modal="true" aria-labelledby="dice-title">
+<div id="dice-overlay" class="hidden" onclick="if(event.target===this)closeDice()" role="dialog" aria-modal="true" aria-labelledby="dice-title" tabindex="-1">
   <div class="dice-sheet">
     <div class="dice-handle"></div>
     <div class="dice-sheet-top" id="dice-sheet-top">
@@ -1633,7 +1647,7 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
 </div>
 
 <div id="modal-backdrop" class="hidden"></div>
-<div class="modal-overlay hidden" id="score-modal" role="dialog" aria-modal="true" aria-labelledby="score-modal-player">
+<div class="modal-overlay hidden" id="score-modal" role="dialog" aria-modal="true" aria-labelledby="score-modal-player" tabindex="-1">
   <div class="modal-box">
     <div class="modal-content-rotatable" id="modal-content-rotatable">
       <div class="modal-handle"></div>
@@ -1652,7 +1666,7 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
   </div>
 </div>
 
-<div class="modal-overlay hidden" id="winner-modal" role="alertdialog" aria-modal="true" aria-live="assertive" aria-labelledby="winner-name">
+<div class="modal-overlay hidden" id="winner-modal" role="alertdialog" aria-modal="true" aria-live="assertive" aria-labelledby="winner-name" tabindex="-1">
   <div class="modal-box winner-modal-box">
     <div class="winner-icon" id="winner-icon" aria-hidden="true">🏆</div>
     <div class="winner-name" id="winner-name">—</div>
@@ -1665,7 +1679,7 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
   </div>
 </div>
 
-<div class="modal-overlay hidden" id="reset-modal" role="alertdialog" aria-modal="true" aria-labelledby="reset-sub-txt">
+<div class="modal-overlay hidden" id="reset-modal" role="alertdialog" aria-modal="true" aria-labelledby="reset-sub-txt" tabindex="-1">
   <div class="simple-modal-box">
     <div class="winner-sub reset-sub" id="reset-sub-txt"></div>
     <div class="simple-modal-btns">
@@ -1676,7 +1690,7 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
   </div>
 </div>
 
-<div class="modal-overlay hidden" id="elim-modal" role="alertdialog" aria-modal="true" aria-labelledby="elim-confirm-name" aria-describedby="elim-confirm-sub">
+<div class="modal-overlay hidden" id="elim-modal" role="alertdialog" aria-modal="true" aria-labelledby="elim-confirm-name" aria-describedby="elim-confirm-sub" tabindex="-1">
   <div class="simple-modal-box">
     <div class="winner-icon" aria-hidden="true">💀</div>
     <div class="winner-name" id="elim-confirm-name">—</div>
@@ -1688,7 +1702,7 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
   </div>
 </div>
 
-<div class="modal-overlay hidden" id="endgame-modal" role="alertdialog" aria-modal="true" aria-labelledby="endgame-modal-title" aria-describedby="endgame-modal-sub">
+<div class="modal-overlay hidden" id="endgame-modal" role="alertdialog" aria-modal="true" aria-labelledby="endgame-modal-title" aria-describedby="endgame-modal-sub" tabindex="-1">
   <div class="simple-modal-box">
     <div class="winner-icon" id="endgame-modal-icon" aria-hidden="true">🏁</div>
     <div class="winner-name" id="endgame-modal-title">Fin de partie</div>
@@ -1700,7 +1714,7 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
   </div>
 </div>
 
-<div class="fullpage hidden" id="recap" role="dialog" aria-modal="true" aria-labelledby="recap-title-txt">
+<div class="fullpage hidden" id="recap" role="dialog" aria-modal="true" aria-labelledby="recap-title-txt" tabindex="-1">
   <div class="fullpage-header">
     <div class="fullpage-title" id="recap-title-txt">Récapitulatif</div>
     <button class="fullpage-close" id="recap-close-btn" aria-label="Fermer">✕</button>

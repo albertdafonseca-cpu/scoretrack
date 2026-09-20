@@ -452,3 +452,34 @@ jamais réutilisée même si une décision est amendée.)
   `git stash` scopé aux seuls fichiers de l'élément C pour isoler la cause).
   `npm run typecheck`/`lint`/`test` (87/87)/`build` tous revérifiés verts.
   Voir `docs/audit/DECISIONS-C.md` §8 pour le détail complet.
+- **D26** — Élément D, round 2 : réponse à `docs/audit/D-critique-round1.md`
+  (verdict round 1 : AAA non, 2 P1 + 1 P2 ; le P0 relevé — fetch mort vers
+  Google Fonts dans `src/sw-worker.ts` — était hors de mon périmètre et déjà
+  corrigé par l'orchestrateur avant ce round, commit `eb73132`). Cause exacte
+  du P1-1 (aucun focus visible sur `.go-btn` malgré `:focus-visible` qui
+  matchait) diagnostiquée par isolation : `.go-btn{transition:all 0.18s}`
+  anime aussi `outline`/`box-shadow`, retardant l'apparition du focus de
+  180 ms — invisible sur une capture prise sans délai après `Tab` (piège de
+  mesure reproduit puis expliqué). Corrigé par `transition-duration:0s`
+  dans la règle `:focus-visible` elle-même (la CSS Transitions spec résout
+  la durée d'après le style *après* le changement d'état). P1-2 (aucune
+  gestion clavier des 7 boîtes `dialog`/`alertdialog`) implémenté dans
+  `src/animations.ts` (`initDialogA11y`) sans toucher `game.ts`/`dice-ui.ts` :
+  focus déplacé à l'ouverture, piège de focus, Échap — en réutilisant tel
+  quel les fonctions de fermeture déjà exportées de ces deux modules
+  (`closeScoreModal`, `cancelElim`, `cancelEndgame`, `closeDice`), ou le
+  geste déjà utilisé ailleurs (`classList.add('hidden')`) pour
+  `reset-modal`/`recap` qui n'ont pas de fonction dédiée ; `winner-modal`
+  volontairement sans fermeture Échap (aucun « Annuler » n'existe pour
+  cette boîte, inventer un mécanisme aurait contredit la consigne). P2
+  (contraste chip mono-light mesuré à 2,93:1) corrigé en réutilisant
+  `--accent` du même thème comme `--chip-on` (4,28:1 mesuré). Les 3
+  correctifs vérifiés sur les pixels/comportement réellement rendus
+  (Playwright), chacun mutation-testé (régression réintroduite puis
+  confirmée détectée par le test, restaurée). Aucune régression sur le
+  geste de fermeture par glissement du lanceur de dés (seuils 120px/
+  0,3px·ms, CLAUDE.md) : `src/dice-ui.ts` non modifié, `git diff --stat`
+  vide confirmé, tout comme `game.ts`/`dom.ts`/`globals.d.ts`/`dice3d/*`.
+  `npm run typecheck`/`lint`/`test` (87/87)/`build`/`playwright test`
+  (12/12) tous revérifiés verts. Voir `docs/audit/DECISIONS-D.md` §10 pour
+  le détail complet.
