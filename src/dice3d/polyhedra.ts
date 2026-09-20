@@ -81,7 +81,11 @@ export function dualVertices(archPoints: THREE.Vector3[]): THREE.Vector3[] {
 export function catalanDie(archFn: () => THREE.Vector3[], radius?: number, onSphere?: boolean | number): ConvexGeometry {
   var dv=dualVertices(archFn());
   var maxr=0; dv.forEach(function(v){maxr=Math.max(maxr,v.length());});
-  var s=(radius||1.3)/maxr;
+  // garde-fou division par zéro : un solide dégénéré (tous les sommets à l'origine)
+  // ne peut pas survenir avec les 5 solides d'Archimède codés en dur ci-dessus,
+  // mais un futur appelant avec une géométrie dégénérée ne doit pas produire de
+  // sommets NaN/Infinity (silhouette invisible plutôt qu'un crash de rendu).
+  var s=(radius||1.3)/(maxr||1e-6);
   dv.forEach(function(v){v.multiplyScalar(s);});
   var geo=new ConvexGeometry(dv);
   // Solides à faces TRIANGULAIRES (d48, d120) : les sommets d'un solide de Catalan

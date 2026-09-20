@@ -326,9 +326,46 @@ export function diceAnimate3D(obj: Die3D, finalVal: number, delayMs: number, dur
   obj.raf=requestAnimationFrame(frame);
 }
 
+// Libère les ressources GPU (géométries/matériaux/textures) d'une scène de dé avant
+// de la jeter. `renderer.dispose()` NE le fait PAS lui-même : il vide seulement les
+// caches internes du renderer (WeakMap remplacée), sans jamais appeler
+// gl.deleteBuffer/gl.deleteTexture sur les objets Three.js eux-mêmes (vérifié dans
+// three@0.149 : WebGLProperties.dispose() = `properties = new WeakMap()`). Sans cet
+// appel explicite, la libération réelle dépend entièrement de `forceContextLoss()`,
+// qui n'agit que si l'extension WEBGL_lose_context est disponible (elle peut être
+// absente ou partiellement supportée selon le pilote GPU) : sur un lanceur qui
+// reconstruit ses dés à chaque changement de type/nombre et à chaque thème
+// (diceResetPreview), c'est une fuite mémoire GPU réelle sur des lancers répétés,
+// pas seulement théorique. On ne libère jamais une texture marquée `shared` (cache
+// _numTexCache de die.ts, réutilisé par tous les dés vivants) ; les textures de
+// points du d6/d3/pièce (_dieFaceTexture), elles, sont régénérées à chaque
+// construction et doivent être libérées.
+export function _disposeSceneResources(scene: THREE.Scene): void {
+  scene.traverse(function(obj){
+    var o=obj as THREE.Object3D & {
+      geometry?: THREE.BufferGeometry;
+      material?: THREE.Material | THREE.Material[];
+      shadow?: { map: THREE.Texture | null };
+    };
+    if(o.geometry) o.geometry.dispose();
+    if(o.material){
+      (Array.isArray(o.material)?o.material:[o.material]).forEach(function(m){
+        var map=(m as THREE.Material & { map?: THREE.Texture | null }).map;
+        if(map && !map.userData.shared) map.dispose();
+        m.dispose();
+      });
+    }
+    if(o.shadow && o.shadow.map) o.shadow.map.dispose();
+  });
+}
 export function _disposeDice3D(): void {
   _diceThree.dice.forEach(function(o){
-    try{ if(o.raf)cancelAnimationFrame(o.raf); o.renderer.forceContextLoss(); o.renderer.dispose(); }catch(e){}
+    try{
+      if(o.raf)cancelAnimationFrame(o.raf);
+      _disposeSceneResources(o.scene);
+      o.renderer.forceContextLoss();
+      o.renderer.dispose();
+    }catch(e){}
   });
   _diceThree.dice=[];
 }
@@ -376,7 +413,12 @@ export function diceRenderPreview(): void {
   }
 }
 
-export var _diceRolling=false; var _diceRollGuard: number | null=null;
+// ReturnType<typeof setTimeout> plutôt que `number` : sous tsconfig.test.json
+// (types:["node"], atteint transitivement via les imports des tests), le lib
+// Node ambiant fait résoudre setTimeout() en NodeJS.Timeout et non en number ;
+// ce typage reste correct dans les deux environnements (build navigateur réel
+// via esbuild comme sous ce tsconfig de test).
+export var _diceRolling=false; var _diceRollGuard: ReturnType<typeof setTimeout> | null=null;
 export var _diceRolled=false;   // un lancer a-t-il eu lieu depuis l'ouverture ? (masque l'aperçu)
 
 export function rollDice(): void {

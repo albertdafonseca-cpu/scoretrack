@@ -280,3 +280,46 @@ jamais réutilisée même si une décision est amendée.)
   `src/i18n.ts` — hors du périmètre de B, correctif suggéré aux éléments A/D
   dans `DECISIONS-B.md` §4, contourné pour mes propres tests via
   `tests/support/loadGame.{js,d.ts}`).
+- **D14** — Élément C : fuite mémoire GPU réelle sur les dés reconstruits
+  (`src/dice-ui.ts`) — `renderer.dispose()` (three@0.149) ne libère jamais
+  lui-même les géométries/matériaux/textures (vérifié en lisant le code
+  source : `WebGLProperties.dispose()` remplace juste sa `WeakMap` interne,
+  sans `gl.deleteBuffer`/`gl.deleteTexture`) ; la libération réelle reposait
+  entièrement sur `forceContextLoss()`, un no-op silencieux si l'extension
+  `WEBGL_lose_context` est indisponible. Nouvelle fonction
+  `_disposeSceneResources(scene)` : dispose explicitement chaque
+  géométrie/matériau/texture de la scène avant destruction, sauf les
+  textures marquées `userData.shared` (cache `_numTexCache` de
+  `src/dice3d/die.ts`, réutilisées par tous les dés vivants — les disposer
+  casserait l'affichage des chiffres des autres dés encore affichés).
+  Couvre aussi un oubli distinct : le sol de la scène (`ShadowMaterial` +
+  `PlaneGeometry`) n'était référencé nulle part pour disposal. **Zéro
+  changement visuel** : 16 captures Playwright/swiftshader (14 types de dés +
+  aperçu multi-dés + résultat de lancer, RNG figé pour la reproductibilité)
+  identiques **octet pour octet** avant/après, 3 exécutions consécutives
+  reproductibles. Voir `docs/audit/DECISIONS-C.md` §1.1/1.2/§4.
+- **D15** — Élément C : même défaut cross-cutting que celui documenté par
+  l'élément B en D13 (`tsconfig.test.json`, `"types":["node"]`, atteint
+  transitivement par les tests → `setTimeout()` résout en `NodeJS.Timeout` au
+  lieu de `number`), rencontré indépendamment dans `src/dice-ui.ts`
+  (`_diceRollGuard`). Corrigé localement avec
+  `ReturnType<typeof setTimeout>` plutôt que `number`, sans toucher à
+  `tsconfig.test.json` (hors périmètre C). Convergence à noter pour A/D :
+  deux éléments indépendants (B et C) ont buté sur le même symptôme dans
+  deux fichiers différents. Voir `docs/audit/DECISIONS-C.md` §1.4.
+- **D16** — Élément C : fuite DOM sur `_cardBgHex` (`src/dice3d/die.ts`) —
+  la sonde `<div>` temporaire (mesure de la couleur de fond d'une carte
+  joueur pour teinter le corps du dé) n'était retirée qu'en chemin heureux ;
+  une exception en cours de route (`getComputedStyle`, `.match()`) laissait
+  un `<div>` orphelin dans `<body>`, jusqu'à 10× par dé construit. Corrigé
+  par `try/finally`. Voir `docs/audit/DECISIONS-C.md` §1.3.
+- **D17** — Élément C : 47 tests unitaires ajoutés
+  (`tests/dice3d.color.test.ts`, `tests/dice3d.geometry.test.ts`,
+  `tests/dice3d.dispose.test.ts`) sur les fonctions pures du moteur de dés
+  (colorimétrie/luminance D-CLAUDE-2, extraction/appariement des faces,
+  rayon d'arrondi plafonné D-CLAUDE-1, solides d'Archimède, libération de
+  ressources) — zéro test préexistant sur `src/dice3d/*`/`src/dice-ui.ts`
+  avant cet élément. 8 mutations testées (cassées puis restaurées), chacune
+  confirmée en échec avant restauration (D17 de l'audit v1 : aucun test ne
+  peut structurellement pas échouer). Aucune dépendance npm ajoutée. Voir
+  `docs/audit/DECISIONS-C.md` §3.
