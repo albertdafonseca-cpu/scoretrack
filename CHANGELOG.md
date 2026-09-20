@@ -65,7 +65,7 @@ Refonte complète de la qualité sur la base de l'audit de septembre 2026 (voir
 ### Modifié
 
 - `index.html` (106 Ko monolithique : CSS, JS et 39 `onclick` inline) découpé en une coquille de
-  structure (24 Ko au 17 septembre 2026, sans une ligne de script ni de style inline), neuf feuilles
+  structure (38 Ko au 19 septembre 2026, sans une ligne de script ni de style inline), neuf feuilles
   CSS et des modules ES natifs (`js/core`, `js/ui`, `js/platform`, `js/fx`).
 - Schéma de sauvegarde versionné : v0 (historique, sans version) → v1 (types assainis) → v2
   (journal d'actions) ; migrations testées sur fixtures.
@@ -73,12 +73,28 @@ Refonte complète de la qualité sur la base de l'audit de septembre 2026 (voir
   navigation servie depuis le cache avec page hors ligne intégrée, réseau d'abord pour les
   ressources non précachées.
 
-### En cours (élément A — écran de jeu ; à recaler à la fusion)
+### Connu et non livré (au 19 septembre 2026)
 
-- Récapitulatif chronologique : `timeline(log)` est livrée et testée dans `js/core/history.js` mais
-  n'est pas encore appelée par `js/ui/recap.js`.
-- Diagnostic : `exportDiagnostics()` n'est exposé par aucun bouton de l'interface.
-- Raccourcis du manifeste (`?action=new`, `?action=resume`) : déclarés, pas encore câblés (D14).
+Deux travaux d'intégration continue sont **rouges** sur l'arbre courant et le restent tant que les
+lignes ci-dessous n'ont pas disparu ; ils ne sont pas rendus verts par un réglage.
+
+- **Contraste (job `design`)** : `npm run audit:contrast` sort 1 — 40 écarts sur 18 502 mesures,
+  tous sur le prénom du joueur (`span.pplayer`) pendant les états transitoires (appui, flash,
+  butée), rapports de 4,10 à 4,69 pour 4,70 exigé, dans sept thèmes (`dark`, `nature`, `arcade`,
+  `sunset`, `ocean`, `mono`, `sobre`). Appartient à B ; non corrigé. `docs/DECISIONS.md` D13.
+- **Performance (job `lighthouse`)** : rouge de façon reproductible — pire des 5 exécutions 0,89
+  (0,89 à 0,98) pour un seuil de 0,95, à cause du délai d'affichage du plus grand élément (LCP
+  1,98 s à 3,36 s). Le budget n'est pas relâché ; correction attribuée à B (préchargement des
+  polices du premier rendu, feuilles bloquantes, amorçage). ADR-15.
+- Fragilité de la mesure de performance : même après correction du LCP, la mesure reste sensible à
+  la charge de la machine ; un vert n'est tenu pour acquis qu'après trois passages consécutifs en
+  agrégation pessimiste (D21).
+- `exportDiagnostics()` (version du service worker, navigateur, quota, journal d'erreurs) n'est
+  relié à aucun bouton de l'interface : l'accès se fait par la console, voir
+  `docs/EXPLOITATION.md` § 5.
+- Licence non choisie : `package.json` porte `UNLICENSED` en attendant la décision du propriétaire
+  (`docs/DECISIONS.md`, ADR-17).
+- Actions GitHub épinglées par tag majeur et non par empreinte (ADR-20).
 
 ### Supprimé
 

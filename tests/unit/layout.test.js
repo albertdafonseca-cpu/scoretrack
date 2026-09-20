@@ -493,8 +493,26 @@ describe('nameMaxLength', () => {
 
   it('atteint 18 caractères sur une grande carte et reste ≥ 3 sur la plus petite', () => {
     expect(nameMaxLength(1, 1024, 1366)).toBe(18);
-    expect(nameMaxLength(4, VP.width, VP.height)).toBe(18);
+    expect(nameMaxLength(4, 1024, 1366)).toBe(18);
+    expect(nameMaxLength(1, VP.width, VP.height)).toBe(16);
     expect(nameMaxLength(12, 240, 400)).toBeGreaterThanOrEqual(3);
+  });
+
+  it('ne croît jamais avec le nombre de joueurs (lissage dans le sens sûr)', () => {
+    for (const [w, h] of [
+      [320, 568],
+      [390, 844],
+      [1024, 1366],
+    ]) {
+      for (let n = 2; n <= 12; n++) {
+        expect(nameMaxLength(n, w, h)).toBeLessThanOrEqual(nameMaxLength(n - 1, w, h));
+      }
+      // Le lissage ne dépasse jamais l'ajustement géométrique brut : 9 joueurs restent à 9 ou 10.
+      expect(nameMaxLength(9, w, h)).toBeLessThanOrEqual(10);
+    }
+    // Sans lissage, passer de 8 à 9 joueurs divisait la longueur autorisée par deux (18 → 9).
+    expect(nameMaxLength(8, VP.width, VP.height)).toBe(11);
+    expect(nameMaxLength(9, VP.width, VP.height)).toBe(9);
   });
 
   it('sans écran mesurable, renvoie le minimum', () => {

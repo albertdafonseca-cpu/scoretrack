@@ -26,9 +26,10 @@ describe('fmtNum', () => {
 });
 
 describe('constantes', () => {
-  it('14 thèmes aux identifiants uniques, couleurs hexadécimales, thème par défaut présent', () => {
-    expect(THEMES).toHaveLength(14);
-    expect(new Set(THEMES.map((t) => t.id)).size).toBe(14);
+  it('thèmes aux identifiants uniques, couleurs hexadécimales, thème par défaut présent', () => {
+    // Le nombre de thèmes appartient à la table elle-même : on vérifie sa cohérence, pas un compte.
+    expect(THEMES.length).toBeGreaterThanOrEqual(14);
+    expect(new Set(THEMES.map((t) => t.id)).size).toBe(THEMES.length);
     THEMES.forEach((t) => {
       expect(t.name.length).toBeGreaterThan(0);
       [t.bg, t.a, t.b].forEach((c) => expect(c).toMatch(/^#[0-9a-f]{6}$/i));

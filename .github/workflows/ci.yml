@@ -19,12 +19,16 @@ concurrency:
 env:
   NODE_VERSION: 22
   # Poids maximal du précache du service worker (octets téléchargés à l'installation).
-  # Mesuré le 17 septembre 2026 (`npm run build:dist`) : ≈ 644 000 octets, 61 fichiers.
-  PRECACHE_MAX_BYTES: 750000
+  # Plafond d’expérience (ADR-21), pas un comptage : 900 000 octets = 18,0 s sur le profil « Slow 3G »
+  # des outils Chrome (400 kbit/s, RTT 2 s), 9,6 s en 3G Lighthouse (750 kbit/s), 4,4 s en « 4G lente »
+  # Lighthouse (1,6 Mbit/s). Poids mesuré le 19 septembre 2026 à 14 h : 744 335 octets (82,7 %), soit 14,9 s en
+  # Slow 3G. L’alerte se déclenche à 90 % (810 000 octets), au-dessus du poids courant : elle prévient
+  # d’une dérive, elle n’est pas un bruit permanent.
+  PRECACHE_MAX_BYTES: 900000
 
 jobs:
   lint:
-    name: Lint (eslint, prettier, précache SW, emoji)
+    name: Lint (eslint, prettier, précache SW, emoji, jetons)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -42,6 +46,8 @@ jobs:
         run: npm run check:sw
       - name: Aucun emoji système dans l'interface
         run: npm run lint:emoji
+      - name: Jetons de conception respectés (aucune valeur codée en dur)
+        run: npm run lint:tokens
 
   unit:
     name: Tests unitaires (vitest + couverture)
@@ -95,44 +101,112 @@ jobs:
   paquet:
     name: Empaquetage (dist/) et poids du précache
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Navigateur Chromium (captures)
+        run: npx playwright install --with-deps chromium
+      # ADR-19 : les captures versionnées (manifeste et README) sont régénérées ici et comparées octet
+      # à octet ; une interface qui a changé sans ses captures fait échouer la construction.
+      - name: Captures du manifeste et du README à jour
+        run: npm run check:screenshots
+      - name: Captures régénérées (artefact, en cas d'écart)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: captures-regenerees
+          path: test-results/screenshots/
+          retention-days: 14
+          if-no-files-found: ignore
       # Le paquet publié est construit à chaque PR, pas seulement au déploiement : une régression
       # d'empaquetage (fichier servi oublié, outillage publié par erreur) échoue ici.
       - name: Construire dist/
         run: npm run build:dist
-      - name: Fichiers essentiels présents, outillage absent
+      - name: Fichiers essentiels présents
         run: |
           for f in index.html sw-st.js manifest-st.json .nojekyll \
                    js/main.js css/tokens.css icons/icon-192.png; do
             test -f "dist/$f" || { echo "Manque dist/$f"; exit 1; }
           done
-          for f in package.json package-lock.json tests docs scripts node_modules .git; do
-            test ! -e "dist/$f" || { echo "dist/$f ne doit pas être publié"; exit 1; }
-          done
           echo "dist/ : $(find dist -type f | wc -l) fichiers, $(du -sh dist | cut -f1)"
-      - name: Précache complet et sous le poids maximal
+      # Contrôle en LISTE BLANCHE : tout fichier du paquet qui n'est ni précaché, ni déclaré au
+      # manifeste, ni l'un des actifs justifiés ci-dessous fait échouer la construction. Une liste
+      # noire de chemins connus ne voit pas ce qu'elle n'a pas prévu (des captures de débogage
+      # versionnées par erreur, par exemple) ; l'inverse est exhaustif par construction.
+      - name: Contrôle du paquet (liste blanche) et poids du précache
         run: |
           node - <<'NODE'
-          import { readFileSync, statSync } from 'node:fs';
+          import { readFileSync, readdirSync, statSync } from 'node:fs';
+          import { join } from 'node:path';
+
+          const DIST = 'dist';
           const max = Number(process.env.PRECACHE_MAX_BYTES);
-          const sw = readFileSync('dist/sw-st.js', 'utf8');
+          const warnAt = 0.9;
+
+          /** Actifs servis mais volontairement hors précache — une justification par entrée. */
+          const ALLOWED_UNCACHED = new Map([
+            ['.nojekyll', 'demandé par GitHub Pages pour servir les fichiers sans passer par Jekyll'],
+            ['sw-st.js', 'un service worker ne se précache pas lui-même'],
+            ['favicon.png', 'demandé spontanément à la racine par certains navigateurs'],
+            ['assets/fonts/LICENSES.md', 'mention de licence OFL, exigée à la redistribution des polices'],
+            ['assets/icons/sprite.svg', 'projection du jeu d\u2019icônes, non requise à l\u2019exécution'],
+            ['assets/brand/logo.svg', 'marque, non requise à l\u2019exécution (dessin inline dans js/ui/icons.js)'],
+            ['assets/brand/logo-mono.svg', 'idem, variante monochrome'],
+            ['icons/favicon-32.png', 'icône de favori, chargée en ligne seulement'],
+          ]);
+
+          const walk = (dir, base = '') =>
+            readdirSync(join(DIST, dir), { withFileTypes: true }).flatMap((e) => {
+              const rel = base ? `${base}/${e.name}` : e.name;
+              return e.isDirectory() ? walk(rel, rel) : [rel];
+            });
+          const present = walk('').sort();
+
+          const sw = readFileSync(`${DIST}/sw-st.js`, 'utf8');
           const block = sw.match(/const PRECACHE = \[([\s\S]*?)\];/);
           if (!block) { console.error('Liste PRECACHE introuvable dans sw-st.js'); process.exit(1); }
-          const urls = [...block[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
-          let total = 0;
-          const missing = [];
-          for (const u of urls) {
-            const rel = u.replace(/^\.\//, '') || 'index.html';
-            try { total += statSync(`dist/${rel}`).size; } catch { missing.push(rel); }
+          const precache = [...block[1].matchAll(/'([^']+)'/g)]
+            .map((m) => m[1].replace(/^\.\//, '') || 'index.html');
+
+          const manifest = JSON.parse(readFileSync(`${DIST}/manifest-st.json`, 'utf8'));
+          const declared = [
+            ...(manifest.icons ?? []).map((i) => i.src),
+            ...(manifest.screenshots ?? []).map((s) => s.src),
+            ...(manifest.shortcuts ?? []).flatMap((s) => (s.icons ?? []).map((i) => i.src)),
+          ].map((u) => u.replace(/^\.\//, ''));
+
+          const allowed = new Set([...precache, ...declared, ...ALLOWED_UNCACHED.keys()]);
+          const intruders = present.filter((f) => !allowed.has(f));
+          const ghosts = [...allowed].filter((f) => !present.includes(f));
+
+          let fatal = false;
+          if (intruders.length) {
+            fatal = true;
+            console.error(`Fichiers publiés sans y avoir droit (${intruders.length}) :`);
+            for (const f of intruders) console.error(`  ${f} (${statSync(`${DIST}/${f}`).size} octets)`);
+            console.error('Retirez-les du dépôt, ou déclarez-les (précache, manifeste, ALLOWED_UNCACHED).');
           }
-          console.log(`Précache : ${urls.length} entrées, ${total} octets (max ${max}).`);
-          if (missing.length) { console.error('Absents de dist/ :', missing.join(', ')); process.exit(1); }
-          if (total > max) { console.error('Précache trop lourd : première visite dégradée.'); process.exit(1); }
+          if (ghosts.length) {
+            fatal = true;
+            console.error('Déclarés mais absents du paquet :', ghosts.join(', '));
+          }
+
+          const total = precache.reduce((sum, f) => sum + (present.includes(f) ? statSync(`${DIST}/${f}`).size : 0), 0);
+          const pct = ((total / max) * 100).toFixed(1);
+          console.log(`Paquet : ${present.length} fichiers.`);
+          console.log(`Précache : ${precache.length} entrées, ${total} octets — ${pct} % du plafond (${max}).`);
+          if (total > max) {
+            fatal = true;
+            console.error('Précache au-dessus du plafond : première visite dégradée.');
+          } else if (total / max > warnAt) {
+            console.log(`::warning::Précache à ${pct} % du plafond : prévoir la révision du plafond (ADR-21) avant le prochain actif.`);
+          }
+          process.exit(fatal ? 1 : 0);
           NODE
       - name: Paquet publié (artefact)
         if: always()

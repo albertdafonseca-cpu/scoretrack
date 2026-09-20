@@ -411,6 +411,47 @@ test('journal du récap : aucune intersection avec le bouton « Revenir ici »',
   expect(errors).toEqual([]);
 });
 
+test('récap : un prénom de 18 caractères n’est abrégé que si la place manque vraiment', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await openApp(page);
+  await startGame(page, { players: 2, start: 10, names: [LONG, 'Bartholomew Longna'] });
+  // Élimination du second : sa ligne du classement porte la pastille « éliminé », qui volait la
+  // largeur du prénom (« Bartho… ») alors que la ligne du dessous était vide.
+  await page.evaluate(async () => {
+    const g = await import('./js/ui/game.js');
+    g.applyManualDelta(1, -10);
+  });
+  await page.locator('#elim-modal [data-action="confirm-elim"]').click();
+  await page.locator('#winner-modal [data-action="show-recap"]').click();
+  await expect(page.locator('#recap')).toBeVisible();
+  const rows = await page.evaluate(() =>
+    [...document.querySelectorAll('.recap-rank-name')].map((row) => {
+      const name = row.querySelector('span:first-child');
+      const tag = row.querySelector('.recap-tag');
+      return {
+        text: name.textContent,
+        tronque: name.scrollWidth > name.clientWidth + 0.5,
+        // Place réellement disponible pour le prénom seul : la largeur de son conteneur.
+        placeSeul: row.clientWidth >= name.scrollWidth,
+        pastille: tag ? tag.textContent : null,
+        pastilleSousLeNom: tag ? tag.offsetTop > name.offsetTop + name.offsetHeight / 2 : null,
+      };
+    }),
+  );
+  expect(rows.length).toBe(2);
+  for (const r of rows) {
+    // Règle : abrégé ⇒ le prénom seul ne tenait pas. Ici il tient (390 px, deux joueurs), donc
+    // aucun prénom ne doit être abrégé, pastille ou non.
+    if (r.placeSeul) expect(r.tronque, `${r.text} abrégé alors que la place existe`).toBe(false);
+  }
+  const out = rows.find((r) => r.pastille === 'éliminé');
+  expect(out, 'ligne de l’éliminé').toBeTruthy();
+  expect(out.tronque, 'prénom de l’éliminé').toBe(false);
+  expect(errors).toEqual([]);
+});
+
 test('feuille joueur : renommer (18 caractères) et réintégrer', async ({ page }) => {
   const errors = collectErrors(page);
   await openApp(page);
@@ -606,7 +647,7 @@ test('taps SIMULTANÉS : chaque doigt compte (2 puis 3 cartes à la fois)', asyn
   expect(errors).toEqual([]);
 });
 
-test('contraste sur pixels rendus : 14 thèmes × 7 états × 12 couleurs de carte × 3 textes (D16)', async ({
+test('contraste sur pixels rendus : tous les thèmes × 7 états × 12 couleurs de carte × 3 textes (D16)', async ({
   page,
 }, testInfo) => {
   test.setTimeout(600_000);
@@ -829,7 +870,7 @@ test('aucun prénom COURT tronqué, de 1 à 12 joueurs, et écart de taille du s
   expect(errors).toEqual([]);
 });
 
-test('hauteur de capitale du score, sur les 14 THÈMES, au gabarit 390 × 844', async ({
+test('hauteur de capitale du score, sur TOUS les thèmes de la table, au gabarit 390 × 844', async ({
   page,
 }, testInfo) => {
   test.setTimeout(240_000);
@@ -846,13 +887,18 @@ test('hauteur de capitale du score, sur les 14 THÈMES, au gabarit 390 × 844', 
       ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${parseFloat(cs.fontSize)}px ${cs.fontFamily}`;
       return Math.round(
         Math.min(
-          ...sc.textContent.split('\n').map((l) => ctx.measureText(l || '0').actualBoundingBoxAscent),
+          ...sc.textContent
+            .split('\n')
+            .map((l) => ctx.measureText(l || '0').actualBoundingBoxAscent),
         ),
       );
     });
   await openApp(page);
   const themes = await themeIds(page);
-  expect(themes.length, 'nombre de thèmes couverts').toBe(14);
+  // Le nombre de thèmes vient de la TABLE (js/core/constants.js), jamais d'une constante ici :
+  // la table a déjà changé une fois (thème « Automatique ») et un 14 en dur mettait la suite en
+  // rouge sans qu'aucun rendu n'ait régressé.
+  expect(themes.length, 'nombre de thèmes couverts').toBeGreaterThanOrEqual(14);
   const caps = {};
   const rowsOf = {};
   for (const players of [4, 12]) {

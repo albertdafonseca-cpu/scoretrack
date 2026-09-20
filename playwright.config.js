@@ -34,6 +34,11 @@ export default defineConfig({
         browserName: 'chromium',
         hasTouch: true,
         viewport: { width: 390, height: 844 },
+        // L'enregistreur de trace est lui-même un coût, et un coût PROPORTIONNEL à l'activité de la
+        // page : il pénalisait la série « cartes » sans toucher le témoin, soit 18 % de durée en
+        // trop entièrement imputables à l'instrument. On ne trace pas ce qu'on chronomètre.
+        trace: 'off',
+        video: 'off',
       },
       fullyParallel: false,
       // `dependencies` garantit que RIEN d'autre ne tourne pendant la mesure : le projet

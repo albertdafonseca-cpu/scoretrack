@@ -358,3 +358,61 @@ test("taille de police système à 200 % : rien n'est tronqué ni rétréci (D19
     }
   }
 });
+
+test('les feuilles générées (critical, deferred) portent exactement les règles de leurs sources', async ({
+  page,
+}) => {
+  // scripts/build-css.mjs concatène et minifie neuf feuilles sources en deux feuilles servies. Le
+  // navigateur est seul juge de l'équivalence : chaque feuille est chargée, ses règles sérialisées
+  // (`cssText`, forme normalisée) et comparées une à une. Une règle perdue par la minification (un
+  // `calc()` privé de ses espaces, par exemple) tomberait silencieusement à l'exécution — mesuré :
+  // neuf tests rouges avant que ce contrôle n'existe.
+  await page.goto('/');
+  const groups = {
+    'css/critical.css': ['fonts', 'tokens', 'themes', 'base', 'setup'],
+    'css/deferred.css': ['game', 'modals', 'motion', 'system'],
+  };
+  const rulesOf = async (href) =>
+    page.evaluate(async (url) => {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.media = 'print';
+      link.href = url + '?equiv=' + Math.random();
+      const done = new Promise((resolve, reject) => {
+        link.onload = resolve;
+        link.onerror = () => reject(new Error('feuille introuvable : ' + url));
+      });
+      document.head.appendChild(link);
+      await done;
+      // Les propriétés personnalisées sont sérialisées telles qu'écrites (espaces compris) : on
+      // neutralise les blancs autour des virgules, parenthèses et points-virgules, ce qui laisse
+      // intacts sélecteurs, déclarations et valeurs — et surtout les deux-points, qui distinguent
+      // `.a :is(.b)` (descendant) de `.a:is(.b)`.
+      const rules = [...link.sheet.cssRules].map((r) =>
+        r.cssText
+          .replace(/\s+/g, ' ')
+          .replace(/\s*([,;])\s*/g, '$1')
+          .replace(/\(\s+/g, '(')
+          .replace(/\s+\)/g, ')'),
+      );
+      link.remove();
+      return rules;
+    }, href);
+  for (const [generated, sources] of Object.entries(groups)) {
+    const expected = [];
+    for (const s of sources) expected.push(...(await rulesOf(`css/${s}.css`)));
+    const actual = await rulesOf(generated);
+    expect(actual.length, `${generated} : nombre de règles`).toBe(expected.length);
+    const diffs = [];
+    for (let i = 0; i < expected.length; i++) {
+      if (actual[i] !== expected[i]) {
+        diffs.push({
+          i,
+          source: expected[i].slice(0, 160),
+          generee: (actual[i] || '').slice(0, 160),
+        });
+      }
+    }
+    expect(diffs, `${generated} : règles différentes des sources`).toEqual([]);
+  }
+});

@@ -33,11 +33,12 @@ y compris dans les workflows GitHub Actions (jeton implicite en lecture seule ; 
 
 ### 2.2 Content-Security-Policy en balise `<meta>` et ses limites
 
-La CSP **actuellement** déclarée dans `index.html` (vérifiée le 17 septembre 2026) :
+La CSP déclarée dans `index.html` (vérifiée le 19 septembre 2026, ligne 11) :
 
 ```
-default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline';
-font-src 'self'; script-src 'self'; connect-src 'self'; manifest-src 'self'
+default-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none';
+img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self';
+script-src 'self'; worker-src 'self'; connect-src 'self'; manifest-src 'self'
 ```
 
 - GitHub Pages **ne permet pas de définir d'en-têtes HTTP** : pas de `Content-Security-Policy`,
@@ -47,22 +48,12 @@ font-src 'self'; script-src 'self'; connect-src 'self'; manifest-src 'self'
   `report-to` et `sandbox` y sont **ignorées** ; la politique ne s'applique qu'après l'analyse de la
   balise (ce qui précède dans le `<head>` n'est pas couvert, d'où sa position en tête) ; le
   service worker n'est pas gouverné par la CSP du document.
-- **Écart ouvert** : `base-uri` et `form-action` **ne retombent pas** sur `default-src` (spécifiés
-  hors de son champ), ils sont donc absents. Sans `base-uri`, une balise `<base>` injectée
-  redirigerait toutes les URL relatives ; sans `form-action`, un `<form>` injecté pourrait poster
-  vers un tiers. `object-src` et `worker-src` retombent bien sur `default-src`, mais les déclarer
-  explicitement rend la politique lisible et résiste aux évolutions de la spécification. Ligne
-  attendue, à poser par les propriétaires d'`index.html` (éléments C/A) :
-
-```
-default-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none';
-img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self';
-script-src 'self'; worker-src 'self'; connect-src 'self'; manifest-src 'self'
-```
-
-(Vérifié : aucun `new Worker`, aucun `<form>`, aucun `<base>`, aucun `<object>`/`<embed>` dans le
-code servi ; l'export de données passe par un `<a download>` + Blob, non soumis à ces directives.)
-
+- `base-uri 'none'` et `form-action 'none'` sont **déclarés explicitement** parce qu'ils ne
+  retombent pas sur `default-src` : sans eux, une balise `<base>` injectée détournerait toutes les
+  URL relatives et un `<form>` injecté pourrait poster vers un tiers. `object-src 'none'` et
+  `worker-src 'self'` retombent bien sur `default-src`, mais les écrire rend la politique lisible et
+  la met à l'abri des évolutions de la spécification. (Vérifié : aucun `new Worker`, `<form>`,
+  `<base>`, `<object>`/`<embed>` dans le code servi ; l'export passe par un `<a download>` + Blob.)
 - `style-src 'unsafe-inline'` est requis tant que du style est posé via `element.style` (couleurs
   des joueurs, tailles adaptatives). Ce n'est pas un vecteur d'exécution de code ; le durcir
   (nonces) est impossible sans serveur. Lighthouse le signale en « informatif » uniquement.
@@ -120,13 +111,29 @@ code servi ; l'export de données passe par un `<a download>` + Blob, non soumis
 
 ## 3. Ce que la CI garantit
 
-| Job          | Garantie de sécurité                                                    |
-| ------------ | ----------------------------------------------------------------------- |
-| `lint`       | Pas d'`eval`/`Function`, précache SW cohérent avec les fichiers réels   |
-| `unit`       | Migrations et validation de schéma (données hostiles ou corrompues)     |
-| `e2e`        | Injection par prénom, hors-ligne, mise à jour SW, aucune requête tierce |
-| `lighthouse` | `errors-in-console`, `csp-xss` (informatif), taille totale bornée       |
-| `audit`      | Aucune dépendance de production ; dev sans vulnérabilité critique       |
+| Job          | Garantie de sécurité                                                                                                                                                                                                                                                         |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lint`       | Pas d'`eval`/`Function` ; précache SW cohérent avec les fichiers réels ; aucun emoji hors des exceptions déclarées ; jetons de conception non contournés                                                                                                                     |
+| `unit`       | Migrations et validation de schéma (données hostiles ou corrompues)                                                                                                                                                                                                          |
+| `e2e`        | Injection par prénom, hors-ligne, mise à jour SW, aucune requête tierce                                                                                                                                                                                                      |
+| `paquet`     | **Liste blanche** : aucun fichier publié qui ne soit précaché, déclaré au manifeste ou justifié (ADR-21) ; chaque actif déclaré est présent ; poids de la première visite borné ; captures du manifeste et du README identiques à l'octet à ce que l'interface rend (ADR-19) |
+| `design`     | Contraste AA sur les 14 thèmes et lisibilité en protanopie/deutéranopie/tritanopie, mesurés sur les pixels rendus du paquet publié (D13, D16)                                                                                                                                |
+| `lighthouse` | `errors-in-console`, poids du chargement initial, budget de `lighthouserc.json` asserté sur la **pire** de 5 exécutions (D21)                                                                                                                                                |
+| `audit`      | Aucune dépendance de production ; dev sans vulnérabilité critique                                                                                                                                                                                                            |
+
+Chaque garde-fou de ce tableau est **prouvé par dégradation volontaire** avant d'être considéré
+comme livré (D17) : on introduit exprès la régression qu'il est censé arrêter et on vérifie le
+code 1. Journal des preuves du 19 septembre 2026 — sept dégradations, sept échecs constatés, dans
+l'ordre d'ADR-21 : capture de débogage publiée, `package.json` publié, dossier `docs/` publié,
+capture du manifeste absente, entrée de précache absente, plafond abaissé sous le poids courant,
+emoji dans l'interface / `sw-st.js` périmé.
+
+**Exception documentée (D17)** : `npm run audit:cvd` ne fait échouer la construction que sur la
+paire gain/perte. Les écarts de séparabilité de la palette des douze joueurs sont **listés dans le
+rapport sans bloquer**, parce que la palette est figée par D1 et qu'aucune palette de douze couleurs
+n'est séparable deux à deux pour un dichromate : la distinction repose sur un identifiant non
+chromatique par carte (D18), vérifié par les tests visuels. Ce n'est donc pas un garde-fou muet par
+négligence, mais une limite assumée et écrite.
 
 ## 4. Signalement
 

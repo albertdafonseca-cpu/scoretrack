@@ -50,7 +50,26 @@ export function flashHalf(half, positive) {
   setTimeout(() => half.classList.remove(cls), FLASH_MS);
 }
 
-const bubbleTimers = new WeakMap();
+/**
+ * Minuteries et fondus en cours, par bulle. Une `Map` et non une `WeakMap` : il faut pouvoir les
+ * PURGER toutes en quittant la partie (voir `purgeDeltaBubbles`), ce qu'une WeakMap interdit.
+ */
+const bubbleTimers = new Map();
+
+/**
+ * Annule toute minuterie de groupe et tout fondu encore en cours, sans toucher au DOM.
+ * À appeler en QUITTANT l'écran de jeu : sinon la minuterie de l'ancienne partie survivait au
+ * démontage de ses cartes et, en se déclenchant, fermait le groupe et masquait la bulle de la
+ * partie SUIVANTE — première bulle disparue à 0,9 s après un tap suivant un reset rapide.
+ */
+export function purgeDeltaBubbles() {
+  for (const [node, prev] of bubbleTimers) {
+    clearTimeout(prev.timer);
+    cancel(prev.anim);
+    clearFade(node);
+  }
+  bubbleTimers.clear();
+}
 
 /**
  * Affiche la bulle de delta cumulé d'un joueur. Elle reste pleinement visible `GROUP_DELAY` ms

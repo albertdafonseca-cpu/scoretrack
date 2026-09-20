@@ -873,6 +873,28 @@ test('erreur non gérée : bannière discrète, partie sauvegardée, journal loc
   await expect(toast).toBeVisible();
   await expect(toast).toHaveText('Un problème est survenu, la partie a été sauvegardée');
   await expect(toast).toHaveAttribute('role', 'status');
+  // En partie, le toast se place au-dessus de la barre d'action : le point sous chaque libellé n'est
+  // ni dans le rectangle du toast, ni couvert par autre chose que la barre elle-même.
+  await expect(toast).toHaveClass(/above-bar/);
+  const covered = await page.evaluate(() => {
+    const t = document.getElementById('sys-toast').getBoundingClientRect();
+    const inToast = (x, y) => x >= t.left && x <= t.right && y >= t.top && y <= t.bottom;
+    return [...document.querySelectorAll('#bar .btn-label')]
+      .map((n) => {
+        const r = n.getBoundingClientRect();
+        const x = r.left + r.width / 2;
+        const y = r.top + r.height / 2;
+        const under = document.elementFromPoint(x, y);
+        return {
+          label: n.textContent.trim(),
+          inToast: inToast(x, y),
+          inBar: Boolean(under?.closest('#bar')),
+        };
+      })
+      .filter((p) => p.inToast || !p.inBar);
+  });
+  expect(covered).toEqual([]);
+  expect(await page.locator('#bar .btn-label').count()).toBeGreaterThan(0);
   await page.screenshot({ path: join(SHOTS, 'error-toast.png') });
   const diag = await page.evaluate(async () => {
     const e = await import('./js/platform/errors.js');

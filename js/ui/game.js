@@ -62,7 +62,13 @@ import {
 import { setRestoreBannerVisible } from './setup.js';
 import { fitCard, lastFitGap } from '../fx/layout-fit.js';
 import { captureRects, playFlip } from '../fx/flip.js';
-import { flashHalf, hideDeltaBubble, setScoreText, showDeltaBubble } from '../fx/score.js';
+import {
+  flashHalf,
+  hideDeltaBubble,
+  purgeDeltaBubbles,
+  setScoreText,
+  showDeltaBubble,
+} from '../fx/score.js';
 import { createRing, startRing } from '../fx/hold-ring.js';
 import { celebrate, stopConfetti } from '../fx/confetti.js';
 
@@ -97,7 +103,7 @@ const cards = [];
 const parts = new WeakMap();
 /** Sens du dernier tap par joueur : un changement de sens ouvre une nouvelle action. */
 const lastTapDir = new Map();
-/** Texte du score affiché, par joueur : le ré-ajustement n'a lieu que s'il change vraiment. */
+/** Nombre de caractères du score affiché, par joueur : seule sa VARIATION rebat les tailles. */
 const scoreLen = [];
 /** Repère lisible de chaque carte (`cardBox`), recalculé à chaque mesure. */
 const boxes = [];
@@ -183,6 +189,10 @@ export function startGame(names) {
 /** Quitte l'écran de jeu et supprime la sauvegarde (reset). */
 export function leaveGame() {
   stopConfetti();
+  // Les minuteries de groupe (bulles de delta) appartiennent à CETTE partie : sans purge, l'une
+  // d'elles fermait le premier groupe de la partie suivante.
+  purgeDeltaBubbles();
+  endPress();
   if (resizeObserver) resizeObserver.disconnect();
   gameScreen().style.display = 'none';
   bar().style.display = 'none';
@@ -365,7 +375,7 @@ function measureCard(card, precomputed, ceiling = Infinity) {
     fit,
   );
   appliedSz[pi] = applied.scoreSz;
-  scoreLen[pi] = ref.score.textContent;
+  scoreLen[pi] = ref.score.textContent.length;
   fitGap = Math.max(fitGap, lastFitGap());
 }
 
@@ -559,9 +569,12 @@ function updateScore(pi, direction) {
   setScoreText(ref.score, text, direction);
   const cls = `score ${scoreClass(p.score, store.config.startPoints)}`.trim();
   if (ref.score.className !== cls) ref.score.className = cls;
-  // Un changement du nombre de chiffres rebat les tailles de TOUTE la disposition (plafond
-  // d'harmonisation) : on repasse donc sur l'ensemble des cartes, ce qui reste rare.
-  if (text !== scoreLen[pi]) measureAll();
+  // Un changement du NOMBRE DE CARACTÈRES rebat les tailles de toute la disposition (plafond
+  // d'harmonisation) : on repasse alors sur l'ensemble des cartes, ce qui reste rare. Comparer le
+  // texte lui-même déclenchait cette re-mesure à CHAQUE tap — 19 ms de calcul par appui à douze
+  // joueurs, mesurés par le test de fluidité — alors que passer de 100 à 101 ne change aucune
+  // taille. Le nombre de caractères couvre les deux formes du score : chiffres et coupure de ligne.
+  if (text.length !== scoreLen[pi]) measureAll();
   refreshScoreLabel(pi);
 }
 

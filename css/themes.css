@@ -284,8 +284,16 @@
 [data-theme='mono-light'],
 [data-theme='ldm-day'] {
   color-scheme: light;
-  --gain: #003d63;
-  --loss: #9a3c00;
+  /* Bleu assombri en même temps que la perte : sous protanopie, assombrir le brûlé le rapproche
+     en luminance du bleu (écart tombé à 13 %, sous la porte de 20 % de scripts/audit-cvd.mjs).
+     À #00334f l'écart remonte à 40 % en protanopie, 72 % en deutéranopie, 58 % en tritanopie. */
+  --gain: #00334f;
+  /* Brûlé assombri : à #9a3c00 le libellé « Reset » de la barre mesurait 4,33:1 en mono clair
+     lorsque l'ombre portée de la bannière système assombrit la barre (#cccccc au lieu de #dddddd),
+     état réel désormais audité. À #8c3400 : 5,02 sur la barre ombrée, 5,93 sur la barre au repos,
+     et la paire gain/perte reste à ΔE 41,8 avec 47 % d'écart de luminance sous les trois
+     simulations de daltonisme. */
+  --loss: #8c3400;
   /* Paire assombrie sur fond clair : l'encre posée dessus repasse en blanc. */
   --on-gain: #ffffff;
   --on-loss: #ffffff;
@@ -317,7 +325,10 @@
   --font-ui: 'Inter', 'Inter fallback', sans-serif;
   --radius: 12px;
   --chip-bg: #c8d4f0;
-  --chip-on: #4477aa;
+  /* Puce sélectionnée : à #4477aa, le blanc posé dessus mesurait 4,70:1, sans aucune marge — toute
+     trame de transition de thème passait sous 4,5 (violation intermittente de l'outil automatique
+     en état « erreur »). À #36628f : 6,36 pour le texte blanc, 4,28 sur --chip-bg (≥ 3:1). */
+  --chip-on: #36628f;
   --chip-on-text: #ffffff;
   --bg-grad:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Ccircle cx='10' cy='10' r='0.8' fill='%234455dd' opacity='0.18'/%3E%3C/svg%3E"),
@@ -343,7 +354,10 @@
   --font-ui: 'Inter', 'Inter fallback', sans-serif;
   --radius: 0px;
   --chip-bg: #d6d6d6;
-  --chip-on: #4477aa;
+  /* Puce sélectionnée : à #4477aa, le blanc posé dessus mesurait 4,70:1, sans aucune marge — toute
+     trame de transition de thème passait sous 4,5 (violation intermittente de l'outil automatique
+     en état « erreur »). À #36628f : 6,36 pour le texte blanc, 4,28 sur --chip-bg (≥ 3:1). */
+  --chip-on: #36628f;
   --chip-on-text: #ffffff;
   --card-mix: 13%;
   --score-color: var(--text);
@@ -372,7 +386,10 @@
   --font-ui: 'Inter', 'Inter fallback', sans-serif;
   --radius: 8px;
   --chip-bg: #ddd5c0;
-  --chip-on: #4477aa;
+  /* Puce sélectionnée : à #4477aa, le blanc posé dessus mesurait 4,70:1, sans aucune marge — toute
+     trame de transition de thème passait sous 4,5 (violation intermittente de l'outil automatique
+     en état « erreur »). À #36628f : 6,36 pour le texte blanc, 4,28 sur --chip-bg (≥ 3:1). */
+  --chip-on: #36628f;
   --chip-on-text: #ffffff;
   --card-base: #f0e9dc;
   --score-color: #664700;
@@ -413,15 +430,15 @@
   );
   --on-gain: light-dark(#ffffff, #000000);
   --on-loss: light-dark(#ffffff, #000000);
-  --gain: light-dark(#003d63, #8fe0ff);
-  --loss: light-dark(#9a3c00, #ff8844);
+  --gain: light-dark(#00334f, #8fe0ff);
+  --loss: light-dark(#8c3400, #ff8844);
   --warn: light-dark(#6e3d00, #ffb454);
   --font-display: 'Inter', 'Inter fallback', sans-serif;
   --font-score: 'Inter', 'Inter fallback', sans-serif;
   --font-ui: 'Inter', 'Inter fallback', sans-serif;
   --radius: 10px;
   --chip-bg: light-dark(#c8d4f0, #0d2535);
-  --chip-on: light-dark(#4477aa, #66ccee);
+  --chip-on: light-dark(#36628f, #66ccee);
   --chip-on-text: light-dark(#ffffff, #000000);
   --card-text: light-dark(#111111, #ffffff);
   --card-sign: light-dark(rgba(17, 17, 17, 0.6), rgba(255, 255, 255, 0.72));

@@ -43,9 +43,17 @@
 }
 
 /* Au-dessus de la barre de jeu (#bar : 68 px + zone sûre) */
-.sys-banner.above-bar,
-.sys-toast.above-bar {
+.sys-banner.above-bar {
   bottom: calc(var(--bar-h, 68px) + var(--sys-banner-gap, 12px) + env(safe-area-inset-bottom, 0px));
+}
+
+/* Le toast se place au-dessus de la barre et, si la bannière est ouverte, au-dessus d'elle
+   (`--sys-banner-h` vaut déjà bannière + interstice) : il ne recouvre ni libellé ni bouton. */
+.sys-toast.above-bar {
+  bottom: calc(
+    var(--bar-h, 68px) + var(--sys-banner-gap, 12px) + var(--sys-banner-h, 0px) +
+      env(safe-area-inset-bottom, 0px)
+  );
 }
 
 .sys-banner.hidden,

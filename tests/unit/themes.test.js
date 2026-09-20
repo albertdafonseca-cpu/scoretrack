@@ -180,15 +180,27 @@ describe('themes.css', () => {
     // La grille de réglages peint chaque carte avec bg/a/b de constants.js. Si ces trois valeurs
     // s'écartent des jetons réels, l'aperçu ment sur ce que l'utilisateur obtiendra — et le nom de
     // la carte, peint avec `a` sur `bg`, perd son contraste (mesuré à 4,58:1 avant resynchronisation).
+    // Thème « auto » : ses jetons sont des `light-dark(clair, sombre)`. La table ne porte que des
+    // couleurs fixes ; la règle retenue est que l'aperçu montre la branche SOMBRE, celle du thème
+    // par défaut, que l'application affiche partout ailleurs. La règle est vérifiée, pas supposée.
+    const previewOf = (value) => {
+      const m = value.match(/^light-dark\(\s*(#[0-9a-f]{6})\s*,\s*(#[0-9a-f]{6})\s*\)$/i);
+      return m ? m[2] : value;
+    };
     for (const t of THEMES) {
       const tok = t.id === DEFAULT_THEME ? rootTokens : byTheme[t.id];
-      if (!tok || !tok.bg) continue;
-      expect(tok.bg.toLowerCase(), `${t.id} : fond d'aperçu`).toBe(t.bg.toLowerCase());
-      expect(tok.accent.toLowerCase(), `${t.id} : accent d'aperçu`).toBe(t.a.toLowerCase());
-      expect(tok.accent2.toLowerCase(), `${t.id} : accent secondaire d'aperçu`).toBe(
+      expect(tok && tok.bg, `${t.id} : jetons introuvables dans la feuille`).toBeTruthy();
+      expect(previewOf(tok.bg).toLowerCase(), `${t.id} : fond d'aperçu`).toBe(t.bg.toLowerCase());
+      expect(previewOf(tok.accent).toLowerCase(), `${t.id} : accent d'aperçu`).toBe(
+        t.a.toLowerCase(),
+      );
+      expect(previewOf(tok.accent2).toLowerCase(), `${t.id} : accent secondaire d'aperçu`).toBe(
         t.b.toLowerCase(),
       );
     }
+    const auto = THEMES.find((t) => t.id === 'auto');
+    expect(auto, 'le thème auto doit être sélectionnable').toBeTruthy();
+    expect(auto.hint).toMatch(/système/);
   });
 
   it('les thèmes clairs déclarent color-scheme: light et une paire gain/perte assombrie', () => {

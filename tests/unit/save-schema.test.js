@@ -275,6 +275,25 @@ describe('réparations : une sauvegarde lisible n’est jamais perdue (D5)', () 
     expect(canUndo(res.game.log)).toBe(true);
   });
 
+  it('toute valeur non relue telle quelle est signalée : conversion comprise (D15)', () => {
+    const one = (over) =>
+      parseGame({ players: [{ playerName: 'A', score: 1, eliminated: false }], ...over });
+    expect(one({ players: [{ playerName: 'A', score: '40', eliminated: false }] }).repaired).toBe(
+      true,
+    );
+    expect(one({ startPoints: '40' }).repaired).toBe(true);
+    expect(one({ maxPoints: '40' }).repaired).toBe(true);
+    expect(one({ allowNeg: 'true' }).repaired).toBe(true);
+    expect(one({ allowNeg: 'true' }).game.config.allowNeg).toBe(true);
+    expect(one({ ts: 'hier' }).repaired).toBe(true);
+    expect(one({ players: [{ playerName: 'A', score: 1, eliminated: 'true' }] }).repaired).toBe(
+      true,
+    );
+    // Les encodages légitimes ne comptent pas : maxPoints null (= sans plafond), champs absents.
+    expect(one({ maxPoints: null }).repaired).toBe(false);
+    expect(one({}).repaired).toBe(false);
+  });
+
   it('les sauvegardes saines ne sont jamais marquées réparées', () => {
     expect(parseGame(v2save()).repaired).toBe(false);
     expect(parseGame(JSON.stringify(v2save())).repaired).toBe(false);
@@ -520,6 +539,51 @@ describe('parseGame : journal v2 assaini', () => {
     expect(game.log.entries[3]).toMatchObject({ from: false, to: true, approx: true, delta: 0 });
   });
 
+  it('une entrée illisible APRÈS le curseur ne touche ni à l’annulation ni au rétablissement', () => {
+    const log = createLog();
+    recordScore(log, 0, 10, 11, 'tap', 1);
+    recordScore(log, 0, 11, 12, 'tap', 5000);
+    recordScore(log, 0, 12, 13, 'tap', 10_000);
+    undo(log); // curseur 2 : la 3e entrée est rétablissable
+    const entries = [...log.entries.map((e) => ({ ...e }))];
+    entries.splice(2, 0, 'illisible'); // déchet inséré après le curseur
+    const { game, repaired } = parseGame(
+      save({ entries, cursor: 2 }, { players: makePlayers([12, 20, 30]) }),
+    );
+    expect(repaired).toBe(true);
+    expect(game.log.cursor).toBe(2);
+    expect(game.log.floor).toBe(0);
+    expect(canUndo(game.log)).toBe(true);
+    expect(redo(game.log)).toMatchObject({ to: 13 });
+  });
+
+  it('une entrée illisible AVANT le curseur décale le curseur d’autant, sans sceller le journal', () => {
+    const log = createLog();
+    recordScore(log, 0, 10, 11, 'tap', 1);
+    recordScore(log, 0, 11, 12, 'tap', 5000);
+    const entries = [null, ...log.entries.map((e) => ({ ...e }))];
+    const { game } = parseGame(
+      save({ entries, cursor: 3 }, { players: makePlayers([12, 20, 30]) }),
+    );
+    expect(game.log.cursor).toBe(2);
+    expect(game.log.floor).toBe(0);
+    expect(canUndo(game.log)).toBe(true);
+  });
+
+  it('après relecture v2, un tap à moins de GROUP_DELAY du dernier tap ouvre une nouvelle action', () => {
+    const log = createLog();
+    recordScore(log, 0, 40, 41, 'tap', 1000);
+    recordScore(log, 0, 41, 42, 'tap', 1200);
+    const saved = serializeGame(
+      { players: makePlayers([42]), seatOrder: [0], log, config: { startPoints: 40 } },
+      1,
+    );
+    const { game } = parseGame(JSON.stringify(saved));
+    expect(game.log.entries.at(-1).closed).toBe(true);
+    recordScore(game.log, 0, 42, 43, 'tap', 1300);
+    expect(groups(game.log).map((a) => a.count)).toEqual([2, 1]);
+  });
+
   it('identifiants triés puis renumérotés : plus jamais de doublon après un record', () => {
     const entries = [
       { id: 3, t: 30, playerIdx: 0, from: 5, to: 10, via: 'keypad', groupId: 3 },
@@ -628,6 +692,70 @@ describe('parseGame : journal v2 assaini', () => {
     const state = { players: game.players.map((p) => ({ ...p })), seatOrder: [0, 1, 2] };
     applyEntry(state, undo(game.log));
     expect(state.players[0].score).toBe(5);
+  });
+});
+
+describe('parseGame : champ cursor absent', () => {
+  it('un journal sans champ cursor n’est pas une réparation : tout est appliqué', () => {
+    const players = makePlayers([10, 20, 30]);
+    const entries = [{ id: 1, t: 1, playerIdx: 0, from: 9, to: 10, via: 'tap' }];
+    const res = parseGame({ v: 2, players, seatOrder: [0, 1, 2], log: { entries } });
+    expect(res.game.log.cursor).toBe(1);
+    expect(res.repaired).toBe(false);
+    const bad = parseGame({ v: 2, players, seatOrder: [0, 1, 2], log: { entries, cursor: 'x' } });
+    expect(bad.repaired).toBe(true);
+    expect(bad.game.log.cursor).toBe(1);
+  });
+});
+
+describe('parseGame : curseur et entrées illisibles', () => {
+  const players3 = makePlayers([12, 20, 30]);
+  it('entrée illisible AVANT le curseur ET rétablissement restant : les deux sont préservés', () => {
+    const log = createLog();
+    recordScore(log, 0, 10, 11, 'tap', 1);
+    recordScore(log, 0, 11, 12, 'tap', 5000);
+    recordScore(log, 0, 12, 13, 'tap', 10_000);
+    undo(log); // curseur 2, la 3e entrée est rétablissable
+    const entries = [null, ...log.entries.map((e) => ({ ...e }))];
+    const { game, repaired } = parseGame({
+      v: 2,
+      players: players3,
+      seatOrder: [0, 1, 2],
+      log: { entries, cursor: 3 },
+    });
+    expect(repaired).toBe(true);
+    expect(game.log.cursor).toBe(2);
+    expect(game.log.floor).toBe(0);
+    expect(canUndo(game.log)).toBe(true);
+    expect(redo(game.log)).toMatchObject({ from: 12, to: 13 });
+  });
+
+  it('un curseur hors bornes est signalé comme réparation et ramené dans les bornes', () => {
+    const entries = [
+      { id: 1, t: 1, playerIdx: 0, from: 11, to: 12, via: 'tap' },
+      { id: 2, t: 5000, playerIdx: 0, from: 12, to: 13, via: 'tap' },
+    ];
+    const base = { v: 2, players: players3, seatOrder: [0, 1, 2] };
+    const tooFar = parseGame({
+      ...base,
+      players: makePlayers([13, 20, 30]),
+      log: { entries, cursor: 99 },
+    });
+    expect(tooFar.repaired).toBe(true);
+    expect(tooFar.game.log.cursor).toBe(2);
+    const negative = parseGame({
+      ...base,
+      players: makePlayers([11, 20, 30]),
+      log: { entries, cursor: -4 },
+    });
+    expect(negative.repaired).toBe(true);
+    expect(negative.game.log.cursor).toBe(0);
+    const exact = parseGame({
+      ...base,
+      players: makePlayers([13, 20, 30]),
+      log: { entries, cursor: 2 },
+    });
+    expect(exact.repaired).toBe(false);
   });
 });
 

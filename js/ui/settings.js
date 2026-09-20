@@ -93,6 +93,9 @@ function themeCard(t) {
     },
     el('span', { className: 'theme-check', 'aria-hidden': 'true' }, icon('check', '✓')),
     el('span', { className: 'theme-card-name', text: t.name }),
+    // Sous-titre visible (pas une simple infobulle) : lisible au doigt, au clavier, et repris
+    // dans le nom accessible de la carte puisqu'il fait partie de son texte.
+    t.hint ? el('span', { className: 'theme-card-hint', text: t.hint }) : null,
     el(
       'span',
       { className: 'theme-swatches', 'aria-hidden': 'true' },

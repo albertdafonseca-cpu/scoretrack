@@ -37,17 +37,23 @@
       href="assets/fonts/share-tech-mono-400-latin.woff2"
       crossorigin
     />
-    <link rel="stylesheet" href="css/fonts.css" />
-    <link rel="stylesheet" href="css/tokens.css" />
-    <link rel="stylesheet" href="css/themes.css" />
-    <link rel="stylesheet" href="css/base.css" />
-    <link rel="stylesheet" href="css/setup.css" />
-    <link rel="stylesheet" href="css/game.css" />
-    <link rel="stylesheet" href="css/modals.css" />
-    <link rel="stylesheet" href="css/motion.css" />
-    <link rel="stylesheet" href="css/system.css" />
-    <!-- Décisions de pré-rendu (thème, présence d'une sauvegarde) : bloquant mais minuscule. -->
-    <script type="module" blocking="render" src="js/platform/prepaint.js"></script>
+    <!-- Feuilles générées par scripts/build-css.mjs à partir des neuf sources de css/ (npm run
+         build:css) : la critique bloque le rendu, la différée est téléchargée sans le bloquer
+         (media="print") et activée par js/main.js avant l'amorçage. Mesuré : premier rendu
+         2,1–2,5 s → 1,4–1,8 s en profil mobile ralenti. -->
+    <link rel="stylesheet" href="css/critical.css" />
+    <!-- L'écran de jeu et sa barre sont stylés par la feuille différée : cachés d'emblée pour ne
+         jamais apparaître nus, js/ui/game.js les affiche en style inline. -->
+    <style>
+      #game-screen,
+      #bar {
+        display: none;
+      }
+    </style>
+    <link rel="stylesheet" href="css/deferred.css" media="print" data-deferred />
+    <!-- Décisions de pré-rendu (thème, présence d'une sauvegarde) : script classique minuscule,
+         exécuté pendant l'analyse, donc avant le premier rendu (voir js/platform/prepaint.js). -->
+    <script src="js/platform/prepaint.js"></script>
     <script type="module" src="js/main.js"></script>
   </head>
   <body>

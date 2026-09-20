@@ -38,6 +38,12 @@ export const GROUP_DELAY = 1500;
  * groupe : une partie très longue ne peut pas saturer le stockage en pleine partie.
  */
 export const MAX_LOG_ENTRIES = 2000;
+/**
+ * Nombre maximal de taps dans une même action. Au-delà, le tap suivant ouvre une nouvelle action :
+ * un groupe ne peut donc jamais grossir jusqu'à absorber tout le journal (et une annulation ne
+ * retire jamais plus de 500 points d'un coup, ce qui reste intelligible).
+ */
+export const MAX_GROUP_TAPS = 500;
 /** Moyens d'action reconnus. */
 export const VIAS = Object.freeze(['tap', 'keypad', 'rotate', 'elim', 'unelim', 'rename']);
 /** Moyens qui modifient un score (les seuls comptés dans les bilans). */
@@ -111,8 +117,16 @@ function validate(entry) {
   }
 }
 
+/** Vrai si le groupe qui se termine à l'indice `last` compte déjà MAX_GROUP_TAPS entrées. */
+function groupIsFull(entries, last) {
+  const gid = entries[last].groupId;
+  let n = 0;
+  for (let i = last; i >= 0 && entries[i].groupId === gid && n < MAX_GROUP_TAPS; i--) n++;
+  return n >= MAX_GROUP_TAPS;
+}
+
 /** Vrai si un tap `next` (à l'instant `t`) peut rejoindre le groupe de l'entrée `prev`. */
-function joinsGroup(prev, next, t) {
+function joinsGroup(entries, prev, next, t) {
   return (
     prev !== undefined &&
     prev.via === 'tap' &&
@@ -120,19 +134,25 @@ function joinsGroup(prev, next, t) {
     prev.playerIdx === next.playerIdx &&
     prev.closed !== true &&
     t >= prev.t &&
-    t - prev.t <= GROUP_DELAY
+    t - prev.t <= GROUP_DELAY &&
+    !groupIsFull(entries, entries.length - 1)
   );
 }
 
-/** Oublie les plus vieux groupes quand le journal dépasse MAX_LOG_ENTRIES. */
+/**
+ * Oublie les plus vieux groupes quand le journal dépasse MAX_LOG_ENTRIES. La coupure tombe sur une
+ * frontière d'action et ne retire JAMAIS l'action la plus récente (celle qui vient d'être
+ * enregistrée) : un journal borné garde toujours au moins une annulation possible.
+ */
 function trim(log) {
-  const excess = log.entries.length - MAX_LOG_ENTRIES;
+  const { entries } = log;
+  const excess = entries.length - MAX_LOG_ENTRIES;
   if (excess <= 0) return;
-  let cut = excess;
-  while (cut < log.entries.length && log.entries[cut].groupId === log.entries[cut - 1].groupId) {
-    cut++;
-  }
-  log.entries.splice(0, cut);
+  const keepFrom = groupStart(entries, entries.length - 1);
+  let cut = Math.min(excess, keepFrom);
+  while (cut < keepFrom && entries[cut].groupId === entries[cut - 1].groupId) cut++;
+  if (cut <= 0) return;
+  entries.splice(0, cut);
   log.cursor = Math.max(0, log.cursor - cut);
   log.floor = Math.max(0, Math.min(log.cursor, log.floor - cut));
 }
@@ -141,7 +161,10 @@ function trim(log) {
  * Enregistre une entrée à la position du curseur (les entrées rétablissables sont tronquées).
  * Complète `id` (dernier + 1), `t` (Date.now() par défaut), `delta` (toujours recalculé depuis
  * `from`/`to` : la valeur fournie est ignorée) et `groupId` : un tap rejoint le groupe du tap
- * précédent du même joueur s'il survient dans les GROUP_DELAY ms et que ce groupe n'est pas clos.
+ * précédent du même joueur s'il survient dans les GROUP_DELAY ms, que ce groupe n'est pas clos et
+ * qu'il compte moins de MAX_GROUP_TAPS entrées. Un `groupId` EXPLICITE est pris tel quel et
+ * contourne ce plafond : choix assumé, réservé aux appelants qui reconstruisent un journal
+ * (migration, tests) et savent ce qu'ils regroupent.
  * @param {{entries:object[],cursor:number}} log
  * @param {{playerIdx?:number,from:any,to:any,via:string,t?:number,groupId?:number}} entry
  * @returns {object} l'entrée telle que stockée
@@ -163,7 +186,11 @@ export function record(log, entry) {
     from: entry.via === 'rotate' ? entry.from.slice() : entry.from,
     to: entry.via === 'rotate' ? entry.to.slice() : entry.to,
     via: entry.via,
-    groupId: isInt(entry.groupId) ? entry.groupId : joinsGroup(prev, entry, t) ? prev.groupId : id,
+    groupId: isInt(entry.groupId)
+      ? entry.groupId
+      : joinsGroup(log.entries, prev, entry, t)
+        ? prev.groupId
+        : id,
   };
   if (entry.via === 'elim' || entry.via === 'unelim') {
     stored.from = entry.via === 'unelim';

@@ -23,6 +23,12 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
  * (numéro + prénom), lui, ne l'est pas : on lui applique donc la préférence, jusqu'à la limite
  * géométrique, la réduction par mesure garantissant qu'aucun prénom n'est tronqué pour autant.
  * Borné à 2 : au-delà, la carte ne contiendrait plus que le prénom.
+ *
+ * LIMITE CONNUE (relevée par le critique, non traitée) : à douze joueurs avec un texte système à
+ * 200 %, la préférence demande 32 px de prénom sur des cartes de 122 px de large ; la réduction
+ * par mesure ramène alors certains prénoms de 16 à 12 px, c'est-à-dire AU plancher (D10), jamais
+ * en dessous, et rien n'est tronqué. C'est la géométrie de la disposition qui plafonne, pas un
+ * défaut de calcul : la seule alternative serait de rogner le score, qui est déjà au minimum lisible.
  */
 function rootScale() {
   if (typeof getComputedStyle !== 'function') return 1;

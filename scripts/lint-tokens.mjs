@@ -20,7 +20,9 @@ const LIST = process.argv.includes('--list');
 /** Feuilles autorisées à porter des couleurs littérales : ce sont elles qui définissent les jetons. */
 const TOKEN_SHEETS = new Set(['css/tokens.css', 'css/themes.css']);
 /** Feuilles dont la couleur vient d'ailleurs (polices auto-hébergées : aucune couleur). */
-const IGNORED = new Set(['css/fonts.css']);
+/** Hors contrôle : la feuille de polices (aucune couleur) et les deux artefacts générés par
+    scripts/build-css.mjs, qui ne font que concaténer les sources déjà contrôlées ci-dessous. */
+const IGNORED = new Set(['css/fonts.css', 'css/critical.css', 'css/deferred.css']);
 
 /**
  * Dette existante au jour de la mise en place, par fichier et par propriétaire.

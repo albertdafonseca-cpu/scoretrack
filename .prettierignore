@@ -11,3 +11,6 @@ css/fonts.css
 # Fichiers de l'élément assets : formatés par leur propriétaire
 scripts/build-icons.mjs
 scripts/fetch-fonts.mjs
+# Artefacts minifiés générés par scripts/build-css.mjs
+css/critical.css
+css/deferred.css

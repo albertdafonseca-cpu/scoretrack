@@ -1,16 +1,33 @@
 // Audit daltonisme : simulation Machado 2009 (protanopie, deutéranopie, tritanopie à 100 %)
 // sur la palette joueurs Paul Tol (12 couleurs) et sur la paire sémantique --gain / --loss.
 //
-// Critères : ΔE2000 ≥ 15 entre chaque paire de couleurs joueurs sous chaque simulation ;
-// gain/perte distinguables sous les trois simulations : ΔE2000 ≥ 20 ET écart de luminance
-// relative ≥ 20 % (|Y1 − Y2| / max(Y1, Y2)).
+// CE QUE CE SCRIPT FAIT ÉCHOUER, ET CE QU'IL SE CONTENTE DE MESURER (décision D17 : une tolérance
+// assumée et écrite est légitime, une tolérance sous-entendue dans le code ne l'est pas).
+//
+// Portes dures — le script sort en 1 si l'une cède :
+//   1. séparabilité de la sous-palette réellement en jeu jusqu'à SEPARABLE_MAX joueurs :
+//      ΔE2000 ≥ SEPARABLE_MIN_DE entre chaque paire, sous les trois simulations ;
+//   2. paire sémantique gain/perte : ΔE2000 ≥ PAIR_MIN_DE ET écart de luminance relative
+//      ≥ PAIR_MIN_LUM, sous les trois simulations ;
+//   3. identification NON CHROMATIQUE de chaque carte à 12 joueurs (D18), relevée dans la page ;
+//   4. budget de régression figé sur les douze couleurs : ni une paire serrée de plus, ni un ΔE
+//      minimal plus bas que la mesure du jour, simulation par simulation (PALETTE_BUDGET).
+//
+// Mesuré SANS faire échouer, et pourquoi : le seuil de référence ΔE2000 ≥ PALETTE_MIN appliqué aux
+// 66 paires des douze couleurs. Un dichromate ne perçoit que deux axes chromatiques ; au-delà de
+// trois teintes, aucune palette de douze couleurs ne tient ce seuil deux à deux — c'est une limite
+// de la perception humaine, pas un réglage de l'application, et aucune valeur de couleur ne la
+// lèverait. Le faire échouer rendrait le script rouge en permanence sans indiquer quoi corriger.
+// Cette impossibilité n'est pas pour autant une dispense : elle est compensée par la porte 1 (la
+// sous-palette réellement en jeu reste séparable), par la porte 3 (au-delà, la couleur cesse d'être
+// un identifiant et chaque carte porte un numéro de siège et un nom) et par la porte 4 (l'acquis
+// mesuré ne peut plus se dégrader). Les 66 paires restent listées dans le rapport, avec leur ΔE.
 //
 // Usage : node scripts/audit-cvd.mjs [--out rapport.md] [--json couleurs-resolues.json]
 //         [--shots dossier]   → captures de l'écran de jeu à 12 joueurs sous les 3 déficiences
 //         [--url http://localhost:8765/]
 // Le JSON optionnel est celui produit par audit-contrast.mjs --json : il permet d'auditer aussi
-// les fonds de cartes dérivés de chaque thème. Code de sortie 1 si la paire gain/perte échoue ;
-// les échecs de palette sont listés (la palette est figée par la décision D1, voir rapport).
+// les fonds de cartes dérivés de chaque thème.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { contrast, deltaE2000, luminance, parseColor, simulateCvd, toHex } from './lib/color.mjs';
@@ -37,9 +54,12 @@ const PAIR_MIN_LUM = 0.2;
  * à deux, quelle que soit la palette. Mesure de la palette Tol dans l'ordre en place,
  * ΔE2000 minimal du préfixe de n couleurs (celles en jeu à n joueurs), pire des trois simulations :
  * L'ordre a été refait (palette et jetons réordonnés ensemble) et la mesure d'aujourd'hui donne :
- *   n=2 40,2 · n=3 29,9 · n=4 20,1 · n=5 15,7 · n=6 15,1 · n=7 11,2 · n=8 8,6 · n≥9 6,3
- * La porte suit donc ce que le produit sait faire : SEPARABLE_MAX = 6. Elle ne doit jamais être
- * relâchée pour faire passer une régression — c'est elle qui protège l'acquis.
+ *   n=2 40,2 · n=3 29,9 · n=4 20,1 · n=5 15,7 · n=6 15,7 · n=7 11,2 · n=8 10,6 · n=9 8,6 · n=12 3,2
+ * (gris --tol-6 #c4c8c4 : la paire cyan/gris tombait à 15,1 en protanopie avec #bbbbbb, à un dixième
+ * de la référence — une valeur qui n'a pas de marge n'est pas un acquis, décision D21.)
+ * La porte suit donc ce que le produit sait faire : SEPARABLE_MAX = 6 et SEPARABLE_MIN_DE = 15, la
+ * référence elle-même, avec 0.7 de marge. Elle ne doit jamais être relâchée pour faire passer
+ * une régression — c'est elle qui protège l'acquis.
  * D'où le contrat tenu, écrit tel qu'il est atteint :
  *   — jusqu'à SEPARABLE_MAX joueurs, les couleurs en jeu gardent ΔE ≥ SEPARABLE_MIN_DE (porte dure) ;
  *   — au-delà, la couleur cesse d'être un identifiant et D18 prend le relais : chaque carte porte
@@ -49,7 +69,7 @@ const PAIR_MIN_LUM = 0.2;
  * expliquant pourquoi la palette a bougé.
  */
 const SEPARABLE_MAX = 6;
-const SEPARABLE_MIN_DE = 14;
+const SEPARABLE_MIN_DE = 15;
 const PALETTE_BUDGET = {
   normale: { maxPairs: 2, minDE: 6.5 },
   protanopie: { maxPairs: 9, minDE: 5.1 },
@@ -378,6 +398,10 @@ async function main() {
         : `- Identification non chromatique (D18) : **ÉCHEC** — ${seats.problem}.`,
     );
   }
+  lines.push(
+    '',
+    `Ce qui fait échouer ce script : séparabilité de la sous-palette en jeu jusqu'à ${SEPARABLE_MAX} joueurs, paire gain/perte, identification non chromatique de chaque carte, budget de régression figé sur les douze couleurs. Ce qui est mesuré SANS faire échouer : le seuil de référence ΔE2000 ≥ ${PALETTE_MIN} sur les 66 paires des douze couleurs — aucune palette de douze teintes ne le tient en dichromatie, c'est une limite de la perception et non un réglage, et aucune valeur de couleur ne la lèverait. La tolérance est écrite ici et dans l'en-tête du script, jamais laissée sous-entendue (D17) ; elle est compensée par les quatre portes ci-dessus.`,
+  );
   if (game.files.length) {
     lines.push(
       '',

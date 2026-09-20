@@ -295,6 +295,11 @@
 }
 
 /* ── Contenu affiché par-dessus les moitiés ─────────────────────── */
+/* LIMITE CONNUE (relevée par le critique, non traitée) : à douze joueurs, les deux cartes de la
+   colonne centrale sont très hautes et étroites (rot-0 et rot-180) ; le bloc d'identité reste
+   collé au bord côté joueur et le chiffre est centré, si bien qu'ils sont séparés par un grand
+   vide. C'est la composition de la disposition 12 — l'orientation de lecture latérale et la
+   place du chiffre sont des décisions d'audit — et non un défaut de cette feuille. */
 .card-face {
   position: absolute;
   inset: 0;

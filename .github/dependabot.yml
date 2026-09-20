@@ -13,6 +13,10 @@ updates:
     groups:
       outillage:
         patterns: ['*']
+        # Playwright embarque Chromium : toute montée change la rastérisation et donc les captures
+        # comparées à l'octet par le job `paquet`. Elle arrive en PR séparée, avec régénération
+        # obligatoire des captures dans la même PR (ADR-19).
+        exclude-patterns: ['@playwright/test']
         update-types: [minor, patch]
     commit-message:
       prefix: 'deps'

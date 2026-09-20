@@ -19,6 +19,18 @@ export const THEMES = [
   { id: 'mono-light', name: 'Mono clair', bg: '#F4F4F4', a: '#000000', b: '#333333' },
   { id: 'ldm', name: 'Loi du Milieu · Nuit', bg: '#2e2418', a: '#f0c040', b: '#ffe070' },
   { id: 'ldm-day', name: 'Loi du Milieu · Jour', bg: '#f5f0e8', a: '#664600', b: '#5E4000' },
+  // Suit `prefers-color-scheme` (css/themes.css, `light-dark()`). L'aperçu est la branche SOMBRE de
+  // chaque jeton, celle du thème par défaut : la table ne porte que des couleurs fixes, et c'est la
+  // branche que l'application affiche partout ailleurs (icône, écran de démarrage, `theme_color`).
+  // `hint` porte la précision à afficher en sous-titre ou en infobulle.
+  {
+    id: 'auto',
+    name: 'Automatique',
+    hint: 'Suit le réglage clair ou sombre du système',
+    bg: '#020d12',
+    a: '#00ffe0',
+    b: '#00bfff',
+  },
 ];
 
 /** Thème par défaut : aucun attribut data-theme n'est posé pour lui. */
@@ -28,10 +40,12 @@ export const DEFAULT_THEME = 'cyber';
 // D'ATTRIBUTION qui est optimisé : à n joueurs, seules les n premières couleurs sont en jeu, donc
 // l'ordre décide de la séparabilité réelle. Ordre mesuré par l'audit daltonisme
 // (`npm run audit:cvd`, matrices Machado 2009) : l'écart minimal ΔE2000 sous les trois
-// dichromaties passe de 8,6 à 15,1 à 6 joueurs, soit la porte « ≥ 14 » tenue jusqu'à 6 joueurs
-// au lieu de 4 (2 j. 40,2 · 3 j. 29,9 · 4 j. 20,1 · 5 j. 15,7 · 6 j. 15,1 · 7 j. 11,2).
-// L'indigo #332288 remplace #0077BB, trop proche de #4477AA (ΔE2000 4,4 en vision normale, 2,0 en
-// tritanopie : c'était le minimum de la palette) ; la paire passe à 27,5 / 20,1.
+// dichromaties passe de 8,6 à 15,7 à 6 joueurs, soit la porte « ≥ 15 » tenue jusqu'à 6 joueurs
+// au lieu de 4 (2 j. 40,2 · 3 j. 29,9 · 4 j. 20,1 · 5 j. 15,7 · 6 j. 15,7 · 7 j. 11,2).
+// Deux écarts à Tol : l'indigo #332288 remplace #0077BB, trop proche de #4477AA (ΔE2000 4,4 en
+// vision normale, 2,0 en tritanopie : c'était le minimum de la palette ; la paire passe à
+// 27,5 / 20,1) ; le gris #C4C8C4 remplace #BBBBBB, dont la paire avec le cyan #66CCEE tombait à
+// 15,1 en protanopie (à un dixième de la référence) : elle passe à 16,9 sans dégrader huit joueurs.
 // L'ordre DOIT rester identique à celui des jetons --tol-1…12 (css/tokens.css), dont dérivent les
 // fonds de carte --card-N : tests/unit/themes.test.js le vérifie index par index.
 export const COLORS = [
@@ -40,7 +54,7 @@ export const COLORS = [
   '#66CCEE',
   '#4477AA',
   '#DDCC77',
-  '#BBBBBB',
+  '#C4C8C4',
   '#AA3377',
   '#44AA99',
   '#228833',

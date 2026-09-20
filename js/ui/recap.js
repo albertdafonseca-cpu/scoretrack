@@ -138,7 +138,14 @@ function rankingBlock() {
     'section',
     { className: 'recap-block' },
     el('h2', { className: 'recap-block-title', text: 'Classement' }),
-    ...rows.map((r) => rankRow(r, decided && winner === r && rows.length > 1, scale)),
+    // Une grille partagée par toutes les lignes (sous-grille) : rang, pastille, mini-courbe et
+    // score s'alignent en colonnes SANS largeur minimale réservée, et toute la place restante va
+    // au prénom (voir css/modals.css, `.recap-rank-list`).
+    el(
+      'div',
+      { className: 'recap-rank-list' },
+      ...rows.map((r) => rankRow(r, decided && winner === r && rows.length > 1, scale)),
+    ),
   );
 }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   GROUP_DELAY,
+  MAX_GROUP_TAPS,
   MAX_LOG_ENTRIES,
   SCORE_VIAS,
   VIAS,
@@ -49,6 +50,7 @@ describe('constantes', () => {
   it('conserve les délais historiques et expose les moyens reconnus', () => {
     expect(GROUP_DELAY).toBe(1500);
     expect(MAX_LOG_ENTRIES).toBe(2000);
+    expect(MAX_GROUP_TAPS).toBe(500);
     expect(VIAS).toEqual(['tap', 'keypad', 'rotate', 'elim', 'unelim', 'rename']);
     expect(SCORE_VIAS).toEqual(['tap', 'keypad']);
     expect(Object.isFrozen(VIAS)).toBe(true);
@@ -242,21 +244,147 @@ describe('record', () => {
     expect(e.delta).toBe(11234566);
   });
 
-  it('oublie les plus vieux groupes au-delà de MAX_LOG_ENTRIES, sans couper une action', () => {
+  it('oublie les plus vieux groupes au-delà de MAX_LOG_ENTRIES sans couper une action (tailles 3, 5, 7)', () => {
+    // Groupes de tailles variées, chacun clos explicitement, avec des identifiants de groupe connus.
+    const sizes = [3, 5, 7];
     const log = createLog();
-    for (let i = 0; i < MAX_LOG_ENTRIES + 50; i++) {
-      // Taps groupés deux par deux (même joueur, horodatages rapprochés)
-      recordScore(log, 0, i, i + 1, 'tap', T0 + Math.floor(i / 2) * 10_000);
+    const expected = new Map(); // groupId → taille d'origine
+    let score = 0;
+    let t = T0;
+    let k = 0;
+    let recorded = 0;
+    // On enregistre bien plus que la borne : le bornage doit avoir joué plusieurs fois.
+    while (recorded + sizes[k % 3] <= MAX_LOG_ENTRIES + 40) {
+      const size = sizes[k % 3];
+      recorded += size;
+      const gid = 1000 + k;
+      for (let j = 0; j < size; j++) {
+        record(log, { via: 'tap', playerIdx: 0, from: score, to: score + 1, t, groupId: gid });
+        score++;
+        t += 10;
+      }
+      expected.set(gid, size);
+      k++;
     }
     expect(log.entries.length).toBeLessThanOrEqual(MAX_LOG_ENTRIES);
+    // Chaque groupe restant a exactement sa taille d'origine : aucune action coupée.
+    const counts = new Map();
+    log.entries.forEach((e) => counts.set(e.groupId, (counts.get(e.groupId) || 0) + 1));
+    for (const [gid, n] of counts) expect(`${gid}:${n}`).toBe(`${gid}:${expected.get(gid)}`);
+    // Les groupes retirés sont les plus anciens, et le premier restant ouvre bien son groupe.
+    const removed = [...expected.keys()].filter((g) => !counts.has(g));
+    expect(removed.length).toBeGreaterThan(0);
+    expect(Math.max(...removed)).toBeLessThan(Math.min(...counts.keys()));
     expect(log.cursor).toBe(log.entries.length);
-    // Aucune action n'est coupée en deux : la première entrée ouvre bien son groupe
-    const first = log.entries[0];
-    expect(log.entries.filter((e) => e.groupId === first.groupId)).toHaveLength(2);
     expect(canUndo(log)).toBe(true);
-    expect(log.entries.map((e) => e.id)).toEqual(
-      [...log.entries.map((e) => e.id)].sort((a, b) => a - b),
-    );
+    // Les identifiants restent uniques et croissants, y compris après un nouvel enregistrement.
+    recordScore(log, 1, 0, 5, 'keypad', t + 10_000_000);
+    const ids = log.entries.map((e) => e.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toEqual([...ids].sort((a, b) => a - b));
+    expect(ids[0]).toBeGreaterThan(1);
+  });
+
+  it('un groupe géant ne vide jamais le journal : la dernière action survit toujours au bornage', () => {
+    for (const taps of [
+      MAX_LOG_ENTRIES,
+      MAX_LOG_ENTRIES + 1,
+      MAX_LOG_ENTRIES + 500,
+      3 * MAX_LOG_ENTRIES,
+    ]) {
+      const log = createLog();
+      recordScore(log, 0, 0, 5, 'keypad', T0);
+      for (let i = 0; i < taps; i++) recordScore(log, 0, 5 + i, 6 + i, 'tap', T0 + 10 + i);
+      expect(log.entries.length).toBeGreaterThan(0);
+      expect(log.entries.length).toBeLessThanOrEqual(MAX_LOG_ENTRIES);
+      expect(canUndo(log)).toBe(true);
+      const last = undo(log);
+      expect(last.to).toBe(5 + taps - last.count);
+      expect(last.count).toBeLessThanOrEqual(MAX_GROUP_TAPS);
+    }
+  });
+
+  it('une action ne dépasse jamais MAX_GROUP_TAPS taps : le suivant ouvre une nouvelle action', () => {
+    const log = createLog();
+    for (let i = 0; i < MAX_GROUP_TAPS + 1; i++) recordScore(log, 0, i, i + 1, 'tap', T0 + i);
+    const g = groups(log);
+    expect(g.map((a) => a.count)).toEqual([MAX_GROUP_TAPS, 1]);
+    expect(undo(log)).toMatchObject({ count: 1, delta: -1 });
+    expect(undo(log)).toMatchObject({ count: MAX_GROUP_TAPS, delta: -MAX_GROUP_TAPS });
+  });
+
+  it('la dernière action prime sur la borne : un journal réduit à une action géante n’est jamais vidé', () => {
+    const log = createLog();
+    for (let i = 0; i < MAX_LOG_ENTRIES + 5; i++) {
+      log.entries.push({
+        id: i + 1,
+        t: T0 + i,
+        playerIdx: 0,
+        delta: 1,
+        from: i,
+        to: i + 1,
+        via: 'tap',
+        groupId: 1,
+      });
+    }
+    log.cursor = log.entries.length;
+    // Le nouveau tap rejoint explicitement l'action géante : elle est la dernière, rien n'est retiré.
+    record(log, { via: 'tap', playerIdx: 0, from: 2005, to: 2006, t: T0 + 99_999, groupId: 1 });
+    expect(log.entries).toHaveLength(MAX_LOG_ENTRIES + 6);
+    expect(canUndo(log)).toBe(true);
+    expect(groups(log)).toHaveLength(1);
+  });
+
+  it('le plafond de MAX_GROUP_TAPS arrête le regroupement par lui-même, sans identifiant explicite', () => {
+    // Tous les taps se suivent à 1 ms : seule la taille du groupe peut le clore.
+    const log = createLog();
+    for (let i = 0; i < 2 * MAX_GROUP_TAPS + 3; i++) recordScore(log, 0, i, i + 1, 'tap', T0 + i);
+    expect(groups(log).map((a) => a.count)).toEqual([MAX_GROUP_TAPS, MAX_GROUP_TAPS, 3]);
+    const ids = new Set(log.entries.map((e) => e.groupId));
+    expect(ids.size).toBe(3);
+  });
+
+  it('le bornage décale le plancher d’annulation d’autant que le curseur', () => {
+    const log = createLog();
+    for (let i = 0; i < MAX_LOG_ENTRIES; i++) recordScore(log, 0, i, i + 1, 'keypad', T0 + i);
+    log.floor = 10; // les 10 premières actions sont de l'historique en lecture seule
+    recordScore(log, 0, MAX_LOG_ENTRIES, MAX_LOG_ENTRIES + 1, 'keypad', T0 + MAX_LOG_ENTRIES);
+    expect(log.entries).toHaveLength(MAX_LOG_ENTRIES);
+    expect(log.floor).toBe(9);
+    expect(log.entries[0].id).toBe(2);
+    // Le plancher ne remonte jamais au-dessus du curseur et ne devient jamais négatif.
+    for (let i = 0; i < 20; i++) {
+      recordScore(
+        log,
+        0,
+        MAX_LOG_ENTRIES + 1 + i,
+        MAX_LOG_ENTRIES + 2 + i,
+        'keypad',
+        T0 + 9000 + i,
+      );
+    }
+    expect(log.floor).toBe(0);
+    expect(canUndo(log)).toBe(true);
+  });
+
+  it('le bornage ne retire jamais la dernière action même quand elle est la seule', () => {
+    const log = createLog();
+    const entries = Array.from({ length: MAX_LOG_ENTRIES + 10 }, (_, i) => ({
+      id: i + 1,
+      t: T0 + i,
+      playerIdx: 0,
+      delta: 1,
+      from: i,
+      to: i + 1,
+      via: 'tap',
+      groupId: 1,
+    }));
+    log.entries.push(...entries);
+    log.cursor = entries.length;
+    recordScore(log, 1, 0, 3, 'keypad', T0 + 99_999);
+    // Le groupe géant précède l'action nouvelle : il est retiré en entier, l'action nouvelle reste.
+    expect(log.entries.map((e) => e.via)).toEqual(['keypad']);
+    expect(canUndo(log)).toBe(true);
   });
 });
 
@@ -609,48 +737,51 @@ describe('groups / timeline', () => {
     expect(groups(log).map((g) => g.n)).toEqual([1, 2, 3]);
   });
 
-  it('timeline et groups restent linéaires : nombre d’accès mesuré, sans aucune durée', () => {
-    // Le défaut recherché est le motif `entries.find(e => e.id === id)` dans une boucle, qui lit
-    // `id` un nombre quadratique de fois. On compte donc les lectures de `id` plutôt que le temps :
-    // la mesure est exacte et ne dépend ni de la machine ni de la charge.
-    let reads = 0;
-    const build = (n) => ({
-      entries: Array.from({ length: n }, (_, i) => {
-        const e = {
+  it('timeline et groups restent linéaires : tous les accès comptés, tailles de groupe variées', () => {
+    // Un mandataire compte CHAQUE lecture : indices du tableau et tous les champs des entrées.
+    // Une boucle quadratique, sur `id` comme sur `groupId`, ferait exploser le compte (n²/2).
+    const build = (n, size) => {
+      let reads = 0;
+      const entries = Array.from({ length: n }, (_, i) => {
+        const raw = {
+          id: i + 1,
           t: T0 + i,
           playerIdx: 0,
           delta: 1,
           from: i,
           to: i + 1,
           via: 'keypad',
-          groupId: i + 1,
+          groupId: Math.floor(i / size) + 1,
         };
-        Object.defineProperty(e, 'id', {
-          enumerable: true,
-          get() {
+        return new Proxy(raw, {
+          get(o, k) {
             reads++;
-            return i + 1;
+            return o[k];
           },
         });
-        return e;
-      }),
-      cursor: n,
-      floor: 0,
-    });
-
-    const counts = [500, 1000, 2000].map((n) => {
-      const log = build(n);
-      reads = 0;
-      expect(timeline(log)).toHaveLength(n);
-      expect(groups(log)).toHaveLength(n);
-      return { n, reads };
-    });
-    // Linéaire : 3 lectures par entrée. Quadratique : n/2 par entrée (500 à 2 000 ici).
-    counts.forEach(({ n, reads: r }) => expect(r).toBeLessThanOrEqual(10 * n));
-    // Doubler la taille double le travail (à ±25 %), il ne le quadruple pas.
-    const ratio = counts[2].reads / counts[1].reads;
-    expect(ratio).toBeGreaterThan(1.5);
-    expect(ratio).toBeLessThan(2.5);
+      });
+      const arr = new Proxy(entries, {
+        get(o, k) {
+          if (typeof k === 'string' && /^\d+$/.test(k)) reads++;
+          return o[k];
+        },
+      });
+      return { log: { entries: arr, cursor: n, floor: 0 }, reads: () => reads };
+    };
+    for (const size of [1, 3, 7, 50]) {
+      const counts = [1000, 2000].map((n) => {
+        const b = build(n, size);
+        expect(timeline(b.log)).toHaveLength(n);
+        expect(groups(b.log)).toHaveLength(Math.ceil(n / size));
+        return b.reads();
+      });
+      // Mesuré : 20 à 29 accès par entrée. Quadratique : > 500 par entrée dès n = 1 000.
+      expect(counts[0]).toBeLessThanOrEqual(40 * 1000);
+      expect(counts[1]).toBeLessThanOrEqual(40 * 2000);
+      const ratio = counts[1] / counts[0];
+      expect(ratio).toBeGreaterThan(1.5);
+      expect(ratio).toBeLessThan(2.5);
+    }
   });
 });
 
@@ -683,6 +814,14 @@ describe('appliedState', () => {
     expect(scores.get(0)).toBe(43);
     expect(scores.get(1)).toBe(25);
     expect(seats).toEqual([1, 0]);
+  });
+  it('ignore les éliminations et renommages : ils ne portent ni score ni sièges', () => {
+    const log = createLog();
+    recordElim(log, 0, true, T0);
+    recordRename(log, 1, 'B', 'Bob', T0 + 1);
+    const { scores, seats } = appliedState(log);
+    expect(scores.size).toBe(0);
+    expect(seats).toBeNull();
   });
   it('ignore ce qui est au-delà du curseur ; pas de rotation appliquée ⇒ seats null', () => {
     const log = sample();

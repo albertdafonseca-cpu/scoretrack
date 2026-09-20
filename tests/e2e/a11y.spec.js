@@ -274,12 +274,64 @@ test('la coche des cartes de thème contraste sur le fond qu’elle marque, sur 
   for (const id of themes) {
     // Sélectionner la carte applique son thème ET affiche sa coche : c'est l'état réel où la
     // coche du thème prévisualisé doit rester lisible (elle empruntait l'accent du thème actif).
-    await page.locator(`#themes-grid .theme-card[data-theme="${id}"]`).click();
-    const sel = `#themes-grid .theme-card[data-theme="${id}"] .theme-check`;
-    const [r] = await renderedContrast(page, [sel]);
-    if (r.ratio === undefined || r.ratio < 4.5) failures.push({ theme: id, ...r });
+    // Le thème « Automatique » est mesuré sous les deux schémas système.
+    const schemes = id === 'auto' ? ['light', 'dark'] : ['dark'];
+    for (const colorScheme of schemes) {
+      await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+      await page.locator(`#themes-grid .theme-card[data-theme="${id}"]`).click();
+      const sel = `#themes-grid .theme-card[data-theme="${id}"] .theme-check`;
+      const [r] = await renderedContrast(page, [sel]);
+      if (r.ratio === undefined || r.ratio < 4.5) failures.push({ theme: id, colorScheme, ...r });
+    }
   }
   expect(failures, JSON.stringify(failures, null, 2)).toEqual([]);
+});
+
+test('thème « Automatique » : sous-titre lisible et annoncé, préférence système réellement suivie', async ({
+  page,
+}) => {
+  await openApp(page);
+  await page.locator('.logo-gear').click();
+  const card = page.locator('#themes-grid .theme-card[data-theme="auto"]');
+  await expect(card).toHaveCount(1);
+  // Le sous-titre est un texte visible, et il entre dans le nom accessible du bouton radio.
+  await expect(card.locator('.theme-card-hint')).toBeVisible();
+  await expect(card.locator('.theme-card-hint')).toHaveText(/clair ou sombre/);
+  await expect(page.getByRole('radio', { name: /Automatique.*clair ou sombre/ })).toHaveCount(1);
+  // La grille reste alignée : toutes les cartes de la même rangée ont la même hauteur.
+  const rows = await page.evaluate(() => {
+    const byTop = new Map();
+    for (const c of document.querySelectorAll('#themes-grid .theme-card')) {
+      const r = c.getBoundingClientRect();
+      const key = Math.round(r.top);
+      byTop.set(key, [...(byTop.get(key) || []), Math.round(r.height)]);
+    }
+    return [...byTop.values()];
+  });
+  for (const heights of rows) expect(new Set(heights).size, `rangée ${heights}`).toBe(1);
+
+  // Sélectionner « Automatique » puis émuler chaque schéma : le fond de page doit changer.
+  await card.click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'auto');
+  // Couleurs RÉSOLUES (le fond de page est un dégradé et une propriété personnalisée en
+  // `light-dark()` se lit telle quelle) : fond d'un bouton et couleur du titre.
+  const paletteUnder = async (colorScheme) => {
+    await page.emulateMedia({ colorScheme });
+    return page.evaluate(() => ({
+      surface: getComputedStyle(document.querySelector('.ghost-btn')).backgroundColor,
+      accent: getComputedStyle(document.querySelector('#settings-title')).color,
+    }));
+  };
+  const dark = await paletteUnder('dark');
+  const light = await paletteUnder('light');
+  expect(dark.surface).not.toBe(light.surface);
+  expect(dark.accent).not.toBe(light.accent);
+  // Persistance : après rechargement, le réglage tient et le pré-rendu le pose avant main.js.
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'auto');
+  expect(
+    await page.evaluate(() => JSON.parse(localStorage.getItem('scoretrack_settings')).theme),
+  ).toBe('auto');
 });
 
 test.describe('conditions d’affichage', () => {

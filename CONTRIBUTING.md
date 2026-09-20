@@ -20,15 +20,21 @@ Playwright télécharge Chromium à la première exécution (`npx playwright ins
 2. **`npm run build:sw` après tout ajout, suppression ou modification d'un fichier servi**
    (HTML, CSS, JS, JSON, police, image). Le précache et le hash de version de `sw-st.js` sont
    générés ; un oubli fait échouer `check:sw` et priverait les utilisateurs de la mise à jour.
-3. **Langue** : interface, documentation, commentaires, messages de commit et de PR en français ;
+3. **`npm run build:screenshots` après tout changement visuel** (CSS, thème, écran, icône) et
+   versionner les huit PNG régénérés : la CI les compare octet à octet à ce que l'interface rend.
+   La référence est Linux (runner Ubuntu, Playwright du lockfile) : sous macOS ou Windows,
+   `check:screenshots` est rouge en local sans être en tort — ne versionnez pas vos captures, laissez
+   la CI trancher ou régénérez depuis un conteneur Ubuntu. Toute montée de `@playwright/test`
+   (PR Dependabot dédiée) exige de régénérer les captures dans la même PR.
+4. **Langue** : interface, documentation, commentaires, messages de commit et de PR en français ;
    identifiants de code (variables, fonctions, fichiers, clés JSON, classes CSS) en anglais.
-4. **Zéro dépendance à l'exécution, zéro bundler** (D2) : pas d'`import` depuis `node_modules`
+5. **Zéro dépendance à l'exécution, zéro bundler** (D2) : pas d'`import` depuis `node_modules`
    dans `js/`, pas d'étape de build pour servir.
-5. **Vie privée** (D4) : aucune requête réseau vers un tiers, aucune police ou script externe.
-6. **Accessibilité et daltonisme** (D1, D10) : toute information portée par une couleur l'est aussi
+6. **Vie privée** (D4) : aucune requête réseau vers un tiers, aucune police ou script externe.
+7. **Accessibilité et daltonisme** (D1, D10) : toute information portée par une couleur l'est aussi
    par un glyphe, une icône, un texte ou une position ; contraste AA sur les 14 thèmes ; cibles
    ≥ 44 px ; **aucun texte sous 12 px** ; navigation clavier et focus visible.
-7. **Aucune donnée fictive, aucun identifiant de modèle d'IA** dans le code, les commits ou les
+8. **Aucune donnée fictive, aucun identifiant de modèle d'IA** dans le code, les commits ou les
    docs (D9).
 
 ## Organisation du code

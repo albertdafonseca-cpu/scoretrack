@@ -97,17 +97,24 @@ consigne les préférences du propriétaire.
   12 px (jeton `--fs-1`), sans exception — libellés de la barre d'action et mentions légales
   comprises. Les jetons de l'échelle typographique sont décalés en conséquence.
 - Conséquences : l'assertion `font-size` = 1 du budget Lighthouse devient tenable et cesse de
-  contredire D7. Six sélecteurs de `css/setup.css` restent à corriger au moment de cette entrée.
+  contredire D7.
+- État au 19 septembre 2026 : appliqué — `--fs-1: max(0.75rem, 12px)` (D19), plus aucun sélecteur
+  de `css/setup.css` sous 12 px, et l'audit Lighthouse `font-size` vaut **1** sur les 5 exécutions.
 
-## D11 — Le CLS est un défaut, pas un budget à assouplir
+## D11 — Le CLS est un défaut, pas un budget à assouplir (rectifié le 18 septembre 2026)
 
-- Contexte : CLS de 0,330 mesuré sur l'écran d'accueil, causé par le chargement des polices
-  (`#setup-page > .setup-section` se déplace à l'arrivée des fontes).
-- Décision : le budget (performance ≥ 0,95, CLS ≤ 0,1) ne bouge pas ; le décalage se corrige par
-  `size-adjust`/`ascent-override` dans `css/fonts.css`, préchargement (`<link rel="preload">`) des
-  deux polices du premier rendu et réservation de la hauteur des blocs.
-- Conséquences : le job `lighthouse` reste rouge tant que la correction n'est pas faite ; c'est le
-  signal attendu, pas un réglage à contourner.
+- Contexte : CLS de 0,317 mesuré sur l'écran d'accueil.
+- **Rectificatif de l'auditeur.** Le diagnostic initial de cette entrée — « causé par le chargement
+  des polices » — était **faux**, et il est rétracté. Mesures de l'agent B : sur 0,317, **0,289
+  viennent de la grille de préréglages remplie en JavaScript** (`#presets-grid` : la section passe
+  de 41 px à 154 px vers 310 ms) et **0,031 seulement des polices**. Le correctif principal
+  appartenait donc à C (réserver la hauteur de la grille, ou rendre les préréglages directement
+  dans le HTML), B ne restant responsable que des métriques de police et du préchargement.
+- Décision (inchangée) : le budget ne bouge pas — performance ≥ 0,95, CLS ≤ 0,1.
+- **Leçon générale, applicable à tous : un correctif ne se décide pas sans avoir mesuré la cause.**
+  Une cause plausible n'est pas une cause mesurée ; l'écrire dans ce journal avant de l'avoir
+  vérifiée a envoyé le travail au mauvais agent.
+- État au 19 septembre 2026 : CLS mesuré **0,018** sur les 5 exécutions Lighthouse (budget tenu).
 
 ## D12 — `meta-viewport` : seule dérogation Lighthouse admise
 
@@ -121,12 +128,28 @@ consigne les préférences du propriétaire.
   appelait. Une garantie documentée mais non exécutée est un mensonge de documentation.
 - Décision : job `design` de `ci.yml` — `npm run audit:contrast` et `npm run audit:cvd` sur `dist/`
   servi localement, rapports en artefact, échec de la construction en cas de régression.
+- **État au 19 septembre 2026 (mesure de 14 h) : le job `design` est rouge**, et la documentation le
+  dit plutôt que de l'ignorer (D15). `npm run audit:contrast` sort 1 : **40 écarts sur 18 502
+  mesures**, tous sur le même élément — le prénom du joueur (`span.pplayer`) — et tous dans les
+  quatre états transitoires (butée 12, flash gain 10, flash perte 8, pression 10) de sept thèmes
+  (`dark` 8, `nature` 8, `arcade` 5, `sunset` 5, `ocean` 5, `mono` 5, `sobre` 4) ; rapports mesurés
+  de 4,10 à 4,70 exclu, pour un seuil de 4,70 (4,5 exigé par D20 + la marge de 0,2 de D21). Aucun
+  écart en état stable. Vérifié avant d'attribuer : le script est conforme à D20 — il ne concède 3:1
+  qu'au texte de 24 px ou plus (le score), et le prénom, plus petit, reste tenu à 4,5:1 même pendant
+  un flash. Ce sont donc de vrais défauts de contraste, **à corriger par B** (couleur du prénom et
+  voiles des états transitoires dans ces thèmes) ; ils ne sont pas corrigés à la date de cette
+  entrée. F n'a touché à aucun seuil pour faire passer le job.
+- Déterminisme (D21) : trois exécutions consécutives le 19 septembre au matin → 40 échecs à chaque
+  fois, ensembles strictement identiques ; depuis, B a rendu le nombre de mesures auto-contrôlé
+  (« 0 cellule instable, 0 écart de nombre de mesures » dans le rapport).
+- `npm run audit:cvd` sort 0 (la paire gain/perte reste distinguable sous les trois simulations).
 
 ## D14 — Rien d'annoncé ne reste non câblé
 
 - Décision : les raccourcis `./?action=new` et `./?action=resume` déclarés dans `manifest-st.json`
   doivent être implémentés (lecture de `location.search` au démarrage) ou retirés du manifeste.
-- État à la date de cette entrée : déclarés, non câblés — à traiter par l'élément E.
+- État au 19 septembre 2026 : **câblés** — `js/platform/shortcuts.js` (`applyLaunchAction`, appelé
+  par `js/main.js`) lit `location.search` au démarrage et applique `?action=new` / `?action=resume`.
 
 ## D15 — Aucune documentation ne décrit un état futur au présent
 
@@ -136,6 +159,77 @@ consigne les préférences du propriétaire.
 - Conséquences : les mesures citées dans la documentation portent leur date et la commande qui les
   produit ; un chiffre invérifiable est retiré plutôt qu'arrondi.
 
+## D16 — Un audit doit mesurer ce que l'utilisateur voit réellement
+
+- Contexte : l'audit de contraste lisait une couleur de fond **théorique** (jeton CSS) en ignorant
+  les moitiés teintées des zones plus/moins et la texture des cartes. Ses 1600 résultats étaient
+  donc faux là où ça compte.
+- Décision : tout audit automatique échantillonne les **pixels rendus**, dans les états réels
+  (repos, pressé, éliminé). Un audit qui mesure autre chose que ce que l'œil reçoit est un faux
+  témoignage, et vaut moins que pas d'audit du tout.
+- Conséquences : `scripts/audit-contrast.mjs` capture la page et lit les pixels ; le nombre de
+  mesures passe de 1 600 à ~16 500 et le job `design` de la CI s'allonge en proportion.
+
+## D17 — Un test désactivé par défaut n'est pas un test
+
+- Contexte : les assertions fortes des tests visuels étaient conditionnées à une variable
+  d'environnement posée nulle part ; un script d'audit sortait en succès malgré trente paires en
+  échec.
+- Décision : tout contrôle de qualité **échoue par défaut** en cas de régression. Interdiction des
+  garde-fous silencieux : pas d'assertion sous condition d'environnement, pas de sortie 0 avec des
+  échecs dans le rapport.
+- Conséquences pour F : chaque garde-fou de la CI est prouvé par dégradation volontaire avant
+  d'être considéré comme livré (voir `docs/SECURITE.md` § 3). Reste une exception **documentée** :
+  `audit:cvd` ne fait échouer que sur la paire gain/perte, les écarts de palette étant listés sans
+  bloquer, parce que la palette est figée par D1 et que la distinction est portée par des signes
+  non chromatiques (D18).
+
+## D18 — Distinction non chromatique obligatoire sur l'écran de jeu
+
+- Contexte : en simulation d'achromatopsie, les douze cartes apparaissent identiques et ne portent
+  ni nom ni numéro de siège lisible.
+- Décision : chaque carte porte en permanence un identifiant non chromatique (numéro de siège
+  et/ou prénom, à une taille suffisante). L'appartenance d'une carte à un joueur ne dépend jamais
+  de la couleur. C'est l'application directe de D1.
+
+## D19 — L'échelle typographique passe en unités relatives
+
+- Contexte : l'application cumulait deux verrous — zoom par pincement désactivé (D7) et échelle
+  typographique en pixels absolus. Un utilisateur qui agrandit la taille du texte dans les réglages
+  de son système n'obtenait **aucun** effet : échec du critère « redimensionnement du texte », et
+  la contrepartie posée en D7 s'en trouvait vidée de sa substance.
+- Décision : les jetons `--fs-*` passent en `rem`, calés sur une base de 16 px, plancher effectif de
+  12 px conservé (D10). Propriétaire : B (`css/tokens.css`) ; les feuilles de A et C suivent.
+- Vérification exigée : à 200 % de taille système, l'application reste utilisable, aucun texte
+  tronqué, aucune cible sous 44 px, zone de jeu jouable.
+- État au 19 septembre 2026 : appliqué — `--fs-1: max(0.75rem, 12px)`.
+
+## D20 — Seuil de contraste en état transitoire, ratifié explicitement
+
+- Contexte : les règles d'accessibilité accordent 3:1 aux grands textes sans condition, et le score
+  de l'écran de jeu dépasse largement la taille de grand texte.
+- Décision, plus stricte que la norme : **4,5:1 exigé au repos pour tout texte, score compris** ;
+  3:1 toléré **uniquement** pendant les états transitoires et brefs (pression, flash, butée). La
+  tolérance ne s'applique jamais à un état stable.
+- Conséquence de forme : cette règle doit être écrite en toutes lettres dans l'en-tête du script
+  d'audit, dans son rapport et ici. Un en-tête qui affirmerait encore « 4,5:1 pour tout texte »
+  contredirait le code et tomberait sous D15.
+
+## D21 — Un audit dont le verdict varie d'une exécution à l'autre ne vaut rien
+
+- Contexte : deux passages consécutifs de l'audit de contraste ont donné des ensembles d'échecs
+  différant sur onze entrées sur vingt-deux, tous les échecs se situant à moins de 0,3 du seuil.
+  Le verdict de la CI était alors tiré au sort.
+- Décision : trois exécutions consécutives doivent produire des **ensembles d'échecs identiques** ;
+  l'échantillonnage est stabilisé (médiane de plusieurs captures) ; tout élément mesuré à moins de
+  0,2 du seuil est traité comme un **défaut de conception à corriger**, pas comme un résultat à
+  publier. La même exigence vaut pour **tout** audit automatique du projet.
+- Application à Lighthouse (F) : la mesure de performance variait de 0,86 à 0,98 d'une exécution à
+  l'autre et le job passait grâce à l'exécution médiane — un vert tiré au sort. Depuis le
+  19 septembre 2026, `lighthouserc.json` collecte **5 exécutions** et asserte sur la **pire**
+  (`aggregationMethod: pessimistic`) pour les quatre catégories, le CLS, le poids et les audits
+  binaires sensibles. Voir ADR-15 pour les mesures.
+
 ## ADR-10 — CSP déclarée en `<meta>` (pas d'en-têtes sur Pages)
 
 - Contexte : GitHub Pages n'autorise aucun en-tête HTTP personnalisé.
@@ -143,10 +237,10 @@ consigne les préférences du propriétaire.
   inline ; `style-src 'unsafe-inline'` toléré (styles calculés).
 - Conséquences : plus aucun `onclick` inline (table `ACTIONS`) ; `frame-ancestors`/`report-to`
   inapplicables (voir SECURITE § 2.2) ; l'audit Lighthouse `csp-xss` reste informatif.
-- Écart ouvert au 17 septembre 2026 : `base-uri` et `form-action` ne retombent pas sur
-  `default-src`, ils sont donc absents de la politique actuelle. La ligne complète attendue figure
-  dans `docs/SECURITE.md` § 2.2 ; `index.html` appartient aux éléments C/A, la correction leur
-  revient.
+- Écart **refermé** le 18 septembre 2026 : `base-uri 'none'`, `form-action 'none'`,
+  `object-src 'none'` et `worker-src 'self'` sont désormais dans `index.html:11` (vérifié le
+  19 septembre). Ces quatre directives ne retombent pas toutes sur `default-src` — `base-uri` et
+  `form-action` en sont exclues par la spécification — et devaient donc être déclarées.
 
 ## ADR-11 — Découpage en modules `core / ui / platform / fx`
 
@@ -197,11 +291,20 @@ consigne les préférences du propriétaire.
 - `@lhci/cli` est appelé par `npx` avec une version épinglée (`0.15.1`) plutôt qu'ajouté aux
   devDependencies (≈ 300 paquets transitifs pour un outil de mesure). Conséquence assumée : cette
   dépendance-là n'est pas couverte par l'intégrité du `package-lock.json`.
-- État au 17 septembre 2026 : le job `lighthouse` est **rouge**. Mesuré sur `dist/` : performance
-  0,83 (attendu ≥ 0,95), CLS 0,330 (attendu ≤ 0,1), `font-size` 0 (six sélecteurs à 11 px dans
-  `css/setup.css`). Accessibilité 0,93, best-practices 0,96, SEO 1,00 sont tenus. Ces trois échecs
-  sont des défauts réels de l'application (D10, D11), pas un budget mal réglé : le budget n'est pas
-  relâché pour faire passer la CI.
+- Déterminisme (D21) : la mesure de performance variait de 0,86 à 0,98 selon l'exécution, et le job
+  passait grâce à l'exécution médiane. Depuis le 19 septembre 2026, la collecte fait **5 exécutions**
+  et les assertions portent sur la **pire** (`aggregationMethod: pessimistic`) pour les quatre
+  catégories, le CLS, le poids total et les audits binaires sensibles (`font-size`,
+  `errors-in-console`, `color-contrast`, `target-size`, `button-name`, `label`).
+- **État au 19 septembre 2026 : le job `lighthouse` est rouge**, et il l'est de façon reproductible.
+  Mesuré sur `dist/`, 5 exécutions, assertion sur la pire : performance **0,95 / 0,98 / 0,89 / 0,95 /
+  0,95 → pire 0,89 < 0,95**, `npm run lhci` sort **1**. Le critique obtient la même chose deux fois
+  sur deux, machine calme (0,90 à 0,98). Accessibilité 0,93, bonnes pratiques 1,00, SEO 1,00, CLS
+  0,018, `font-size` 1 : tenus. Le seul défaut est le **LCP** — 1,98 s à 3,36 s selon l'exécution —
+  attribué à B (préchargement des deux polices du premier rendu, feuilles bloquantes, amorçage).
+- Leçon consignée : une précédente version de cette entrée annonçait « `npm run lhci` sort 0 » sur la
+  foi d'**une** exécution favorable. Un résultat obtenu une fois n'est pas un résultat ; on n'écrit
+  un vert qu'après l'avoir reproduit (trois fois, comme D21 l'exige des audits).
 
 ## ADR-16 — Déploiement Pages par GitHub Actions
 
@@ -232,6 +335,36 @@ consigne les préférences du propriétaire.
 - Décision : **en attente**. Tant qu'elle n'est pas prise, README affiche « Licence : à définir »
   et `package.json` garde `UNLICENSED`.
 
+## ADR-21 — Contrôle du paquet en liste blanche, et plafond de poids du précache
+
+- Contexte : le contrôle du job `paquet` vérifiait l'absence de sept chemins d'outillage nommés. Il
+  n'a donc pas vu quatorze captures de débogage (2,6 Mo) versionnées par erreur à la racine, qui
+  seraient parties en production. Une liste noire ne voit que ce qu'elle a prévu.
+- Décision : le contrôle est **inversé en liste blanche**. Tout fichier du paquet qui n'est ni une
+  entrée du précache, ni un actif déclaré dans `manifest-st.json` (icônes, captures, icônes de
+  raccourcis, lues dynamiquement), ni l'un des actifs justifiés un par un dans `ALLOWED_UNCACHED`
+  (`.nojekyll`, `sw-st.js`, `favicon.png`, `LICENSES.md`, `sprite.svg`, les deux logos,
+  `favicon-32.png`) fait **échouer la construction**. Symétriquement, un actif déclaré mais absent
+  du paquet échoue aussi : la liste ne peut pas pourrir sans qu'on le sache.
+- Preuve (D17) : sept dégradations volontaires rejouées le 19 septembre 2026, script extrait tel quel
+  du YAML — capture de débogage publiée, `package.json` publié, dossier `docs/` publié, capture du
+  manifeste absente, entrée de précache absente, plafond abaissé sous le poids courant, emoji dans
+  l'interface / `sw-st.js` périmé (rejoués sur copie) — donnent toutes un code 1 ; l'état sain donne 0.
+  La même liste, dans le même ordre, figure dans `docs/SECURITE.md` § 3.
+- Plafond de poids : `PRECACHE_MAX_BYTES` borne ce que l'utilisateur télécharge à la **première
+  visite**, pas le comptage du jour. Il est fixé à **900 000 octets**, ce qui correspond à **18,0 s**
+  sur le profil « Slow 3G » des outils de développement Chrome (400 kbit/s, RTT 2 s), **9,6 s** sur le
+  profil 3G de Lighthouse (750 kbit/s) et **4,4 s** sur « 4G lente » de Lighthouse (1,6 Mbit/s). Au-delà,
+  l'installation initiale dépasse ce qu'un utilisateur attend d'une application qui se présente comme
+  légère ; l'app reste utilisable pendant ce téléchargement, qui se fait en arrière-plan après le
+  premier rendu (~445 Kio). Poids mesuré le 19 septembre 2026 à 14 h : **744 335 octets** (82,7 %), soit
+  14,9 s en Slow 3G — le job `paquet` affiche la valeur exacte à chaque construction.
+- Alerte : un avertissement explicite (`::warning::` dans le journal du job `paquet`) est émis dès
+  **90 %** du plafond (810 000 octets). Le seuil est placé **au-dessus** du poids courant, sinon
+  l'avertissement se déclencherait à chaque construction et ne préviendrait plus personne (esprit de
+  D17) : il reste 65 665 octets de marge avant qu'il ne parle, et 155 665 avant l'échec. La première
+  piste de réduction si l'alerte se déclenche : sous-ensembles de polices (244 Kio aujourd'hui).
+
 ## ADR-20 — Actions GitHub épinglées par tag majeur (et non par SHA)
 
 - Contexte : un tag majeur (`actions/checkout@v4`) est mutable ; un compte d'action compromis peut
@@ -250,9 +383,35 @@ consigne les préférences du propriétaire.
 - Décision : npm (devDependencies) et github-actions, le lundi, mises à jour mineures/correctifs
   groupées, préfixes `deps`/`ci`. Un bump majeur reste une PR séparée à relire.
 
-## ADR-19 — Captures de la documentation
+## ADR-19 — Captures de la documentation : générées, déterministes, comparées en CI
 
-- Décision : les captures du README sont produites par Playwright (iPhone 13, thème par défaut),
-  réduites à 390 px de large, stockées dans `docs/img/` ; elles portent la date de prise et sont
-  régénérées à chaque changement visuel notable (script `shoot.mjs` conservé hors dépôt par
-  l'auditeur ; à versionner dans `scripts/` si le besoin devient récurrent).
+- Contexte : le README a d'abord embarqué huit captures prises à la main le 16 septembre 2026,
+  périmées deux commits visuels plus tard (numéros de siège, rétablissement, icônes cerclées) ; puis
+  trois captures du manifeste, dont la légende annonçait douze joueurs sur une image qui en montrait
+  quatre, et qu'aucune vérification ne comparait à l'interface. Deux fois de la documentation fausse
+  (D15), et une documentation qui n'illustrait ni les prénoms, ni le pavé, ni le récapitulatif, ni
+  les thèmes, ni douze joueurs.
+- Décision (19 septembre 2026) : une seule source, `scripts/build-screenshots.mjs`, produit **huit
+  captures** — les trois du manifeste dans `assets/screenshots/` (accueil, table à 4, tablette) et
+  cinq de documentation dans `docs/img/` (prénoms, pavé numérique, récapitulatif, douze joueurs
+  nommés, thème clair). Le rendu est rendu déterministe : polices auto-hébergées attendues
+  (`document.fonts.status === 'loaded'` avant chaque capture, y compris après un changement de
+  thème), animations désactivées, curseur de saisie masqué, service worker bloqué, gestes réels
+  par événements tactiles.
+- Garde-fou : `npm run check:screenshots` régénère les huit captures dans `test-results/` et échoue
+  si un octet diffère des fichiers versionnés ou si l'un manque ; le job `paquet` l'exécute à chaque
+  PR. Après tout changement visuel : `npm run build:screenshots` et versionner le résultat.
+- Preuves (D17, D21) : trois générations consécutives sous une charge machine de 3,7 à 4,1 →
+  **8 captures sur 8 identiques à l'octet** ; un octet ajouté à une capture versionnée → code 1 ;
+  état sain → code 0. Une version antérieure du script sans attente des polices avait produit une
+  divergence d'anticrénelage sur le thème clair : c'est ce qui a motivé l'attente explicite.
+- Limite connue : le rendu dépend du binaire Chromium et de la plateforme. La référence est le
+  runner Ubuntu de la CI, avec la version de Playwright du `package-lock.json` (1.56.1, Chromium
+  1194). Un contributeur sous macOS ou Windows verra `npm run check:screenshots` **rouge en local**
+  (anticrénelage différent) sans que rien ne soit faux : il ne versionne pas ses captures, laisse
+  la CI trancher, et s'il doit régénérer, le fait depuis Linux (conteneur Ubuntu, ou l'artefact
+  `captures-regenerees` que le job `paquet` publie à chaque écart).
+- Montée de version de Playwright : elle change Chromium, donc les octets des huit captures.
+  `@playwright/test` est **exclu du groupe Dependabot** (PR dédiée) et sa montée s'accompagne
+  obligatoirement de `npm run build:screenshots` dans la même PR — sinon le job `paquet` la refuse,
+  ce qui est le comportement voulu.

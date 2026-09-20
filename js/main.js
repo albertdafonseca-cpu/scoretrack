@@ -159,6 +159,27 @@ function hideSplash() {
   }, SPLASH_DELAY);
 }
 
+/**
+ * Feuilles différées (jeu, modales, mouvement, couche système) : déclarées `media="print"` dans
+ * index.html pour ne pas bloquer le premier rendu, elles passent à `all` ici et sont ATTENDUES
+ * avant `init()`, pour qu'aucun écran piloté par l'application ne soit affiché sans sa feuille.
+ * Mesuré avec Lighthouse en profil mobile ralenti : premier rendu 2,1–2,5 s → 1,4–1,8 s.
+ */
+function activateDeferredStyles() {
+  const links = [...document.querySelectorAll('link[rel="stylesheet"][data-deferred]')];
+  const loaded = (link) =>
+    new Promise((resolve) => {
+      if (link.sheet) {
+        resolve();
+        return;
+      }
+      link.addEventListener('load', resolve, { once: true });
+      link.addEventListener('error', resolve, { once: true });
+    });
+  for (const link of links) link.media = 'all';
+  return Promise.all(links.map(loaded));
+}
+
 function init() {
   installErrorJournal();
   hydrateIcons();
@@ -178,4 +199,4 @@ function init() {
   hideSplash();
 }
 
-init();
+activateDeferredStyles().then(init);

@@ -22,24 +22,34 @@
 // Exemption assumée : les contrôles `:disabled` (WCAG 1.4.3, exception « Inactive »), mesurés et
 // listés à titre indicatif, jamais comptés en échec.
 //
-// PÉRIMÈTRE — la bannière système « nouvelle version » (élément E) est le seul élément retiré des
-// écrans ordinaires : elle n'appartient à aucun écran, n'appartient à aucun thème, et son apparition
-// dépend du calendrier du service worker. La laisser entrer au hasard faisait varier le nombre de
-// lignes d'une exécution à l'autre sans rien apprendre. Elle n'échappe pas pour autant à l'audit :
-// l'écran `bannière système` l'affiche VOLONTAIREMENT, dans ses deux états (version disponible sur
-// l'accueil, version active au-dessus de la barre en partie), et mesure son contraste sur chaque
-// thème. Le script échoue si ces mesures manquent. Elle sort du hasard pour entrer dans le contrôle.
+// PÉRIMÈTRE — la couche système de l'élément E (bannière « nouvelle version », notification
+// discrète) est la seule chose retirée des écrans ordinaires : elle n'appartient à aucun écran,
+// n'appartient à aucun thème, et son apparition dépend du calendrier du service worker ou d'une
+// minuterie. La laisser entrer au hasard faisait varier le nombre de lignes d'une exécution à
+// l'autre sans rien apprendre. Elle n'échappe pas pour autant à l'audit : l'écran `couche système`
+// l'affiche VOLONTAIREMENT, dans deux états (version disponible sur l'accueil ; version active plus
+// notification en partie à dix joueurs, grille resserrée par la hauteur réservée), et mesure son
+// contraste sur chaque thème. Le script échoue si ces mesures manquent. Elle sort du hasard pour
+// entrer dans le contrôle.
 //
 // DÉTERMINISME (décision D21) : le fond est échantillonné sur MEDIAN_SHOTS captures successives dont
 // on retient la médiane par canal — une trame de composition transitoire est ainsi écartée par vote.
+// Deux gardes complètent la médiane, parce qu'une mesure stable sur un état de page instable ne
+// vaut rien : (a) le jeu d'éléments est relevé DEUX FOIS, avant et après la capture, polices prêtes
+// et animations terminées ; toute apparition ou disparition entre les deux est une instabilité
+// nommée, qui fait échouer le script ; (b) `--counts` écrit le nombre d'éléments mesurés par
+// cellule et `--expect-counts` l'exige identique — le nombre de mesures est asserté comme une
+// grandeur, car un nombre de mesures qui varie est le symptôme le plus sûr d'un état de page
+// instable, et le compte des écrans absents ne l'attrape pas.
 // Et tout élément qui passe à moins de MARGIN du seuil est compté en ÉCHEC : sans cette marge, une
 // valeur qui oscille de ±0,1 autour du seuil ferait basculer le verdict de la CI d'un passage à
 // l'autre. Un contraste « juste à la limite » est un défaut de conception, pas un résultat à publier.
 //
 // Usage : node scripts/audit-contrast.mjs [--url http://localhost:8765/] [--out rapport.md]
 //         [--json mesures.json] [--themes cyber,light] [--dpr 3]
+//         [--counts signature.json] [--expect-counts signature.json]
 // Sortie : tableau Markdown + code 1 s'il reste un échec.
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { chromium, devices } from '@playwright/test';
 
@@ -57,6 +67,14 @@ const DPR = Number(opt('--dpr', '3'));
 const INJECT = opt('--inject', null);
 /** Dossier où déposer les captures masquées réellement analysées (diagnostic). */
 const DEBUG_SHOTS = opt('--debug-shots', null);
+/**
+ * Signature de l'état de page atteint : nombre d'éléments mesurés par cellule
+ * (thème · écran · état). `--counts` l'écrit, `--expect-counts` l'EXIGE identique — c'est
+ * l'assertion de constance d'une exécution à l'autre demandée par D21 : le nombre de mesures est
+ * une grandeur mesurée comme les autres, et il ne doit pas bouger.
+ */
+const COUNTS_OUT = opt('--counts', null);
+const EXPECT_COUNTS = opt('--expect-counts', null);
 
 /** Thèmes audités : identifiant CSS + schéma de couleurs émulé (pour « auto »). */
 const ALL_THEMES = [
@@ -103,14 +121,18 @@ const MARGIN = 0.2;
  * Relève chaque élément visible porteur d'information : nœud texte propre, ou forme SVG tracée.
  * Renvoie la couleur effective (alpha × opacity héritée) et la boîte englobante.
  */
-function collectForegrounds({ withBanner = false } = {}) {
-  // La bannière « nouvelle version » de l'élément E est un objet SYSTÈME transitoire : elle
-  // n'appartient à aucun écran, n'appartient à aucun thème, et son apparition dépend du calendrier
-  // du service worker. La laisser entrer au hasard rendrait le nombre de lignes mesurées
-  // irreproductible sans rien apprendre. Elle est donc exclue de tous les écrans, et mesurée sur
-  // chaque thème dans deux états dédiés et déterministes (écran « bannière système », où l'audit
-  // l'affiche lui-même). Hors de ces deux états, sa présence est une anomalie et l'audit l'ignore.
-  const bannerNode = document.getElementById('update-banner');
+function collectForegrounds({ withSystemLayer = false } = {}) {
+  // La couche SYSTÈME de l'élément E — bannière « nouvelle version » et notification discrète — est
+  // faite d'objets transitoires : ils n'appartiennent à aucun écran, n'appartiennent à aucun thème,
+  // et leur apparition dépend du calendrier du service worker ou d'une minuterie de six secondes.
+  // Les laisser entrer au hasard rendrait le NOMBRE de lignes mesurées irreproductible sans rien
+  // apprendre. Ils sont donc exclus de tous les écrans, et mesurés sur chaque thème dans des états
+  // dédiés et déterministes (écran « couche système », où l'audit les affiche lui-même). Hors de ces
+  // états, leur présence est un aléa et l'audit l'ignore.
+  const systemNodes = [
+    document.getElementById('update-banner'),
+    document.getElementById('sys-toast'),
+  ].filter(Boolean);
   // `getComputedStyle` renvoie `oklab(...)` dès qu'un `color-mix(in oklab, …)` est en jeu :
   // toute couleur est donc résolue en octets sRGB par le canvas, seule source fiable.
   const probe = document.createElement('canvas');
@@ -175,11 +197,39 @@ function collectForegrounds({ withBanner = false } = {}) {
    * tactiles, dont la teinte fait justement partie du fond composé) ne masque rien ; une couche
    * opaque, elle, cache le texte : ces pixels ne sont pas ceux que l'utilisateur lit.
    */
+  // Couches OPAQUES posées au-dessus de tout et transparentes aux événements (la notification
+  // système : position fixe, z-index 200, pointer-events none). Le test de survol ne les voit pas,
+  // mais elles cachent bel et bien le texte qu'elles recouvrent : un libellé de la barre lu sous la
+  // notification serait mesuré sur les pixels de celle-ci, que personne ne lit. Elles sont donc
+  // relevées une fois et testées géométriquement.
+  const blockers = [...document.querySelectorAll('body *')].filter((n) => {
+    const cs = getComputedStyle(n);
+    if (cs.pointerEvents !== 'none' || !n.checkVisibility || !n.checkVisibility()) return false;
+    if (cs.position !== 'fixed' && cs.position !== 'absolute') return false;
+    return num(cs.backgroundColor)[3] >= 0.85 && Number(cs.opacity) >= 0.85;
+  });
   const covered = (el, rect) => {
     const cx = Math.min(innerWidth - 1, Math.max(0, rect.x + rect.width / 2));
     const cy = Math.min(innerHeight - 1, Math.max(0, rect.y + rect.height / 2));
-    for (const node of document.elementsFromPoint(cx, cy)) {
-      if (node === el || el.contains(node) || node.contains(el)) break;
+    for (const b of blockers) {
+      if (b === el || b.contains(el) || el.contains(b)) continue;
+      const r = b.getBoundingClientRect();
+      if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) return true;
+    }
+    // `pointer-events: none` rend un élément INVISIBLE au test de survol : la pile renvoyée par
+    // `elementsFromPoint` ne le contient pas, elle liste ce qui est peint SOUS lui (et ses parents,
+    // qui apparaissent après les couches opaques qu'il survole). Le test d'occultation ne peut donc
+    // rien en dire, et l'appliquer quand même supprimait de l'audit des éléments parfaitement
+    // lisibles : c'est ce qui masquait la notification système, posée en z-index 200 par-dessus la
+    // barre. Dans cette application, ces couches sans capture d'événement (notification, score,
+    // signes +/−, anneau d'appui) sont justement celles peintes au-dessus : on les mesure.
+    for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
+      if (getComputedStyle(n).pointerEvents === 'none') return false;
+    }
+    const stack = document.elementsFromPoint(cx, cy);
+    const self = stack.findIndex((n) => n === el || el.contains(n) || n.contains(el));
+    if (self < 0) return true;
+    for (const node of stack.slice(0, self)) {
       const bg = num(getComputedStyle(node).backgroundColor);
       if (bg[3] >= 0.85) return true;
     }
@@ -197,8 +247,8 @@ function collectForegrounds({ withBanner = false } = {}) {
     // Technique « réservé aux lecteurs d'écran » : découpé à 1 px, jamais lu à l'œil.
     if (cs.clipPath !== 'none' || cs.clip !== 'auto') continue;
     if (layer && !layer.contains(el)) continue;
-    const inBanner = Boolean(bannerNode && (el === bannerNode || bannerNode.contains(el)));
-    if (inBanner && !withBanner) continue;
+    const inSystemLayer = systemNodes.some((n) => n === el || n.contains(el));
+    if (inSystemLayer && !withSystemLayer) continue;
     const opacity = effOpacity(el);
     if (opacity < 0.05) continue;
     const disabled = Boolean(el.closest('[disabled], :disabled'));
@@ -227,7 +277,7 @@ function collectForegrounds({ withBanner = false } = {}) {
         alpha: a,
         kind: 'graphique',
         disabled,
-        inBanner,
+        inSystemLayer,
       });
       continue;
     }
@@ -249,7 +299,7 @@ function collectForegrounds({ withBanner = false } = {}) {
       kind: 'texte',
       fontSize: parseFloat(cs.fontSize),
       disabled,
-      inBanner,
+      inSystemLayer,
     });
   }
   return out;
@@ -464,8 +514,8 @@ function resetGameStates() {
   for (const s of document.querySelectorAll('.score')) s.classList.remove('low', 'crit');
 }
 
-/** Écran dédié à la bannière système, seul endroit où celle-ci est mesurée. */
-const BANNER_SCREEN = 'bannière système';
+/** Écran dédié à la couche système (bannière + notification), seul endroit où elle est mesurée. */
+const SYSTEM_SCREEN = 'couche système';
 
 /**
  * Affiche VOLONTAIREMENT la bannière « nouvelle version » dans l'état demandé, sans passer par le
@@ -474,21 +524,53 @@ const BANNER_SCREEN = 'bannière système';
  * à chaque exécution. Renvoie faux si elle n'est pas réellement visible (le plan est alors signalé
  * comme non mesuré, jamais ignoré en silence).
  */
-async function showSystemBanner(page, state) {
+async function showSystemLayer(page, { banner = null, toast = null }) {
   await page.evaluate(
-    (s) => import('./js/ui/update-banner.js').then((m) => m.showUpdateBanner(s)),
-    state,
+    async ([st, msg]) => {
+      if (st) {
+        const m = await import('./js/ui/update-banner.js');
+        m.showUpdateBanner(st);
+      }
+      if (msg) {
+        // Notification affichée sans minuterie (`duration: 0`) : figée pour la durée de la mesure.
+        // Même idée que pour la bannière — un aléa remplacé par un choix.
+        const t = await import('./js/ui/toast.js');
+        t.showToast(msg, { duration: 0 });
+      }
+    },
+    [banner, toast],
   );
   await page.waitForTimeout(260);
-  return page.evaluate(() => {
-    const b = document.getElementById('update-banner');
-    return Boolean(b && b.checkVisibility() && !b.classList.contains('hidden'));
-  });
+  return page.evaluate(
+    ([st, msg]) => {
+      const shown = (id) => {
+        const n = document.getElementById(id);
+        return Boolean(n && n.checkVisibility() && !n.classList.contains('hidden'));
+      };
+      return (!st || shown('update-banner')) && (!msg || shown('sys-toast'));
+    },
+    [banner, toast],
+  );
 }
 
 /** Un « plan » = une page réelle à mesurer : comment y arriver, et dans quel état. */
 const PLANS = [
   { screen: 'setup', state: 'repos', go: (p) => gotoSetup(p) },
+  // Préréglage choisi (puce `.on`, la seule où --chip-on-text est posé sur --chip-on) et saisie
+  // invalide (message d'erreur, champ en faute) : l'état où l'outil d'audit automatique a relevé
+  // une violation intermittente que l'écran au repos ne pouvait pas montrer.
+  {
+    screen: 'setup',
+    state: 'préréglage choisi + erreur',
+    go: async (p) => {
+      await gotoSetup(p);
+      await p.locator('#start-presets .points-chip[data-val="40"]').click();
+      await p.locator('#max-custom').fill('20');
+      await p.waitForSelector('#max-error');
+      await p.waitForTimeout(200);
+      return (await p.locator('#start-presets .points-chip.on[data-val="40"]').count()) > 0;
+    },
+  },
   {
     screen: 'réglages',
     state: 'repos',
@@ -541,24 +623,39 @@ const PLANS = [
       await p.waitForTimeout(300);
     },
   },
-  // Les deux états dédiés de la bannière système : sur l'accueil, puis en partie où elle se place
-  // au-dessus de la barre et réserve sa hauteur. Mesurés sur CHAQUE thème, comme tout le reste.
+  // Les deux états dédiés de la couche système : sur l'accueil, puis en partie à DIX joueurs, où la
+  // bannière se place au-dessus de la barre, réserve sa hauteur et resserre donc la grille — la
+  // composition sous les signes +/− n'y est pas celle du repos, et c'est précisément l'état que le
+  // hasard faisait apparaître par intermittence. Mesurés sur CHAQUE thème, comme tout le reste.
   {
-    screen: BANNER_SCREEN,
+    screen: SYSTEM_SCREEN,
     state: 'version disponible',
-    banner: true,
+    systemLayer: true,
     go: async (p) => {
       await gotoSetup(p);
-      return showSystemBanner(p, 'available');
+      return showSystemLayer(p, { banner: 'available' });
     },
   },
   {
-    screen: BANNER_SCREEN,
-    state: 'version active (au-dessus de la barre)',
-    banner: true,
+    screen: SYSTEM_SCREEN,
+    state: 'version active (grille resserrée, 10 joueurs)',
+    systemLayer: true,
     go: async (p) => {
-      await startGame(p, 4);
-      return showSystemBanner(p, 'activated');
+      await startGame(p, 10);
+      return showSystemLayer(p, { banner: 'activated' });
+    },
+  },
+  // La notification occupe la MÊME place que la bannière : affichées ensemble, la seconde recouvre
+  // la première et la mesure porterait sur des pixels que personne ne lit. Elle a donc son état.
+  {
+    screen: SYSTEM_SCREEN,
+    state: 'notification discrète (en partie)',
+    systemLayer: true,
+    go: async (p) => {
+      await startGame(p, 10);
+      return showSystemLayer(p, {
+        toast: 'Sauvegarde impossible. La partie continue en mémoire.',
+      });
     },
   },
 ];
@@ -579,6 +676,13 @@ async function main() {
       // au milieu d'un fondu. Une opacité transitoire ferait lire un premier plan à moitié composé
       // et produirait des ratios fantaisistes (1,00 quand l'élément est encore invisible).
       reducedMotion: 'reduce',
+      // AUCUN service worker pendant l'audit. Mesuré : une route Playwright qui coupe `sw-st.js` ne
+      // voit jamais la requête d'enregistrement (0 requête interceptée, page contrôlée dès la
+      // première navigation). Seule cette option du contexte empêche réellement l'installation.
+      // Avec un service worker actif, le calendrier de ses mises à jour faisait apparaître la
+      // bannière « nouvelle version » au hasard d'un passage — visible ou non, elle resserre la
+      // grille et déplace les mesures : c'était la source de l'écart d'une exécution à l'autre.
+      serviceWorkers: 'block',
     });
   /**
    * Chaque navigation repart d'un stockage vierge. Sans cela, une partie sauvegardée par le thème
@@ -594,13 +698,9 @@ async function main() {
         /* stockage indisponible : l'application démarre déjà vierge */
       }
     });
-    // Le service worker n'est jamais installé pendant l'audit : sa bannière « nouvelle version »
-    // apparaît selon un calendrier propre et ferait varier le jeu d'éléments mesurés d'une
-    // exécution à l'autre. L'enregistrement échoue proprement, l'application le gère déjà.
-    // Cette coupure est doublée d'un filtrage explicite dans `collectForegrounds` (une bannière
-    // survivant d'un enregistrement antérieur ne peut donc pas s'inviter), et la bannière est
-    // mesurée à part, sur chaque thème, dans les états dédiés de l'écran `bannière système`.
-    await c.route('**/sw-st.js', (route) => route.abort());
+    // Le service worker est bloqué au niveau du contexte (voir `newCtx`) ; la couche système est de
+    // plus filtrée explicitement dans `collectForegrounds`, et mesurée à part, sur chaque thème,
+    // dans les états dédiés de l'écran `couche système`.
     return c;
   };
   let ctx = await freshCtx('dark');
@@ -608,6 +708,10 @@ async function main() {
 
   const rows = [];
   const skipped = new Set();
+  /** Cellules (thème · écran · état) dont le jeu d'éléments a changé pendant la mesure (D21). */
+  const unstable = [];
+  /** Nombre d'éléments mesurés par cellule : signature de l'état de page atteint. */
+  const cellCounts = new Map();
   const setTheme = (id) =>
     page.evaluate(
       (t) => document.documentElement.setAttribute('data-theme', t === 'cyber' ? '' : t),
@@ -662,9 +766,9 @@ async function main() {
       return v[(v.length - 1) >> 1];
     });
 
-  async function measure(theme, screen, state, withBanner = false) {
+  async function measure(theme, screen, state, withSystemLayer = false) {
     await page.evaluate(settle);
-    const fgs = await page.evaluate(collectForegrounds, { withBanner });
+    const fgs = await page.evaluate(collectForegrounds, { withSystemLayer });
     if (!fgs.length) {
       await clearTags();
       return;
@@ -691,6 +795,32 @@ async function main() {
     }
     await page.evaluate(showForegrounds);
     await clearTags();
+    // CONTRÔLE D'INVARIANCE (D21) — le jeu d'éléments est relevé une SECONDE fois, après la
+    // séquence de captures, dans les mêmes conditions (polices prêtes, animations terminées).
+    // S'il a changé entre les deux relevés, la page n'était pas stable : un élément système à
+    // minuterie (toast, bannière) est apparu ou a disparu pendant la mesure, ou une couche s'est
+    // composée en retard. Un NOMBRE D'ÉLÉMENTS MESURÉS QUI VARIE est le symptôme le plus sûr d'un
+    // état de page instable, et il ne se voit pas dans le compte des écrans absents : il est donc
+    // relevé ici, nommément, et fait échouer le script. Reproche du critique de F : sur le paquet
+    // publié, deux exécutions ne mesuraient pas le même nombre d'éléments.
+    await page.evaluate(settle);
+    const after = await page.evaluate(collectForegrounds, { withSystemLayer });
+    await clearTags();
+    const tally = (list) => {
+      const m = new Map();
+      for (const f of list) m.set(`${f.kind} ${f.sel}`, (m.get(`${f.kind} ${f.sel}`) || 0) + 1);
+      return m;
+    };
+    const t1 = tally(fgs);
+    const t2 = tally(after);
+    const drifted = [];
+    for (const k of new Set([...t1.keys(), ...t2.keys()])) {
+      const a = t1.get(k) || 0;
+      const b = t2.get(k) || 0;
+      if (a !== b) drifted.push(`${k} : ${a} → ${b}`);
+    }
+    if (drifted.length) unstable.push({ theme, screen, state, drifted });
+    cellCounts.set(`${theme} · ${screen} · ${state}`, fgs.length);
 
     fgs.forEach((f, i) => {
       if (!boxes[i]) return;
@@ -734,7 +864,7 @@ async function main() {
         kind: f.kind,
         fontSize: f.fontSize,
         disabled: f.disabled,
-        banner: f.inBanner === true,
+        systemLayer: f.inSystemLayer === true,
         fg: hex(over(f.color, f.alpha, worstQuad.q)),
         bg: hex(worstQuad.q),
         bgMean: hex(meanBg),
@@ -788,7 +918,7 @@ async function main() {
         await setTheme(id);
         await page.waitForTimeout(160);
       }
-      await measure(theme, plan.screen, plan.state, plan.banner === true);
+      await measure(theme, plan.screen, plan.state, plan.systemLayer === true);
     }
   }
   // L'interface applique-t-elle réellement les classes d'alerte du score ? (revendication à prouver)
@@ -813,19 +943,38 @@ async function main() {
   // mesurée là où elle est attendue : sur chaque thème, dans ses deux états dédiés. Et un écran
   // atteint par un geste réel (le pavé numérique) peut échouer à s'ouvrir. Dans les deux cas
   // l'audit est incomplet : c'est une lacune, pas un détail, et elle fait échouer le script (D17).
-  const bannerRows = counted.filter((r) => r.banner);
-  const bannerStates = new Set(bannerRows.map((r) => `${r.theme} · ${r.state}`));
+  const systemRows = counted.filter((r) => r.systemLayer);
+  const systemStates = new Set(systemRows.map((r) => `${r.theme} · ${r.state}`));
   const expected = [];
   for (const [id, scheme] of THEMES) {
     const theme = id === 'auto' ? `auto (${scheme})` : id;
     for (const plan of PLANS) {
-      if (plan.banner) expected.push(`${theme} · ${plan.state}`);
+      if (plan.systemLayer) expected.push(`${theme} · ${plan.state}`);
     }
   }
+  // Constance du nombre de mesures d'une exécution à l'autre (D21) : même page, même état, même
+  // nombre d'éléments. Un écart est signalé cellule par cellule et fait échouer le script.
+  const counts = Object.fromEntries([...cellCounts.entries()].sort());
+  const countDiffs = [];
+  if (EXPECT_COUNTS) {
+    const ref = JSON.parse(readFileSync(EXPECT_COUNTS, 'utf8'));
+    for (const k of [...new Set([...Object.keys(ref), ...Object.keys(counts)])].sort()) {
+      const a = ref[k];
+      const b = counts[k];
+      if (a !== b) countDiffs.push(`${k} : ${a ?? 'absent'} → ${b ?? 'absent'}`);
+    }
+  }
+  if (COUNTS_OUT) {
+    mkdirSync(dirname(COUNTS_OUT), { recursive: true });
+    writeFileSync(COUNTS_OUT, JSON.stringify(counts, null, 2));
+  }
+
   const gaps = [
     ...new Set([
       ...[...skipped].map((sc) => `écran jamais mesuré : ${sc}`),
-      ...expected.filter((k) => !bannerStates.has(k)).map((k) => `bannière non mesurée : ${k}`),
+      ...expected
+        .filter((k) => !systemStates.has(k))
+        .map((k) => `couche système non mesurée : ${k}`),
     ]),
   ];
 
@@ -847,7 +996,15 @@ async function main() {
     `Seuils appliqués (D20) : texte en état stable ≥ ${TEXT}:1 quelle que soit sa taille · objets graphiques ≥ ${GRAPHIC}:1 · texte de ${LARGE_PX} px ou plus ≥ ${GRAPHIC}:1 pendant les seuls états transitoires (${[...TRANSIENT].join(', ')}), seuil que WCAG 2.x accorde au grand texte sans condition — la règle d'ici reste donc plus stricte que la norme.`,
     `Marge de déterminisme (D21) : un élément doit dépasser son seuil de ${MARGIN} pour être compté conforme ; entre le seuil et le seuil + ${MARGIN}, le contraste est déclaré insuffisant plutôt que publié comme un résultat qui oscillerait d'un passage à l'autre. Le fond est la médiane de ${MEDIAN_SHOTS} captures.`,
     `Exemptées (contrôles \`:disabled\`, WCAG 1.4.3) : ${exempt.length}.`,
-    `Bannière système : exclue des écrans ordinaires, car c'est un objet système transitoire qui n'appartient à aucun écran ni à aucun thème et dont l'apparition dépend du calendrier du service worker — la laisser entrer au hasard rendrait le nombre de lignes irreproductible sans rien apprendre. Elle est mesurée à part, sur **chaque thème**, dans ${PLANS.filter((pl) => pl.banner).length} états dédiés que l'audit provoque lui-même (écran « ${BANNER_SCREEN} ») : ${bannerRows.length} mesures de ses propres éléments, dont ${bannerRows.filter((r) => !r.ok).length} en échec, la plus faible à ${bannerRows.length ? Math.min(...bannerRows.map((r) => r.ratio)).toFixed(2) : '—'}:1. Elle sort du hasard pour entrer dans le contrôle ; elle ne sort pas du contrôle.`,
+    `Couche système (bannière « nouvelle version » et notification discrète) : exclue des écrans ordinaires, car ce sont des objets transitoires qui n'appartiennent à aucun écran ni à aucun thème et dont l'apparition dépend du calendrier du service worker ou d'une minuterie — les laisser entrer au hasard rendrait le nombre de lignes irreproductible sans rien apprendre. Ils sont mesurés à part, sur **chaque thème**, dans ${PLANS.filter((pl) => pl.systemLayer).length} états dédiés que l'audit provoque lui-même (écran « ${SYSTEM_SCREEN} »), dont un en partie à dix joueurs où la bannière resserre la grille : ${systemRows.length} mesures de leurs propres éléments, dont ${systemRows.filter((r) => !r.ok).length} en échec, la plus faible à ${systemRows.length ? Math.min(...systemRows.map((r) => r.ratio)).toFixed(2) : '—'}:1. Ils sortent du hasard pour entrer dans le contrôle ; ils ne sortent pas du contrôle.`,
+    unstable.length
+      ? `> **État de page instable.** ${unstable.length} cellule(s) où le jeu d'éléments a changé entre le relevé d'avant capture et celui d'après : ${unstable.map((u) => `${u.theme} · ${u.screen}/${u.state} (${u.drifted.join(', ')})`).join(' · ')}. Le script échoue : un nombre de mesures qui varie est le symptôme d'un état non stabilisé, et aucune mesure prise dans cet état n'est publiable.`
+      : `Invariance vérifiée : dans les ${cellCounts.size} cellules mesurées, le jeu d'éléments relevé avant la capture est identique à celui relevé après, polices prêtes et animations terminées dans les deux cas.`,
+    EXPECT_COUNTS
+      ? countDiffs.length
+        ? `> **Nombre de mesures non constant.** Comparaison à \`${EXPECT_COUNTS}\` : ${countDiffs.length} cellule(s) divergente(s) — ${countDiffs.join(' · ')}.`
+        : `Nombre de mesures constant : identique à \`${EXPECT_COUNTS}\` dans les ${cellCounts.size} cellules (assertion D21).`
+      : `Signature de l'état de page : ${cellCounts.size} cellules${COUNTS_OUT ? `, écrite dans \`${COUNTS_OUT}\`` : ''} — à rejouer avec \`--expect-counts\` pour asserter que le nombre de mesures ne bouge pas d'une exécution à l'autre (D21).`,
     gaps.length
       ? `> **Lacune d'audit.** ${gaps.length} : ${gaps.join(' · ')}. Le script échoue : un écran attendu et non mesuré ne peut pas être déclaré conforme.`
       : `Aucune lacune : tous les écrans planifiés ont été mesurés, bannière comprise.`,
@@ -942,10 +1099,14 @@ async function main() {
     );
   }
   for (const g of gaps) console.log(`LACUNE ${g}`);
+  for (const u of unstable) {
+    console.log(`INSTABLE ${u.theme} · ${u.screen}/${u.state} : ${u.drifted.join(', ')}`);
+  }
+  for (const d of countDiffs) console.log(`NOMBRE DE MESURES ${d}`);
   console.log(
-    `${counted.length} mesures comptées (dont ${bannerRows.length} sur les éléments de la bannière système), ${failing.length} échec(s), ${gaps.length} lacune(s) → ${OUT}`,
+    `${counted.length} mesures comptées (dont ${systemRows.length} sur les éléments de la couche système), ${failing.length} échec(s), ${gaps.length} lacune(s), ${unstable.length} cellule(s) instable(s), ${countDiffs.length} écart(s) de nombre de mesures → ${OUT}`,
   );
-  process.exit(failing.length || gaps.length ? 1 : 0);
+  process.exit(failing.length || gaps.length || unstable.length || countDiffs.length ? 1 : 0);
 }
 
 main().catch((e) => {

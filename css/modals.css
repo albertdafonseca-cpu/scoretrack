@@ -419,6 +419,27 @@
   padding: var(--sp-3) var(--sp-4);
   border-bottom: 1px solid var(--border);
 }
+/* Colonnes PARTAGÉES entre les lignes du classement. Les largeurs minimales de repli (34 px pour
+   le rang, 56 px pour le score) n'existaient que pour aligner les colonnes ; sur une ligne
+   ordinaire elles gaspillaient 65 px, et un prénom de 18 caractères y était abrégé à 390 px de
+   large alors que la place existait. La sous-grille aligne sans rien réserver : le rang et le
+   score prennent la largeur du plus large d'entre eux, tout le reste revient au prénom. */
+@supports (grid-template-columns: subgrid) {
+  .recap-rank-list {
+    display: grid;
+    grid-template-columns: max-content max-content minmax(0, 1fr) 72px max-content;
+  }
+  .recap-rank-row {
+    display: grid;
+    grid-template-columns: subgrid;
+    grid-column: 1 / -1;
+    column-gap: var(--sp-2);
+  }
+  .recap-rank-list .recap-rank-pos,
+  .recap-rank-list .recap-rank-score {
+    min-width: 0;
+  }
+}
 .recap-rank-row.winner {
   background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
@@ -457,8 +478,13 @@
 }
 .recap-rank-name {
   display: flex;
+  /* La pastille (« éliminé ») passe À LA LIGNE quand le prénom a besoin de la largeur : un prénom
+     n'est abrégé que si, SEUL sur sa ligne, il ne tient toujours pas. Sans ce retour, la pastille
+     (insécable) prenait sa largeur d'abord et « Bartholomew Longna » devenait « Bartho… » alors
+     que la ligne du dessous était vide. */
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--sp-2);
+  gap: 2px var(--sp-2);
   min-width: 0;
   font-family: var(--font-ui);
   font-size: var(--fs-3);
@@ -466,6 +492,7 @@
   color: var(--text);
 }
 .recap-rank-name > span:first-child {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

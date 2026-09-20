@@ -20,7 +20,7 @@ flowchart TB
     A11Y["a11y.js\ntrapFocus, announce, onKey"]
     SETUP["setup.js · names.js · settings.js"]
     GAME["game.js · modals.js · recap.js"]
-    BANNER["update-banner.js"]
+    BANNER["update-banner.js · toast.js"]
   end
 
   subgraph FX["js/fx — animations"]
@@ -43,7 +43,8 @@ flowchart TB
     ERR["errors.js\njournal d'erreurs local"]
     HAPT["haptics.js"]
     BACKUP["backup.js\nexportData / importData"]
-    BOOT["boot.js"]
+    BOOT["boot.js · prepaint.js\nthème appliqué avant le premier rendu"]
+    SHORT["shortcuts.js\nraccourcis ?action=new / ?action=resume"]
   end
 
   SW["sw-st.js\nprécache généré (hash), cache st-<hash>"]
@@ -61,6 +62,7 @@ flowchart TB
   SWC -. postMessage SKIP_WAITING .-> SW
   Page -. link rel=manifest .-> MANIFEST
   MAIN --> SWC
+  MAIN --> SHORT
 ```
 
 Règles de dépendance : `core` n'importe rien d'autre que `core` ; `platform` n'importe que `core` ;
@@ -217,15 +219,17 @@ précache y existe, et que le poids téléchargé à la première visite reste s
 
 ## 8. Poids et chiffres
 
-Ordres de grandeur mesurés le 17 septembre 2026, alors que les éléments A et D travaillaient encore :
-chaque ligne indique la commande qui les reproduit, à relancer avant toute publication.
+Mesures du 19 septembre 2026, prises sur le paquet `dist/` de l'arbre de travail. Chaque ligne
+indique la commande qui les reproduit : elles bougent à chaque livraison et doivent être relancées
+avant publication (D15).
 
-| Élément                       | Valeur                                        | Comment la reproduire                                         |
-| ----------------------------- | --------------------------------------------- | ------------------------------------------------------------- |
-| Coquille `index.html`         | ≈ 24 Ko                                       | `stat -c%s index.html`                                        |
-| Paquet publié `dist/`         | 66 fichiers, ≈ 840 Kio                        | `npm run build:dist && du -sb dist`                           |
-| Précache du service worker    | 61 entrées, ≈ 640 Ko (dont 238 Ko de polices) | job `paquet` de la CI (plafond `PRECACHE_MAX_BYTES`)          |
-| Chargement initial de la page | ≈ 400 Kio                                     | audit Lighthouse `total-byte-weight` (plafond 512 000 octets) |
+| Élément                       | Valeur                                                                                                | Comment la reproduire                                         |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Coquille `index.html`         | 38 630 octets (37,7 Kio)                                                                              | `stat -c%s index.html`                                        |
+| Paquet publié `dist/`         | 69 fichiers, 1,07 Mio                                                                                 | `npm run build:dist && du -sb dist`                           |
+| Précache du service worker    | 59 entrées (58 fichiers distincts), 744 335 octets à 14 h, soit 82,7 % du plafond de 900 000 (ADR-21) | job `paquet` de la CI                                         |
+| dont polices auto-hébergées   | 244 132 octets (238 Kio)                                                                              | `du -cb assets/fonts/*.woff2`                                 |
+| Chargement initial de la page | 444 Kio (454 801 octets, identique sur les 5 exécutions)                                              | audit Lighthouse `total-byte-weight` (plafond 512 000 octets) |
 
 Le précache et le chargement initial diffèrent : la page n'a besoin que d'une partie des fichiers
 pour s'afficher, le service worker télécharge le reste en arrière-plan pour le mode hors ligne.

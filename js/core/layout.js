@@ -347,13 +347,27 @@ export function computeFit(box, scoreStr) {
  * disposition, à cette taille d'écran : la taille du nom vient de la hauteur du repère lisible
  * (comme `computeFit`), sa longueur de la largeur disponible. Bornée entre 3 et 18 caractères
  * (18 = maximum de saisie de l'écran des prénoms, atteint sur les grandes cartes).
+ * Garantie : la valeur ne CROÎT jamais avec le nombre de joueurs — c'est le minimum des ajustements
+ * géométriques de 1 à `numPlayers`. La géométrie brute oscille (une carte latérale de la grille à
+ * 2 colonnes est plus large qu'une carte de la grille à 3 colonnes), ce qui donnerait, sur un
+ * téléphone, 18 caractères à 8 joueurs et 9 à 9 joueurs : l'écran des prénoms ne doit pas voir la
+ * limite remonter quand on ajoute un joueur. Le lissage ne va que dans le sens sûr.
  * @param {number} numPlayers 1 à 12
  * @param {number} viewportW largeur d'écran (px)
  * @param {number} viewportH hauteur d'écran (px)
  * @returns {number} nombre de caractères
  */
 export function nameMaxLength(numPlayers, viewportW, viewportH) {
-  const { minCard } = layoutStats(numPlayers, { width: viewportW, height: viewportH });
+  let best = 18;
+  for (let n = 1; n <= Math.min(MAX_PLAYERS, Math.max(1, numPlayers | 0)); n++) {
+    best = Math.min(best, rawNameLength(n, viewportW, viewportH));
+  }
+  return best;
+}
+
+/** Ajustement géométrique brut pour exactement `n` joueurs (sans lissage). */
+function rawNameLength(n, viewportW, viewportH) {
+  const { minCard } = layoutStats(n, { width: viewportW, height: viewportH });
   if (!minCard) return 3;
   const { nameSz } = computeFit(minCard, '0');
   const chars = Math.floor((minCard.w * USABLE_W) / (nameSz * ADV_LETTER));

@@ -7,9 +7,13 @@
 // elle détecte une sauvegarde tronquée ou altérée.
 //
 // Deux familles de défauts, deux traitements (D5 : une sauvegarde lisible n'est JAMAIS perdue) :
-//   - RÉPARABLE (la partie est rendue, `repaired: true`) : score en chaîne ou absent (converti, à
-//     défaut ramené au score de départ), prénom non textuel, drapeau d'élimination approximatif,
-//     ordre des sièges incohérent, entrées de journal illisibles, curseur hors bornes ou au milieu
+//   - RÉPARABLE (la partie est rendue, `repaired: true` dès qu'une valeur n'a pas été relue telle
+//     quelle — conversion comprise, l'interface prévient alors l'utilisateur) : score en chaîne ou
+//     absent (converti, à défaut ramené au score de départ), nombre ou booléen écrit en chaîne,
+//     horodatage illisible, prénom non textuel, drapeau d'élimination approximatif,
+//     ordre des sièges incohérent, entrées de journal illisibles (règle propre au schéma v2 : les
+//     versions 0 et 1 n'ont pas de journal, leurs groupes illisibles sont simplement écartés à la
+//     migration), curseur hors bornes ou au milieu
 //     d'une action, journal en désaccord avec les scores (le journal devient alors de l'historique
 //     en lecture seule : voir `floor` dans history.js — on ne propose pas une annulation qui
 //     téléporterait un score) ;
@@ -53,9 +57,16 @@ const isObj = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
 const num = (x, fallback) => (typeof x === 'number' && Number.isFinite(x) ? x : fallback);
 const int = (x, fallback) => (Number.isInteger(x) ? x : fallback);
 
-/** Nombre fini à partir d'un nombre OU d'une chaîne numérique (« 40 ») ; sinon `fallback`. */
-function loose(x, fallback) {
+/** Compteur de réparations : tout ce qui n'est pas relu tel quel y est compté (voir `repaired`). */
+const NO_REP = { n: 0 };
+
+/**
+ * Nombre fini à partir d'un nombre OU d'une chaîne numérique (« 40 ») ; sinon `fallback`.
+ * Toute valeur présente qui n'est pas déjà un nombre fini compte pour une réparation.
+ */
+function loose(x, fallback, rep = NO_REP) {
   if (typeof x === 'number' && Number.isFinite(x)) return x;
+  if (x !== undefined) rep.n++;
   if (typeof x === 'string' && x.trim() !== '') {
     const v = Number(x);
     if (Number.isFinite(v)) return v;
@@ -63,9 +74,14 @@ function loose(x, fallback) {
   return fallback;
 }
 
-/** Booléen strict : seuls `true`, 1, '1' et 'true' valent vrai (« non » ne vaut pas vrai). */
-function bool(x) {
-  return x === true || x === 1 || x === '1' || x === 'true';
+/**
+ * Booléen strict : seuls `true`, 1, '1' et 'true' valent vrai (« non » ne vaut pas vrai).
+ * Une valeur présente qui n'est pas un booléen compte pour une réparation.
+ */
+function bool(x, rep = NO_REP) {
+  if (typeof x === 'boolean') return x;
+  if (x !== undefined) rep.n++;
+  return x === 1 || x === '1' || x === 'true';
 }
 
 // ── Somme de contrôle ───────────────────────────────────────────────
@@ -134,13 +150,13 @@ export function parseSettings(raw) {
 function parsePlayer(p, fallbackScore, rep) {
   const src = isObj(p) ? p : {};
   if (!isObj(p)) rep.n++;
-  const score = loose(src.score, null);
-  if (score === null) rep.n++;
+  const score = loose(src.score, null, rep);
+  if (src.score === undefined) rep.n++;
   if (typeof src.playerName !== 'string' && src.playerName !== undefined) rep.n++;
   return {
     playerName: typeof src.playerName === 'string' ? src.playerName : '',
     score: score === null ? fallbackScore : score,
-    eliminated: bool(src.eliminated),
+    eliminated: bool(src.eliminated, rep),
   };
 }
 
@@ -174,16 +190,16 @@ function parseGroup(g) {
 }
 
 /** Configuration normalisée ; `maxPoints` null/absent ⇒ Infinity. */
-function parseConfig(c, n) {
+function parseConfig(c, n, rep) {
   const src = isObj(c) ? c : {};
   return {
     numPlayers: n,
-    startPoints: loose(src.startPoints, 0),
+    startPoints: loose(src.startPoints, 0, rep),
     maxPoints:
       src.maxPoints === null || src.maxPoints === undefined
         ? Infinity
-        : loose(src.maxPoints, Infinity),
-    allowNeg: bool(src.allowNeg),
+        : loose(src.maxPoints, Infinity, rep),
+    allowNeg: bool(src.allowNeg, rep),
   };
 }
 
@@ -255,10 +271,18 @@ function parseLog(raw, n, rep) {
   });
 
   const total = log.entries.length;
-  const dropped = kept.length !== raw.entries.length;
-  // Des entrées écartées décalent tout : le curseur enregistré ne veut plus rien dire.
-  let cursor = dropped ? total : Math.max(0, Math.min(total, int(raw.cursor, total)));
-  if (!dropped && !Number.isInteger(raw.cursor)) rep.n++;
+  // Le curseur enregistré compte des positions du tableau BRUT : on garde appliquées les entrées
+  // conservées qui étaient avant lui, ni plus ni moins. Une entrée illisible située après le
+  // curseur ne touche donc ni à l'annulation ni au rétablissement des autres.
+  let cursor;
+  if (Number.isInteger(raw.cursor)) {
+    const rawCursor = Math.max(0, Math.min(raw.entries.length, raw.cursor));
+    if (rawCursor !== raw.cursor) rep.n++;
+    cursor = kept.filter((k) => k.idx < rawCursor).length;
+  } else {
+    if (raw.cursor !== undefined) rep.n++;
+    cursor = total;
+  }
   // Un curseur au milieu d'une action rendrait « annuler puis rétablir » non neutre : on le cale
   // sur la fin de l'action en cours.
   while (
@@ -357,11 +381,12 @@ export function parseGame(raw) {
 
   const rep = { n: 0 };
   const rawConfig = v === 2 ? data.config : data;
-  const config = parseConfig(rawConfig, data.players.length);
+  const config = parseConfig(rawConfig, data.players.length, rep);
   const players = data.players.map((p) => parsePlayer(p, config.startPoints, rep));
   const n = players.length;
   const seatOrder = parseSeatOrder(data.seatOrder, n, rep);
   const ts = num(data.ts, 0);
+  if (data.ts !== undefined && !Number.isFinite(data.ts)) rep.n++;
 
   let log;
   if (v === 2) {

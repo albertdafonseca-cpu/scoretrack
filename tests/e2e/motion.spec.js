@@ -134,6 +134,47 @@ test('bulle de delta : pleine visibilité pendant tout le groupe, à la 1re COMM
   testInfo.annotations.push({ type: 'bulle-de-delta', description: trace.join(' | ') });
   expect(errors).toEqual([]);
 });
+test('bulle de delta : la minuterie de l’ancienne partie ne ferme pas le groupe de la nouvelle', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await openApp(page);
+  await startGame(page, { players: 2, start: 100 });
+  // Un tap ouvre un groupe (minuterie de 1,5 s), puis reset immédiat et nouvelle partie : le
+  // premier tap de la nouvelle partie survient bien avant l'échéance de l'ancienne minuterie.
+  await page.locator('#card-0 .tap-half.plus').tap();
+  await expect(page.locator('#df-0')).toHaveText('+1');
+  await page.getByRole('button', { name: /Reset/ }).click();
+  await page.getByRole('button', { name: 'Confirmer' }).click();
+  await expect(page.locator('#setup-page')).toBeVisible();
+  await startGame(page, { players: 2, start: 100 });
+  const start = Date.now();
+  await page.locator('#card-0 .tap-half.plus').tap();
+  await expect(page.locator('#df-0')).toHaveText('+1');
+  const opacity = () =>
+    page.evaluate(() => {
+      const n = document.getElementById('df-0');
+      return n.hidden ? 0 : parseFloat(getComputedStyle(n).opacity);
+    });
+  const at = async (ms) => {
+    const wait = ms - (Date.now() - start);
+    if (wait > 0) await page.waitForTimeout(wait);
+    return opacity();
+  };
+  // Défaut d'origine : la bulle disparaissait à 0,9 s (échéance de la partie précédente).
+  expect(await at(1100), 'bulle à 1,1 s après le tap de la nouvelle partie').toBeGreaterThan(0.9);
+  expect(await at(1400), 'bulle à 1,4 s').toBeGreaterThan(0.9);
+  expect(await at(1900), 'bulle à 1,9 s').toBe(0);
+  // Et le groupe n'a pas été fermé prématurément : un second tap à 1,2 s du premier aurait été
+  // regroupé ; ici on vérifie simplement que le journal n'a qu'une entrée et qu'elle est intacte.
+  const entries = await page.evaluate(async () => {
+    const { store } = await import('./js/store.js');
+    return store.game.log.entries.length;
+  });
+  expect(entries).toBe(1);
+  expect(errors).toEqual([]);
+});
+
 test('célébration : confettis présents, absents sous mouvement réduit', async ({ page }) => {
   const errors = collectErrors(page);
   await openApp(page);

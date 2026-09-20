@@ -5,16 +5,18 @@ progressive (PWA) **hors ligne**, **sans compte** et **sans aucune collecte de d
 reste sur l'appareil. Interface en français, pensée pour être posée au milieu de la table et lue à
 un mètre.
 
-|                                           Réglage de la partie                                           |                              Joueurs                              |                              Écran de jeu (4 joueurs)                               |                              Pavé numérique                               |
-| :------------------------------------------------------------------------------------------------------: | :---------------------------------------------------------------: | :---------------------------------------------------------------------------------: | :-----------------------------------------------------------------------: |
-| ![Écran de réglage : préréglages, nombre de joueurs, points de départ et maximum](docs/img/01-setup.png) | ![Saisie des prénoms et profils mémorisés](docs/img/02-names.png) | ![Quatre cartes orientées vers chaque joueur, zones + et −](docs/img/03-game-4.png) | ![Modale de saisie d'un gain ou d'une perte](docs/img/05-score-modal.png) |
+|                                                  Réglage de la partie                                                   |                                           Prénoms des joueurs                                           |                                                  Écran de jeu (4 joueurs)                                                   |                                  Pavé numérique (appui long)                                  |
+| :---------------------------------------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------------------: | :-------------------------------------------------------------------------------------------------------------------------: | :-------------------------------------------------------------------------------------------: |
+| ![Écran de réglage : préréglages, nombre de joueurs, points de départ et maximum](assets/screenshots/setup-390x844.png) | ![Saisie des prénoms, un numéro de siège par joueur, mémorisation possible](docs/img/names-390x844.png) | ![Quatre cartes orientées vers chaque joueur, numéro de siège et prénom, zones + et −](assets/screenshots/game-390x844.png) | ![Modale de saisie d'un gain ou d'une perte avec pavé numérique](docs/img/keypad-390x844.png) |
 
-|                         12 joueurs                         |                         Récapitulatif                          |                 Thème clair                 |                   Thème Loi du Milieu                   |
-| :--------------------------------------------------------: | :------------------------------------------------------------: | :-----------------------------------------: | :-----------------------------------------------------: |
-| ![Douze cartes sans cellule vide](docs/img/03-game-12.png) | ![Récapitulatif des actions par joueur](docs/img/06-recap.png) | ![Thème clair](docs/img/08-theme-light.png) | ![Thème Loi du Milieu, nuit](docs/img/08-theme-ldm.png) |
+|                                     Douze joueurs                                      |                                                Récapitulatif                                                 |                             Thème clair                              |                                          Tablette posée à plat (4 joueurs)                                          |
+| :------------------------------------------------------------------------------------: | :----------------------------------------------------------------------------------------------------------: | :------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------------------------------: |
+| ![Douze cartes nommées et numérotées, sans cellule vide](docs/img/game-12-390x844.png) | ![Classement avec écarts au premier et journal des actions avec retour possible](docs/img/recap-390x844.png) | ![Écran de réglage en thème clair](docs/img/setup-light-390x844.png) | ![Quatre cartes au format large, orientées vers les quatre côtés de la table](assets/screenshots/game-1280x800.png) |
 
-_Captures Playwright (iPhone 13 émulé) prises le 16 septembre 2026 après la restructuration ;
-elles sont régénérées à chaque évolution visuelle notable._
+_Les huit captures sont produites par `npm run build:screenshots` (Chromium, rendu déterministe) et
+comparées **octet à octet** aux fichiers versionnés par le job `paquet` de la CI : une interface qui
+change sans ses captures fait échouer la construction. Les trois d'`assets/screenshots/` sont aussi
+celles que le manifeste présente à l'installation._
 
 ## Fonctionnalités
 
@@ -43,9 +45,9 @@ elles sont régénérées à chaque évolution visuelle notable._
 - **Ordinateur / Chrome, Edge** : icône d'installation à droite de la barre d'adresse.
 
 Première ouverture en ligne obligatoire : le service worker télécharge l'application complète
-(**≈ 640 Ko** au 17 septembre 2026 — 61 fichiers, dont 238 Ko de polices auto-hébergées). Le chiffre
-exact est recalculé et borné à chaque exécution du job `paquet` de la CI. Ensuite l'application
-fonctionne sans réseau.
+(**≈ 744 Ko** au 19 septembre 2026 — 59 entrées, dont 238 Ko de polices auto-hébergées). Le chiffre
+exact est recalculé, borné et affiché à chaque exécution du job `paquet` de la CI. Ensuite
+l'application fonctionne sans réseau.
 
 ## Développement
 

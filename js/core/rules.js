@@ -11,6 +11,8 @@
 
 /**
  * Borne un score entre le plancher (0, ou -∞ si les négatifs sont permis) et le plafond.
+ * Export volontaire, partie du contrat public (CONTRACTS.md) : `applyDelta` s'en sert, et une
+ * interface qui valide une saisie avant de l'appliquer (pavé numérique) peut l'appeler directement.
  * @param {number} value score candidat
  * @param {{allowNeg?:boolean,maxPoints?:number|null}} [config]
  * @returns {number}
