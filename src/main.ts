@@ -29,7 +29,7 @@ const handlers = {
   confirmEndgame: game.confirmEndgame,
   confirmReset: game.confirmReset,
   confirmScoreModal: game.confirmScoreModal,
-  deleteProfile: game.deleteProfile, // appelé par un onclick construit dans renderProfileChips (game.ts)
+  deleteProfile: game.deleteProfile,
   discardSave: game.discardSave,
   restoreGame: game.restoreGame,
   restoreSavedDefaults: game.restoreSavedDefaults,
