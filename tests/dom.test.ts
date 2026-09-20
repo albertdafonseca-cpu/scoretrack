@@ -10,6 +10,7 @@ describe('src/dom.ts — accès DOM typés', () => {
   beforeEach(() => {
     document.body.innerHTML = `
       <div id="only-one" class="target">A</div>
+      <div class="item">0</div>
       <ul id="list">
         <li class="item">1</li>
         <li class="item">2</li>
@@ -34,8 +35,8 @@ describe('src/dom.ts — accès DOM typés', () => {
 
   it('$$ renvoie tous les éléments correspondant au sélecteur, dans l\'ordre du DOM', () => {
     const items = $$('.item');
-    expect(items).toHaveLength(3);
-    expect(items.map((el) => el.textContent)).toEqual(['1', '2', '3']);
+    expect(items).toHaveLength(4);
+    expect(items.map((el) => el.textContent)).toEqual(['0', '1', '2', '3']);
   });
 
   it('$$ renvoie un tableau vide (jamais null/undefined) quand rien ne correspond', () => {
@@ -43,13 +44,19 @@ describe('src/dom.ts — accès DOM typés', () => {
   });
 
   it('$q renvoie le premier élément correspondant, ou null', () => {
-    expect($q('.item')?.textContent).toBe('1');
+    expect($q('.item')?.textContent).toBe('0');
     expect($q('.nothing-matches')).toBeNull();
   });
 
-  it('$$ et $q acceptent une racine différente de `document`', () => {
+  it('$$ et $q utilisent bien le paramètre `root` (pas seulement `document`)', () => {
+    // Un `.item` existe hors de `#list` (fixture ci-dessus, textContent "0") :
+    // si `$$`/`$q` ignoraient `root` et retombaient sur `document`, les
+    // assertions ci-dessous avec `root=list` échoueraient (4 éléments au lieu
+    // de 3, "0" au lieu de "1").
     const list = $('list');
-    expect($$('.item', list)).toHaveLength(3);
+    const items = $$('.item', list);
+    expect(items).toHaveLength(3);
+    expect(items.map((el) => el.textContent)).toEqual(['1', '2', '3']);
     expect($q('.item', list)?.textContent).toBe('1');
   });
 });

@@ -301,6 +301,61 @@ les autres éléments sachent quoi faire de l'outillage maintenant disponible :
     le navigateur Playwright (`playwright install --with-deps chromium`) et
     prévoir le temps de téléchargement en CI.
 
+## Corrections round 1 (suite au verdict AAA:oui, 2 défauts P2)
+
+Le critique indépendant (`docs/audit/A-critique-round1.md`) a rendu
+**AAA : oui**, avec deux défauts P2 mineurs et actionnables, corrigés ici
+(D9, `docs/audit/BRIEF.md` §7).
+
+**P2-1 — `tests/dom.test.ts` : la fixture ne prouvait pas ce que le test
+prétendait.** Tous les `.item` du montage DOM étaient placés à l'intérieur
+de `#list` ; `document.querySelectorAll('.item')` et
+`list.querySelectorAll('.item')` renvoyaient donc le même résultat, et une
+implémentation de `$$`/`$q` qui **ignorerait totalement le paramètre `root`**
+passait le test sans être détectée (confirmé indépendamment par le critique
+via mutation testing). *Correctif* : ajout d'un `.item` supplémentaire hors
+de `#list` dans la fixture (`beforeEach`), et ajustement des assertions
+existantes qui comptaient les `.item` sans racine (elles voient maintenant 4
+éléments au lieu de 3). Le test renommé « `$$` et `$q` utilisent bien le
+paramètre `root` (pas seulement `document`) » vérifie désormais que
+`$$('.item', list)` renvoie exactement les 3 éléments internes (pas les 4)
+et que `$q('.item', list)` renvoie `'1'` (pas `'0'`, le premier élément
+document-wide).
+
+Mutation testing rejoué et confirmé : `$$`/`$q` modifiés temporairement pour
+ignorer `root` (`document.querySelectorAll`/`querySelector` au lieu de
+`root.…`) → le test échoue bien (`expected [...] to have a length of 3 but
+got 4`). Restauré depuis une copie prise juste avant la mutation (état
+courant de `src/dom.ts`, qui inclut déjà `escapeHtml` ajouté entre-temps par
+l'élément B) ; `git diff src/dom.ts` vide après restauration, confirmé.
+
+**P2-2 — `npm run test:e2e` pouvait tester silencieusement un `dist/`
+obsolète.** Le script ne rebuildait pas automatiquement avant de lancer
+Playwright (documenté comme choix assumé dans la version précédente de ce
+fichier, mais un oubli réel de rebuild automatique). *Correctif* : ajout du
+script `"pretest:e2e": "npm run build"` — npm exécute automatiquement tout
+script `pre<nom>` avant `<nom>` lors d'un `npm run <nom>`, pas seulement pour
+les scripts de cycle de vie standard (`test`, `install`...). Vérifié
+réellement : `dist/app.js` supprimé manuellement, puis `npm run test:e2e` →
+le build s'exécute d'abord (log esbuild visible), puis les tests e2e
+tournent contre le `dist/` frais.
+
+Vérifications finales après les deux corrections (dans le dépôt partagé,
+sans toucher aux fichiers en cours d'édition par B/C/E/F) :
+- `vitest run tests/dom.test.ts tests/translations.test.ts` → 11/11 tests
+  passés.
+- `npm run test:e2e` (avec `dist/app.js` préalablement supprimé) → build
+  automatique déclenché, `e2e/smoke.spec.ts` passe.
+- `git status --porcelain` : seuls `package.json` (script `pretest:e2e`
+  ajouté) et `tests/dom.test.ts` modifiés par cet agent ; aucun fichier hors
+  périmètre touché (les autres modifications visibles dans l'arbre de
+  travail au moment de cette correction — `src/dice-ui.ts`, `src/dice3d/*`,
+  `src/dom.ts` (ajout `escapeHtml`), `src/game.ts`, `src/recap-pdf.ts`,
+  `src/sw-worker.ts`, `package-lock.json` (ajout `jspdf`) — appartiennent
+  aux éléments B/C/E, en cours d'édition en parallèle, non lues au-delà du
+  strict nécessaire (diff `package.json`/`src/dom.ts` uniquement, pour
+  écrire ma restauration sans écraser leur travail).
+
 ## Fichiers créés/modifiés par cet agent
 
 - `package.json` (scripts + devDependencies uniquement — `dependencies`

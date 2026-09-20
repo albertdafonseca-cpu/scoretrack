@@ -195,3 +195,17 @@ jamais réutilisée même si une décision est amendée.)
   au constat initial) — recommandation seulement, non appliquée : hors de
   mon périmètre d'édition (`package.json` = élément A). Voir
   `docs/audit/DECISIONS-F.md` §5.
+- **D9** — Élément A : correction des deux défauts P2 relevés par le critique
+  indépendant (`docs/audit/A-critique-round1.md`, round 1, verdict AAA:oui) :
+  (1) `tests/dom.test.ts` — la fixture du test de `root` pour `$$`/`$q`
+  plaçait tous les `.item` à l'intérieur de `#list`, donc une implémentation
+  qui ignorerait totalement `root` passait le test sans être détectée ;
+  ajout d'un `.item` hors de `#list` pour que `$$('.item', list)` diverge
+  réellement de `$$('.item')` en cas de régression — mutation testing
+  indépendant rejoué (root ignoré → échec confirmé, restauré, `git diff`
+  vide). (2) ajout de `"pretest:e2e": "npm run build"` (npm exécute
+  automatiquement un script `pre<nom>` avant `<nom>`) pour que
+  `npm run test:e2e` ne teste plus silencieusement un `dist/` périmé —
+  vérifié réellement (`dist/app.js` supprimé, `npm run test:e2e` le
+  régénère avant de lancer les tests). Voir `docs/audit/DECISIONS-A.md`
+  §« Corrections round 1 » pour le détail.
