@@ -4,7 +4,7 @@
 // reste ouvrable directement (index.html y référence dist/app.js).
 // Usage : node build.mjs [--watch]
 import * as esbuild from 'esbuild';
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, cpSync } from 'node:fs';
 
 const watch = process.argv.includes('--watch');
 // version de l'app = <meta name="app-version"> d'index.html (injectée dans le worker)
@@ -18,6 +18,9 @@ const copyHtmlPlugin = {
       mkdirSync('dist', { recursive: true });
       const html = readFileSync('index.html', 'utf8').replace('src="dist/app.js"', 'src="app.js"');
       writeFileSync('dist/index.html', html);
+      // Polices auto-hébergées (index.html référence ./fonts/fonts.css) : sans
+      // cette copie, dist/ servi seul (Vercel) renverrait un 404 sur les polices.
+      cpSync('fonts', 'dist/fonts', { recursive: true });
     });
   },
 };

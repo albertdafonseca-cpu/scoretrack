@@ -38,13 +38,25 @@ test('parcours minimal : préréglage -> lancement -> +1 point', async ({ page }
   const before = Number((await firstScore.textContent())?.replace(/[^\d-]/g, ''));
   expect(Number.isNaN(before)).toBe(false);
 
-  // Taper sur la moitié droite de la zone de la première carte (repère "＋",
-  // décoratif et non cliquable lui-même) -> le score augmente de 1 (voir
-  // buildCard/getIsPlus dans game.ts).
-  const tapZone = page.locator('.pcard .tap-zone').first();
+  // Taper dans le quart "＋" de la première carte (repère décoratif, non
+  // cliquable lui-même) -> le score augmente de 1. La moitié qui vaut "plus"
+  // dépend de la rotation de la carte (voir buildCard/getIsPlus dans
+  // game.ts : rot-l -> bas, rot-r -> haut, rot-180 -> gauche, sinon -> droite).
+  // On vise le centre d'un quart plutôt que la limite exacte (50 %) pour ne
+  // pas dépendre d'un arrondi sous-pixel entre les rects de .pcard et .tap-zone.
+  const card = page.locator('.pcard').first();
+  const rot = (await card.getAttribute('class')) ?? '';
+  const tapZone = card.locator('.tap-zone');
   const box = await tapZone.boundingBox();
   if (!box) throw new Error('tap-zone introuvable');
-  await tapZone.click({ position: { x: box.width - 4, y: box.height / 2 } });
+  const position = rot.includes('rot-l')
+    ? { x: box.width / 2, y: (box.height * 3) / 4 }
+    : rot.includes('rot-r')
+      ? { x: box.width / 2, y: box.height / 4 }
+      : rot.includes('rot-180')
+        ? { x: box.width / 4, y: box.height / 2 }
+        : { x: (box.width * 3) / 4, y: box.height / 2 };
+  await tapZone.click({ position });
   await expect(firstScore).toHaveText(String(before + 1));
 
   expect(pageErrors).toEqual([]);
