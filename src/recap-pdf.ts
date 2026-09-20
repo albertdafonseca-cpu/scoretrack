@@ -8,7 +8,7 @@ import type { GameConfig, HistoryGroup, Player } from './types';
 // jsPDF est une dépendance npm bundlée par esbuild (voir docs/audit/DECISIONS-E.md,
 // §1) : plus de chargement CDN (cdnjs), l'export fonctionne hors ligne dès le
 // premier lancement. Import statique et volontaire, pas paresseux : voir
-// docs/audit/BRIEF.md §7 (D23) pour l'arbitrage — un chargement différé par
+// docs/audit/BRIEF.md §7 (D24) pour l'arbitrage — un chargement différé par
 // script séparé casserait la garantie testée d'export PDF hors ligne dès la
 // toute première visite (e2e/pdf-export-offline.spec.ts), avant même
 // l'activation du service worker.

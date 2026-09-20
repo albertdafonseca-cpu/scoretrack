@@ -99,7 +99,15 @@ describe('dist/sw.js compilé — exécution réelle, aucune requête tierce à 
     fn(...Object.values(sandbox));
 
     expect(typeof listeners.install).toBe('function');
-    await listeners.install({ waitUntil: (p: Promise<unknown>) => p });
+    // Le vrai handler ne retourne rien lui-même (il appelle e.waitUntil(promesse)
+    // sans renvoyer cette promesse) : `await listeners.install(...)` seul ne
+    // waiterait que sur `undefined`, pas sur le vrai travail asynchrone — toute
+    // étape ajoutée après le premier fetch de la chaîne passerait alors
+    // inaperçue (trou de couverture confirmé par la critique de l'élément E,
+    // round 2). On capture donc explicitement la promesse passée à waitUntil.
+    let installPromise: Promise<unknown> = Promise.resolve();
+    listeners.install({ waitUntil: (p: Promise<unknown>) => { installPromise = p; } });
+    await installPromise;
 
     expect(requestedUrls.length).toBeGreaterThan(0); // le précache a bien tourné
     for (const url of requestedUrls) {
