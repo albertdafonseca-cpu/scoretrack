@@ -1,7 +1,7 @@
 import { _detectLang, _flashBtnLabel, _getFooterBtn, applyLang, currentLang, setCurrentLang, t, updateRestoreBtn } from './i18n';
 import { playElimAnim, playWinAnim } from './animations';
 import { diceRenderPreview, diceResetPreview, diceUpdateFab } from './dice-ui';
-import { $, $opt, $$, $q } from './dom';
+import { $, $opt, $$, $q, escapeHtml } from './dom';
 import type { BloquerMode, CardRot, GameConfig, GamePreset, GameSave, HistoryGroup, ObjectifMode, Player, Settings, Theme, UndoSnapshot } from './types';
 
 /** Overlay du modal de score : porte l'orientation courante et l'état de glissement. */
@@ -506,8 +506,14 @@ export function renderProfileChips(){
   if(!profiles.length){list.classList.add('hidden');return;}
   list.classList.remove('hidden');
   profiles.forEach(name=>{
+    // Construction par DOM (pas d'innerHTML) : le nom du joueur est une donnée
+    // utilisateur arbitraire, jamais interpolée dans du HTML ou dans un attribut
+    // onclick — voir docs/audit/DECISIONS-B.md (correctif de l'injection P0).
     const chip=document.createElement('div');chip.className='profile-chip';
-    chip.innerHTML=`<span>${name}</span><span class="profile-chip-del" onclick="event.stopPropagation();deleteProfile('${name.replace(/'/g,"\\'")}')">✕</span>`;
+    const label=document.createElement('span');label.textContent=name;
+    const del=document.createElement('span');del.className='profile-chip-del';del.textContent='✕';
+    del.addEventListener('click',e=>{e.stopPropagation();deleteProfile(name);});
+    chip.appendChild(label);chip.appendChild(del);
     chip.onclick=()=>fillName(name);
     list.appendChild(chip);
   });
@@ -526,7 +532,7 @@ export function fillName(name: string){
   if(empty){empty.value=name;empty.focus();}
 }
 export function deleteProfile(name: string){
-  let profiles=loadProfiles().filter(p=>p!==name);
+  const profiles=loadProfiles().filter(p=>p!==name);
   localStorage.setItem('scoretrack_profiles',JSON.stringify(profiles));
   renderProfileChips();
 }
@@ -765,7 +771,7 @@ export function buildCard(pi: number,rot: CardRot){
   p.rot=rot; // mémoriser la rotation pour le modal
   const inner=document.createElement('div');inner.className='card-inner';inner.id=`inner-${pi}`;
   const cls=scoreClass(p.score);
-  const nameHtml=p.playerName?`<div class="pplayer">${p.playerName}</div>`:`<span class="pplayer-ghost"></span>`;
+  const nameHtml=p.playerName?`<div class="pplayer">${escapeHtml(p.playerName)}</div>`:`<span class="pplayer-ghost"></span>`;
   const zone=document.createElement('div');zone.className='tap-zone';
   zone.innerHTML=`${nameHtml}<div class="score-wrap"><span class="score ${cls}" id="sc-${pi}">${fmtNum(p.score)}</span><span class="delta-flash" id="df-${pi}"></span></div><span class="tap-sign-minus">－</span><span class="tap-sign-plus">＋</span>`;
 
@@ -848,7 +854,7 @@ export function buildCard(pi: number,rot: CardRot){
     const tag=document.createElement('div');tag.className='win-tag';
     const winScore: number|null=p.finalScore!==undefined?p.finalScore:null;
     const scoreStr=winScore!==null?`<div class="tag-score">${fmtNum(winScore)}</div>`:'';
-    const nameStr=p.playerName?`<div class="elim-name">${p.playerName}</div>`:'';
+    const nameStr=p.playerName?`<div class="elim-name">${escapeHtml(p.playerName)}</div>`:'';
     const winnerCount = players.filter(pl=>pl.winner).length;
     const multiWin = winnerCount > 1;
     const modeUnique = !!(singleWinner || (elimPoints!==null && !lastLoser));
@@ -866,7 +872,7 @@ export function buildCard(pi: number,rot: CardRot){
     const ppE=$q<HTMLElement>('.pplayer',zone);
     if(ppE)ppE.style.display='none'; // masquer le prénom de la zone
     const tag=document.createElement('div');tag.className='elim-tag';
-    const nameStr=p.playerName?`<div class="elim-name">${p.playerName}</div>`:'';
+    const nameStr=p.playerName?`<div class="elim-name">${escapeHtml(p.playerName)}</div>`:'';
     const rankStr=p.elimRank?`<div class="elim-rank">#${p.elimRank}</div>`:'';
     const elimScore=p.finalScore!==undefined?p.finalScore:p.score;
     tag.innerHTML=`<div class="elim-icon">💀</div><div class="elim-label">${t('eliminated')}</div>${nameStr}${rankStr}<div class="tag-score">${fmtNum(elimScore)}</div>`;
@@ -1019,19 +1025,54 @@ document.addEventListener('visibilitychange',()=>{
 // Pas d'action supplémentaire sur orientationchange — les modaux g/d gèrent nativement
 
 // ── ADJUST ────────────────────────────────────────────────────────
+/** Réglages de plafonnement pris en compte par {@link computeClampedScore}. */
+export interface ScoreLimits {
+  bloquerMode: BloquerMode;
+  startPoints: number;
+  allowNeg: boolean;
+  objectifMode: ObjectifMode;
+  winPoints: number|null;
+  maxPoints: number;
+}
+/** Résultat du calcul d'un ajustement de score borné. */
+export interface ClampedAdjustment {
+  /** score brut avant plafonnement (mémorisé pour le mode « bloquer ») */
+  rawScore: number;
+  /** score effectivement appliqué, après plafonnement */
+  newScore: number;
+  /** variation réellement appliquée (newScore − score précédent) */
+  realDelta: number;
+  /** variation brute avant plafonnement (score précédent → rawScore), pour l'historique */
+  rawDelta: number;
+}
+/**
+ * Calcule le score borné après application d'un delta, selon les réglages de
+ * partie donnés (plafond « bloquer », plafond d'objectif, autorisation du
+ * négatif). Fonction pure (aucun accès DOM ni état module) : factorise la
+ * logique auparavant dupliquée entre `adjust()` (tap +/−) et
+ * `confirmScoreModal()` (saisie manuelle) — voir docs/audit/DECISIONS-B.md.
+ */
+export function computeClampedScore(prevScore: number, delta: number, limits: ScoreLimits): ClampedAdjustment {
+  const minVal=limits.bloquerMode==='min'?limits.startPoints:(limits.allowNeg||limits.objectifMode==='elim'||limits.objectifMode==='none'?-Infinity:(limits.objectifMode==='win'&&limits.winPoints!==null&&limits.winPoints<limits.startPoints?limits.winPoints:0));
+  const capMax=limits.bloquerMode==='max'?limits.startPoints:(limits.maxPoints===Infinity?Infinity:limits.maxPoints);
+  const rawScore=prevScore+delta; // score brut avant clamp
+  const newScore=Math.min(capMax,Math.max(minVal,rawScore));
+  const realDelta=newScore-prevScore;
+  const rawDelta=rawScore-prevScore;
+  return {rawScore,newScore,realDelta,rawDelta};
+}
+/** Réglages courants de plafonnement, à passer à {@link computeClampedScore}. */
+function currentScoreLimits(): ScoreLimits {
+  return {bloquerMode,startPoints,allowNeg,objectifMode,winPoints,maxPoints};
+}
 export function adjust(i: number,delta: number,zone?: HTMLElement|null){
   const p=players[i];if(p.eliminated||p.winner)return;
-  const minVal=bloquerMode==='min'?startPoints:(allowNeg||objectifMode==='elim'||objectifMode==='none'?-Infinity:(objectifMode==='win'&&winPoints!==null&&winPoints<startPoints?winPoints:0));
-  const capMax=bloquerMode==='max'?startPoints:(maxPoints===Infinity?Infinity:maxPoints);
-  const rawScore=p.score+delta; // score brut avant clamp
-  const newScore=Math.min(capMax,Math.max(minVal,rawScore));
-  const realDelta=newScore-p.score;
+  const {rawScore,newScore,realDelta,rawDelta}=computeClampedScore(p.score,delta,currentScoreLimits());
   if(realDelta===0){
     flashZone(zone,'flash-neg');
     if(navigator.vibrate)navigator.vibrate([30,20,30]);
     return;
   }
-  const rawDelta=rawScore-(newScore-realDelta);
   const _prevScore=p.score, _prevRawScore=p.rawScore; // snapshot AVANT modification
   saveUndo();p.score=newScore;p.rawScore=rawScore;
   window._lastAdjustPrev={playerIdx:i, score:_prevScore, rawScore:_prevRawScore};
@@ -1607,15 +1648,11 @@ export function confirmScoreModal(){
   const v=parseInt(modalValue)||0;if(v===0){closeScoreModal();return;}
   const delta=modalSign*v;saveUndo();
   const p=players[modalPlayerIdx];
-  const minVal=bloquerMode==='min'?startPoints:(allowNeg||objectifMode==='elim'||objectifMode==='none'?-Infinity:(objectifMode==='win'&&winPoints!==null&&winPoints<startPoints?winPoints:0));
-  const capMax=bloquerMode==='max'?startPoints:(maxPoints===Infinity?Infinity:maxPoints);
   const prevScore=p.score;
   window._lastAdjustPrev={playerIdx:modalPlayerIdx, score:prevScore, rawScore:p.rawScore};
-  const rawScore=p.score+delta;
-  p.score=Math.min(capMax,Math.max(minVal,rawScore));
+  const {rawScore,newScore,realDelta,rawDelta}=computeClampedScore(prevScore,delta,currentScoreLimits());
+  p.score=newScore;
   p.rawScore=rawScore; // score brut avant clamp
-  const realDelta=p.score-prevScore;
-  const rawDelta=rawScore-prevScore; // delta brut avant clamp
   if(realDelta===0){closeScoreModal();return;}
   updateDisplay(modalPlayerIdx,null,realDelta);
   flashDelta(modalPlayerIdx,realDelta);
@@ -1750,7 +1787,8 @@ export function showRecap(){
       const ordinal = p.elimRank===1?t('elimFirst1'):((p.elimRank as number)+t('elimFirstN'));
       statusBadge=`<div class="recap-status elim">💀 ${t('eliminated')}${showRank?' · '+ordinal:''}</div>`;
     }
-    html+=`<div class="recap-player"><div class="recap-player-header"><div class="recap-player-dot" style="background:${COLORS[pi%12]};box-shadow:0 0 6px ${COLORS[pi%12]}"></div><div class="recap-player-name">${p.playerName||(t('player')+' '+(pi+1))}</div>${statusBadge}</div>`;
+    const recapPlayerName=p.playerName?escapeHtml(p.playerName):(t('player')+' '+(pi+1));
+    html+=`<div class="recap-player"><div class="recap-player-header"><div class="recap-player-dot" style="background:${COLORS[pi%12]};box-shadow:0 0 6px ${COLORS[pi%12]}"></div><div class="recap-player-name">${recapPlayerName}</div>${statusBadge}</div>`;
     groups.forEach(g=>{
       const sum=g.entries.reduce((s,e)=>s+e.delta,0);
       const cls=sum>0?'pos':'neg';const sign=sum>0?'+':'';

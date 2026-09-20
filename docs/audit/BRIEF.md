@@ -265,3 +265,18 @@ jamais réutilisée même si une décision est amendée.)
   liste aussi, par anticipation et sans risque (précache tolérant), les 25
   chemins de polices auto-hébergées de D11. Voir `docs/audit/DECISIONS-E.md`
   §3.
+- **D13** — Élément B : injection HTML par nom de joueur (P0 #2 du constat
+  initial) corrigée aux 5 points d'interpolation non protégée trouvés dans
+  `src/game.ts` (`renderProfileChips` : reconstruction complète par DOM,
+  plus d'attribut `onclick` construit à partir du nom ; `buildCard` ×3
+  variantes et `showRecap` : nouvelle fonction `escapeHtml` dans
+  `src/dom.ts`). Aucun changement d'interface `window` pour C/D. Extraction
+  de `computeClampedScore` (fonction pure, testée) pour dédupliquer le
+  plafonnement de score entre `adjust()` et `confirmScoreModal()`. Voir
+  `docs/audit/DECISIONS-B.md` pour le détail, les preuves de mutation
+  testing, et un défaut d'outillage cross-cutting découvert en cours de
+  route (`tsconfig.test.json`/`src/i18n.ts` : conflit de types
+  `number`/`NodeJS.Timeout` dès qu'un test importe `src/game.ts` ou
+  `src/i18n.ts` — hors du périmètre de B, correctif suggéré aux éléments A/D
+  dans `DECISIONS-B.md` §4, contourné pour mes propres tests via
+  `tests/support/loadGame.{js,d.ts}`).
