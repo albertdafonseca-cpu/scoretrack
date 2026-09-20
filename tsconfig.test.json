@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // e2e/ tourne sous Node (Playwright) : contrairement à src/ (navigateur
+    // seul), il a besoin des types Node (node:url, node:path, process...).
+    "types": ["node"]
+  },
+  "include": ["tests/**/*.ts", "e2e/**/*.ts"],
+  "exclude": []
+}

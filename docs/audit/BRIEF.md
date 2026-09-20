@@ -141,3 +141,21 @@ Un élément est AAA quand, simultanément :
 
 (À compléter par chaque agent au fur et à mesure ; numérotation continue,
 jamais réutilisée même si une décision est amendée.)
+
+- **D1** — Élément A : `typescript` rétrogradé de `^7.0.2` à `^6.0.3`
+  (devDependency, `npm run typecheck` revérifié vert à l'identique après coup)
+  car `typescript-eslint` 8.70 (dernière stable, seule ligne compatible ESLint
+  10) refuse explicitement de démarrer avec TypeScript ≥ 7. TS 6.0.3 est la
+  version stable la plus récente dans la plage acceptée par son peerDependency
+  (`>=4.8.4 <6.1.0`). Décision réversible dès que `typescript-eslint` supporte
+  TS 7 (voir `docs/audit/DECISIONS-A.md`, élément A, pour le détail).
+- **D2** — Élément A : lint ESLint volontairement en analyse de syntaxe
+  (pas de linting « type-aware ») pour la même raison que D1 : impossible
+  d'activer `parserOptions.project`/`projectService` sans revenir sur le choix
+  ci-dessus de façon plus large. À revisiter avec D1.
+- **D3** — Élément A : test e2e Playwright ajouté (`npm run test:e2e`) mais
+  volontairement absent du pipeline CI GitHub Actions (qui n'exécute que
+  install/lint/typecheck/tests unitaires/build) — un runner CI n'a pas
+  Chromium préinstallé et l'ajouter alourdirait une CI que la mission veut
+  minimale. Reste disponible en local/manuel pour tout élément qui en a
+  besoin ; à intégrer en CI plus tard si un élément le juge utile.
