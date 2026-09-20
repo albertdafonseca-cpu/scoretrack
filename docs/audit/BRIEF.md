@@ -422,3 +422,33 @@ jamais réutilisée même si une décision est amendée.)
   pourrait rouvrir ce compromis en migrant tout le build vers l'ESM avec
   découpage de code ET un précache de service worker qui couvre le nouveau
   chunk avant la première coupure réseau — hors de portée ici.
+- **D25** — Élément C, round 2 : réponse à `docs/audit/C-critique-round1.md`
+  (verdict round 1 : AAA non, 1 P1 + 2 P2, zéro régression visuelle déjà
+  confirmée indépendamment). P1 corrigé : `catalanDie` n'était jamais
+  exercé avec son paramètre `onSphere` non trivial — celui qui porte
+  EXACTEMENT la sphérisation verrouillée du d48 (t=1) et du d120 (t=0,85)
+  par D-CLAUDE-1 ; le critique a démontré qu'aucun des 79 tests d'alors ne
+  détectait une mutation sur `t`. Nouveau describe dans
+  `tests/dice3d.geometry.test.ts` (5 tests) : mesure quantitative de
+  l'écart-type des rayons des sommets (silhouette bosselée vs ronde),
+  vérifié monotone en `t`, plus un test de bout en bout sur
+  `dieGeometryFor(48)`/`dieGeometryFor(120)` qui attraperait un échange des
+  arguments entre les deux cas. La mutation exacte du critique (`t*0.1`) est
+  désormais détectée (confirmé non détectée avant l'ajout, détectée après).
+  Les deux P2 sont traités en nuançant la documentation (pas en rouvrant la
+  mesure) : `DECISIONS-C.md` §1.1 et le commentaire de `_disposeSceneResources`
+  ne présentent plus le correctif de fuite mémoire GPU comme une fuite
+  « réelle dans tous les cas » mais comme une bonne pratique dont l'effet
+  mesuré (par le critique) est dans le bruit quand `WEBGL_lose_context` est
+  disponible (environnement de test prescrit par `CLAUDE.md`) et net mais
+  modeste seulement quand l'extension est indisponible ; le garde-fou div/0
+  de `catalanDie` est désormais explicitement noté comme non couvert par
+  mutation testing sur les 5 solides réels (`DECISIONS-C.md` §1.5), écarté du
+  décompte de mutations testées. Zéro régression visuelle réintroduite :
+  16/16 captures identiques octet pour octet à `index.html` constant (une
+  comparaison temporelle naïve avait d'abord montré une différence sur
+  `rolled-d20`, tracée à un changement d'`index.html`/polices par un autre
+  élément entre-temps, pas à ce correctif — comparaison refaite avec un
+  `git stash` scopé aux seuls fichiers de l'élément C pour isoler la cause).
+  `npm run typecheck`/`lint`/`test` (87/87)/`build` tous revérifiés verts.
+  Voir `docs/audit/DECISIONS-C.md` §8 pour le détail complet.

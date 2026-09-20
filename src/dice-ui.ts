@@ -330,16 +330,19 @@ export function diceAnimate3D(obj: Die3D, finalVal: number, delayMs: number, dur
 // de la jeter. `renderer.dispose()` NE le fait PAS lui-même : il vide seulement les
 // caches internes du renderer (WeakMap remplacée), sans jamais appeler
 // gl.deleteBuffer/gl.deleteTexture sur les objets Three.js eux-mêmes (vérifié dans
-// three@0.149 : WebGLProperties.dispose() = `properties = new WeakMap()`). Sans cet
-// appel explicite, la libération réelle dépend entièrement de `forceContextLoss()`,
-// qui n'agit que si l'extension WEBGL_lose_context est disponible (elle peut être
-// absente ou partiellement supportée selon le pilote GPU) : sur un lanceur qui
-// reconstruit ses dés à chaque changement de type/nombre et à chaque thème
-// (diceResetPreview), c'est une fuite mémoire GPU réelle sur des lancers répétés,
-// pas seulement théorique. On ne libère jamais une texture marquée `shared` (cache
-// _numTexCache de die.ts, réutilisé par tous les dés vivants) ; les textures de
-// points du d6/d3/pièce (_dieFaceTexture), elles, sont régénérées à chaque
-// construction et doivent être libérées.
+// three@0.149 : WebGLProperties.dispose() = `properties = new WeakMap()`). La
+// libération réelle dépend donc de `forceContextLoss()`, qui n'agit que si
+// l'extension WEBGL_lose_context est disponible (absente ou bridée selon le pilote
+// GPU). Bonne pratique Three.js standard dans tous les cas ; mesuré (RSS process,
+// voir docs/audit/DECISIONS-C.md §1.1/§2) : différence dans le bruit de mesure quand
+// l'extension est disponible (environnement prescrit par CLAUDE.md), effet net mais
+// modeste quand elle est indisponible/bridée — ne pas sur-vendre cette correction
+// comme la suppression d'une fuite massive : c'est un filet de sécurité pour les
+// environnements dégradés, pas un changement mesurable dans l'environnement standard.
+// On ne libère jamais une texture marquée `shared` (cache _numTexCache de die.ts,
+// réutilisé par tous les dés vivants) ; les textures de points du d6/d3/pièce
+// (_dieFaceTexture), elles, sont régénérées à chaque construction et doivent être
+// libérées.
 export function _disposeSceneResources(scene: THREE.Scene): void {
   scene.traverse(function(obj){
     var o=obj as THREE.Object3D & {

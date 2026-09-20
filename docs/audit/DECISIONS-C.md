@@ -53,14 +53,34 @@ du GPU dépendait donc entièrement de `forceContextLoss()`, qui elle-même
 n'agit que si l'extension `WEBGL_lose_context` est disponible
 (`this.forceContextLoss = function(){ const extension = extensions.get(
 'WEBGL_lose_context' ); if(extension) extension.loseContext(); };` — sinon
-c'est un no-op silencieux). C'est exactement le risque que la note de
-`CLAUDE.md` sur les contextes WebGL simultanés pointe indirectement : un
-lanceur qui reconstruit ses dés à **chaque** changement de type/nombre
-(`diceFacesStep`, `diceCountStep`, sélection rapide) et à chaque changement
-de thème (`diceResetPreview`) sans jamais disposer explicitement les
-géométries/matériaux/textures accumule une fuite GPU réelle sur des lancers
-répétés dès que l'extension manque ou est bridée par le pilote — pas
-seulement dans l'hypothèse pathologique documentée pour Playwright.
+c'est un no-op silencieux). C'est le risque que la note de `CLAUDE.md` sur
+les contextes WebGL simultanés pointe indirectement : un lanceur qui
+reconstruit ses dés à **chaque** changement de type/nombre (`diceFacesStep`,
+`diceCountStep`, sélection rapide) et à chaque changement de thème
+(`diceResetPreview`) sans jamais disposer explicitement les
+géométries/matériaux/textures s'expose à une fuite GPU si l'extension
+manque ou est bridée par le pilote.
+
+> **Mise à jour round 2 (voir `docs/audit/C-critique-round1.md` §2, P2) — à
+> lire avant de juger la sévérité.** Le critique a mesuré indépendamment la
+> RSS process sur 64 cycles de reconstruction (9 dés/cycle) : **dans
+> l'environnement de test prescrit par `CLAUDE.md` (`--use-gl=swiftshader`,
+> extension `WEBGL_lose_context` disponible), l'écart avant/après ce
+> correctif est dans le bruit de mesure** (+226 Mo sans le correctif contre
+> +210 Mo avec, sur un process Chromium complet — pas un écart qu'on peut
+> attribuer avec confiance au correctif plutôt qu'au bruit). L'effet devient
+> net, mais reste modeste, uniquement quand `WEBGL_lose_context` est
+> neutralisée artificiellement (+268 Mo sans vs +248 Mo avec, mesuré une
+> seule fois). **Verdict correct à retenir : c'est une bonne pratique
+> Three.js standard et un filet de sécurité légitime pour les environnements
+> dégradés (extension absente/bridée), PAS une suppression mesurée d'une
+> fuite massive dans l'environnement de test standard du projet.** Ma
+> première rédaction ci-dessous (« fuite mémoire GPU réelle... pas seulement
+> dans l'hypothèse pathologique ») était plus affirmative que ce que la
+> mesure indépendante démontre ; je la corrige explicitement plutôt que de la
+> réécrire silencieusement (cf. journal `BRIEF.md` §7, D-PREF-2) — le
+> paragraphe qui suit reste tel qu'écrit initialement, à lire à la lumière de
+> cette mise à jour.
 
 **Correctif.** Nouvelle fonction exportée `_disposeSceneResources(scene)`
 dans `src/dice-ui.ts` : parcourt la scène entière (`scene.traverse`) et
@@ -153,6 +173,17 @@ réels (vérifié : le test `catalanDie` reproduit exactement le rayon
 englobant demandé à 10⁻³ près, donc AUCUN changement de silhouette), actif
 uniquement dans le cas dégénéré hypothétique.
 
+**Précision explicite (round 2, `C-critique-round1.md` §8, P2)** : parce que
+`maxr` ne peut structurellement pas être nul sur les 5 solides réellement
+codés en dur dans `polyhedra.ts`, **aucune mutation sur cette ligne précise
+(`||1e-6`) ne peut être mise en échec par un test qui construit un de ces 5
+solides réels** — ce n'est donc PAS une ligne « couverte par mutation
+testing » au sens strict de la règle du brief (§3.2 : « un test qui ne peut
+structurellement pas échouer ne vaut rien »), même si le test de non-
+régression (`Number.isFinite` sur toutes les coordonnées) documente
+honnêtement le comportement attendu du chemin normal. Le §3 ci-dessous ne
+compte plus cette ligne dans le total des mutations testées.
+
 ## 2. Passé en revue, aucun défaut trouvé (documenté pour éviter une redite)
 
 - **`dieExtractFaces`** : toutes les divisions potentielles par une longueur
@@ -185,19 +216,36 @@ Trois nouveaux fichiers sous `tests/`, zéro dépendance npm ajoutée (voir §5)
   qu'un vert pur saturé (perçu comme « éclatant ») reçoit une encre foncée
   parce que sa luminance réelle dépasse le seuil, et qu'un bleu pur saturé
   reçoit l'inverse — la teinte seule ne doit jamais dicter le résultat.
-- **`tests/dice3d.geometry.test.ts`** (17 tests) — `dieExtractFaces`,
-  `dieAssignValues` (vérifie noir sur blanc que les faces opposées d'un
-  cube/octaèdre somment bien à N+1, comme un vrai dé), `_normalizeGeoRadius`,
-  `_roundRadiusFor` (vérifie le plafond à 30 % du plus petit rayon inscrit,
-  D-CLAUDE-1), `allPerms`/`evenPerms`/`dedupe`/`catalanDie` de
-  `polyhedra.ts`.
+- **`tests/dice3d.geometry.test.ts`** (22 tests, dont 5 ajoutés en round 2)
+  — `dieExtractFaces`, `dieAssignValues` (vérifie noir sur blanc que les
+  faces opposées d'un cube/octaèdre somment bien à N+1, comme un vrai dé),
+  `_normalizeGeoRadius`, `_roundRadiusFor` (vérifie le plafond à 30 % du plus
+  petit rayon inscrit, D-CLAUDE-1), `allPerms`/`evenPerms`/`dedupe`/
+  `catalanDie` de `polyhedra.ts`. **Round 2** (réponse au P1 de
+  `C-critique-round1.md` §3/§8, mutation #4 du critique non détectée) :
+  nouveau describe dédié au paramètre `onSphere` de `catalanDie` — celui qui
+  porte EXACTEMENT le comportement verrouillé par D-CLAUDE-1 (« t=1 pour le
+  d48, 0.85 pour le d120 »), jusqu'ici jamais exercé avec une valeur non
+  triviale. Mesure quantitative directe (écart-type des distances des
+  sommets au centre — 0 = silhouette parfaitement ronde) : (a) sans
+  `onSphere`, le solide de Catalan brut a bien plusieurs rayons distincts
+  (stddev > 0,01, condition nécessaire pour que le paramètre ait un effet
+  mesurable) ; (b) `onSphere=true` (config réelle du d48) ramène tous les
+  sommets exactement sur la sphère (stddev < 10⁻⁴) ; (c) `onSphere=0.85`
+  (config réelle du d120) donne un écart-type strictement ENTRE le solide
+  brut et le d48 sphérisé (sphérisation partielle, ni 0 ni le solide brut) ;
+  (d) l'effet est monotone et proportionnel à `t` (0 → 0,5 → 0,85 → 1,
+  stddev strictement décroissante) ; (e) test de bout en bout sur le vrai
+  point d'entrée `dieGeometryFor(48)`/`dieGeometryFor(120)` (pas seulement
+  `catalanDie` appelé directement) pour attraper spécifiquement un
+  copier-coller qui échangerait les arguments `onSphere` entre les deux cas.
 - **`tests/dice3d.dispose.test.ts`** (7 tests) — `_disposeSceneResources`
   (géométrie/matériau disposés, texture non partagée disposée, texture
   `shared` jamais disposée, shadow map disposée, scène vide sans exception)
   et `_cardBgHex` (aucune sonde orpheline en chemin heureux ET en chemin
   d'échec simulé).
 
-**Mutation testing (exigence §3.2 du brief) : 8 mutations, cassées puis
+**Mutation testing (exigence §3.2 du brief) : 10 mutations, cassées puis
 restaurées une à une, chacune confirmée en échec avant restauration** :
 
 | # | Fichier | Mutation | Résultat |
@@ -210,18 +258,24 @@ restaurées une à une, chacune confirmée en échec avant restauration** :
 | 6 | `dice-ui.ts` | `_disposeSceneResources` : `if(o.geometry)` → `if(false && o.geometry)` (désactive le dispose des géométries) | 1/7 tests dispose échoue |
 | 7 | `dice-ui.ts` | `_disposeSceneResources` : `!map.userData.shared` retiré (dispose TOUJOURS le `.map`) | 1/7 tests dispose échoue |
 | 8 | `die.ts` | `_cardBgHex` : `finally` retiré, retrait remis en chemin heureux seul (= bug d'origine) | 1/7 tests dispose échoue (reproduit exactement le bug corrigé en 1.3) |
+| 9 | `polyhedra.ts` | **Round 2**, reproduit EXACTEMENT la mutation #4 du critique (`C-critique-round1.md` §3) : `catalanDie`, `var t=(onSphere===true)?1:onSphere;` → `t=(...)*0.1` | 1/22 tests géométrie échoue (le test d48/t=1 dédié) — **confirmé non détecté avant l'ajout du nouveau describe `onSphere`, détecté après** |
+| 10 | `die.ts` | **Round 2** : `dieGeometryFor`, arguments `onSphere` échangés entre les cas `48` et `120` (`catalanDie(archTruncCuboctahedron,1.35,0.85)` / `catalanDie(archTruncIcosidodecahedron,1.35,true)`) — scénario « copier-coller malheureux » cité par le critique | 1/22 tests géométrie échoue (le test de câblage `dieGeometryFor` dédié) |
 
 Chaque mutation a été appliquée par un script Python jetable (diff textuel
 exact conservé ci-dessus pour traçabilité), les tests concernés relancés
 (`npx vitest run tests/dice3d.<fichier>.test.ts`), l'échec constaté, puis le
 fichier restauré depuis une copie de sauvegarde
-(`/tmp/.../scratchpad/{die,dice-ui,polyhedra}.ts.orig`) avant de relancer
-`npm test` complet pour confirmer le retour au vert (79/79). Aucun test
+(`/tmp/.../scratchpad/{die,dice-ui,polyhedra}.ts.orig{,2}`) avant de relancer
+`npm test` complet pour confirmer le retour au vert. Aucun test
 « ne pouvant structurellement pas échouer » (D17 de l'audit v1) : chacun a
-été vu échouer au moins une fois pendant cette session.
+été vu échouer au moins une fois pendant cette session. Le garde-fou
+div/0 de `catalanDie` (§1.5) n'est PAS dans cette table : il n'a
+délibérément aucune mutation testable en échec sur les 5 solides réels (voir
+§1.5, précision round 2) — ne pas le compter comme couvert.
 
-**Résultat final** : `npm test` → **8 fichiers de test, 79 tests, tous
-verts** (32 préexistants + 47 ajoutés par cet élément).
+**Résultat final** : `npm test` → **9 fichiers de test, 87 tests, tous
+verts** (35 préexistants + 52 ajoutés par cet élément, dont 5 ajoutés en
+round 2 pour couvrir `onSphere`).
 
 ## 4. Preuve d'absence de régression visuelle (D-CLAUDE-1)
 
@@ -269,6 +323,25 @@ compte-rendu comme demandé) : `/tmp/claude-0/-home-user-scoretrack/
 leak_check.mjs,check_ext.mjs}` et `.../scratchpad/shots/*.png` — reproductibles
 en relançant ces scripts après `npm run build`.
 
+**Round 2 — re-preuve après les changements du §8, méthode affinée.** Le
+dépôt étant partagé en direct (§0), une comparaison `avant`/`après` séparée
+dans le temps peut capter une dérive **d'un fichier hors de mon périmètre**
+(vu en pratique : en recomparant mes captures `after1..3` du round 1 à une
+nouvelle capture prise après le round 2, `rolled-d20` différait — pas les 14
+dés ni l'aperçu multi-dés. Diagnostic : `index.html`/les polices ont changé
+entre-temps du fait d'autres éléments, ce qui déplace légèrement le rendu du
+texte « Total : N » à côté du dé, sans toucher au dé lui-même). Pour isoler
+strictement l'effet de MES changements round 2 (commentaire dans
+`src/dice-ui.ts`, tests, doc — aucune géométrie touchée), comparaison
+refaite à index.html CONSTANT : `git stash push -- docs/audit/DECISIONS-C.md
+src/dice-ui.ts tests/dice3d.geometry.test.ts` (stash scopé à mes seuls
+fichiers, jamais un `git stash` complet qui aurait aussi emporté le travail
+en cours d'autres agents sur `index.html`/`e2e/*`) → build → capture
+(`round2before`) → `git stash pop` → build → capture (`round2after`).
+**Résultat : 16/16 captures identiques octet pour octet**, `rolled-d20`
+compris — confirme que le round 2 n'a introduit aucune régression visuelle,
+la dérive observée plus haut étant entièrement imputable à un autre élément.
+
 ## 5. Dépendances npm
 
 **Aucune ajoutée.** Les tests du §3 utilisent exclusivement `vitest`, `three`
@@ -294,7 +367,8 @@ Exécutées après le dernier commit de cet élément, sur l'arbre partagé (voi
   avant mon intervention — je n'ai pas converti `var`→`let/const` sur du code
   que je n'ai pas touché, changement massif et hors mandat qui n'aurait rien
   à voir avec la robustesse/le typage/les tests).
-- `npm run test` → **79/79 tests verts** (8 fichiers).
+- `npm run test` → **87/87 tests verts** (9 fichiers, dont 3 miens totalisant
+  52 tests — reconfirmé après les ajouts du round 2).
 - `npm run build` → succès (`dist/app.js`, `dist/sw.js` générés sans erreur).
 - Contrôle visuel Playwright/swiftshader : voir §4 (16 captures identiques
   avant/après, 3 exécutions consécutives reproductibles).
@@ -332,3 +406,49 @@ Exécutées après le dernier commit de cet élément, sur l'arbre partagé (voi
   scratchpad, pas un test versionné. Si un futur agent veut la reconduire
   durablement, il devrait vivre sous `e2e/` (hors de mon périmètre
   d'écriture).
+
+## 8. Round 2 — réponse à la critique indépendante (`docs/audit/C-critique-round1.md`)
+
+Verdict round 1 : **AAA : non** — zéro régression visuelle confirmée
+indépendamment (clause de disqualification automatique non déclenchée), mais
+1 défaut P1 et 2 défauts P2. Traité point par point :
+
+- **P1 (couverture manquante sur `onSphere`, mutation #4 du critique non
+  détectée)** — **corrigé.** Nouveau describe dans
+  `tests/dice3d.geometry.test.ts` (§3 ci-dessus, détail complet) : mesure
+  quantitative de l'effet de sphérisation (écart-type des rayons des
+  sommets) sur les deux configurations réellement verrouillées par
+  D-CLAUDE-1 (d48 : `onSphere=true`/t=1 ; d120 : `onSphere=0.85`), plus un
+  test de monotonicité et un test de bout en bout sur `dieGeometryFor` qui
+  attrape spécifiquement un échange des arguments entre les cas 48 et 120.
+  **Vérifié en reproduisant EXACTEMENT la mutation #4 du critique**
+  (`t=(...)*0.1` dans `catalanDie`) : non détectée avant l'ajout de ces
+  tests (confirmé), détectée après (1/22 tests géométrie échoue — table
+  mutation #9 au §3). Une seconde mutation, non suggérée par le critique
+  mais couvrant le scénario « copier-coller entre d48 et d120 » qu'il cite
+  explicitement en §3, est également détectée (mutation #10).
+- **P2 (formulation trop affirmative de la fuite mémoire)** — **corrigé.**
+  Reformulé `docs/audit/DECISIONS-C.md` §1.1 (nuance ajoutée en tête de
+  section, texte original conservé en dessous plutôt que réécrit
+  silencieusement) et le commentaire de code correspondant dans
+  `src/dice-ui.ts` (au-dessus de `_disposeSceneResources`) : le correctif
+  est présenté comme une bonne pratique Three.js standard dont l'effet
+  mesuré est dans le bruit sous l'environnement de test prescrit par
+  `CLAUDE.md`, et net mais modeste seulement quand `WEBGL_lose_context` est
+  indisponible — plus jamais présenté comme une fuite « réelle... pas
+  seulement dans l'hypothèse pathologique ». Je n'ai pas repris de mesure
+  RSS supplémentaire (le critique a déjà mesuré des deux côtés, avec et sans
+  l'extension) : reformuler l'affirmation était l'action demandée, pas
+  refaire la mesure.
+- **P2 (garde-fou div/0 non mutation-testable sur les cas réels)** —
+  **corrigé.** Précision explicite ajoutée en §1.5 : cette ligne n'est pas
+  comptée dans le total de mutations testées du §3, avec l'explication
+  exacte de pourquoi (impossible de rendre `maxr=0` avec les 5 solides
+  d'Archimède réels codés en dur).
+
+Toutes les vérifications du §6 rejouées après ces changements : `npm run
+typecheck`/`lint`/`test`/`build` tous verts (voir §6, chiffres mis à jour :
+87/87 tests). Aucune modification visuelle introduite par ce round (aucun
+fichier de rendu — `cube.ts`, la géométrie de `die.ts`, `polyhedra.ts` en
+dehors du garde-fou déjà en place — n'a été touché ; seuls des tests, un
+commentaire, et la documentation ont changé).
