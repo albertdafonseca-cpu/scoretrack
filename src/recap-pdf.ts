@@ -1,14 +1,15 @@
+import { jsPDF } from 'jspdf';
 import { t } from './i18n';
 import { fmtNum, history, lastGameConfig, players } from './game';
 import { $ } from './dom';
 import type { GameConfig, HistoryGroup, Player } from './types';
 
 // ── EXPORT PDF RÉCAPITULATIF ──────────────────────────────────────
+// jsPDF est une dépendance npm bundlée par esbuild (voir docs/audit/DECISIONS-E.md,
+// §1) : plus de chargement CDN (cdnjs), l'export fonctionne hors ligne dès le
+// premier lancement.
 export function exportRecapPDF(){
-  if(!window.jspdf){alert('jsPDF non chargé.');return;}
-  const { jsPDF } = window.jspdf;
-  // any : instance jsPDF (librairie CDN sans types embarqués, voir globals.d.ts)
-  const doc: any = new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const doc = new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
 
   const inclScores   = $<HTMLInputElement>('pdf-chk-scores').checked;
   const inclHistory  = $<HTMLInputElement>('pdf-chk-history').checked;
@@ -19,14 +20,18 @@ export function exportRecapPDF(){
   let y = 18;
 
   // ── Couleurs daltonien-safe ──
-  const C_TITLE  = [10,  10,  10];
-  const C_SUB    = [80,  80,  80];
-  const C_POS    = [0,   100, 180]; // bleu
-  const C_NEG    = [200, 80,  20];  // orange
-  const C_BORDER = [200, 200, 200];
-  const C_BG_HDR = [240, 240, 240];
-  const C_WIN    = [30,  120, 40];
-  const C_ELIM   = [150, 150, 150];
+  // Tuples explicites : setTextColor/setFillColor/setDrawColor de jsPDF sont
+  // surchargées en (r,g,b[,a]), pas en (...rgb: number[]) — un spread d'un
+  // number[] non figé ne type-check pas (TS2556).
+  type RGB = readonly [number, number, number];
+  const C_TITLE:  RGB = [10,  10,  10];
+  const C_SUB:    RGB = [80,  80,  80];
+  const C_POS:    RGB = [0,   100, 180]; // bleu
+  const C_NEG:    RGB = [200, 80,  20];  // orange
+  const C_BORDER: RGB = [200, 200, 200];
+  const C_BG_HDR: RGB = [240, 240, 240];
+  const C_WIN:    RGB = [30,  120, 40];
+  const C_ELIM:   RGB = [150, 150, 150];
 
   // ── En-tête ──
   doc.setFont('helvetica','bold');
@@ -200,7 +205,7 @@ export function exportRecapPDF(){
   }
 
   // ── Pied de page ──
-  const totalPages = doc.internal.getNumberOfPages();
+  const totalPages = doc.getNumberOfPages();
   for(let pg=1;pg<=totalPages;pg++){
     doc.setPage(pg);
     doc.setFont('helvetica','normal');

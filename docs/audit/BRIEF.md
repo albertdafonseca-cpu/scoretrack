@@ -209,3 +209,59 @@ jamais réutilisée même si une décision est amendée.)
   vérifié réellement (`dist/app.js` supprimé, `npm run test:e2e` le
   régénère avant de lancer les tests). Voir `docs/audit/DECISIONS-A.md`
   §« Corrections round 1 » pour le détail.
+- **D10** — Élément E : jsPDF n'est plus chargé par CDN (P0 #1 et P1 #6 du
+  constat initial) : `npm install jspdf@4.2.1` (dépendance npm, version
+  exacte figée — même convention que `three`), importé directement dans
+  `src/recap-pdf.ts` (`import { jsPDF } from 'jspdf'`) et bundlé par
+  esbuild comme `three`. Plus de `window.jspdf` ni de garde
+  « jsPDF non chargé ». Mesuré réellement : `dist/app.js` passe de 801,7 Ko
+  à 1 633 Ko (jsPDF bien inclus). Couvert par un test unitaire réel
+  (`tests/recap-pdf.test.ts`, inspection de source anti-régression +
+  génération d'un vrai PDF avec espion réseau qui ferait échouer le test au
+  moindre `fetch`) et un test e2e Playwright réel
+  (`e2e/pdf-export-offline.spec.ts`, export PDF vérifié hors ligne via
+  `context.setOffline(true)`, PDF téléchargé validé par son en-tête
+  `%PDF-`). **Action requise, hors de mon périmètre** : `index.html`
+  contient encore la balise `<script src="https://cdnjs.cloudflare.com/
+  ajax/libs/jspdf/2.5.1/jspdf.umd.min.js">` (ligne 1363), désormais inutile
+  mais qui continue de déclencher une vraie requête réseau à chaque
+  ouverture — à supprimer par l'élément D. Voir `docs/audit/DECISIONS-E.md`
+  §1 pour le texte exact et la preuve (test e2e rouge pour cette seule
+  raison, confirmé en supprimant la ligne sur une copie non committée de
+  `dist/index.html`).
+- **D11** — Élément E : Google Fonts (P0 #1, deuxième moitié) — auto-
+  hébergement complet préparé plutôt que simplement documenté. Neuf
+  familles utilisées par `index.html` téléchargées depuis les URLs
+  `fonts.gstatic.com` réellement servies (25 fichiers `.woff2` uniques,
+  560 Ko au total) et placées dans un nouveau répertoire `/fonts/` à la
+  racine du dépôt (hors du périmètre fichier strict de l'élément E, mais
+  sans collision avec aucun périmètre déclaré — voir la note de périmètre
+  en tête de `docs/audit/DECISIONS-E.md`), avec une feuille `fonts/
+  fonts.css` locale identique à celle de Google (mêmes `unicode-range`/
+  poids/`font-display`, seuls les `url()` pointent en local). Vérifié
+  réellement par Playwright (serveur HTTP local, câblage appliqué sur une
+  copie non committée de `dist/`) : polices effectivement chargées
+  (`document.fonts` → `loaded` pour les graisses utilisées), zéro requête
+  externe. **Action requise, hors de mon périmètre** : 2 lignes dans
+  `index.html` (élément D, remplacer l'`@import` Google Fonts par
+  `<link rel="stylesheet" href="./fonts/fonts.css">`) et 1 ligne dans
+  `build.mjs` (élément F, `cpSync('fonts', 'dist/fonts', {recursive:true})`)
+  — extraits exacts et texte de politique de confidentialité honnête
+  (variante avec/sans auto-hébergement) dans `docs/audit/DECISIONS-E.md`
+  §2/§4. Une fois câblé, ceci referme aussi la recommandation de
+  resserrement de la CSP notée en D7 (`vercel.json`, élément F) pour
+  `fonts.googleapis.com`/`fonts.gstatic.com`/`cdnjs.cloudflare.com`,
+  puisque plus aucune des deux origines externes ne serait contactée.
+- **D12** — Élément E : `src/sw-worker.ts` — suppression du cache CDN
+  jsPDF devenu inutile (`CDN_CACHE`/`CDN_URLS`/`CDN_HOSTS` et la branche
+  fetch associée) et correction d'une incohérence déjà repérée au constat
+  initial : `FONT_CSS_URLS` précachait une URL Google Fonts
+  (`Orbitron:wght@700`+`Share+Tech+Mono`+`Exo+2:wght@400;600`) qui ne
+  correspondait à AUCUNE police réellement utilisée par l'app (« Exo 2 »
+  n'existe nulle part ailleurs dans le code ; six familles réellement
+  utilisées — Inter, Press Start 2P, Cinzel, Bebas Neue, Ballet, Permanent
+  Marker, Dancing Script — étaient absentes du précache) : corrigée pour
+  correspondre exactement à l'`@import` actuel d'`index.html`. `STATIC`
+  liste aussi, par anticipation et sans risque (précache tolérant), les 25
+  chemins de polices auto-hébergées de D11. Voir `docs/audit/DECISIONS-E.md`
+  §3.
