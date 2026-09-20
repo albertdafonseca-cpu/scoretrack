@@ -323,3 +323,69 @@ jamais réutilisée même si une décision est amendée.)
   confirmée en échec avant restauration (D17 de l'audit v1 : aucun test ne
   peut structurellement pas échouer). Aucune dépendance npm ajoutée. Voir
   `docs/audit/DECISIONS-C.md` §3.
+- **D18** — Élément D : les 2 actions P0 obligatoires du handoff de
+  l'élément E appliquées dans `index.html` — balise `<script>` CDN jsPDF
+  résiduelle (ligne 1363) supprimée, `@import` Google Fonts remplacé par
+  `<link rel="stylesheet" href="./fonts/fonts.css">` (polices auto-hébergées
+  déjà livrées par E dans `/fonts/`). Revérifié réellement : le test e2e de
+  E (`e2e/pdf-export-offline.spec.ts`), rouge à cause de cette seule ligne,
+  passe maintenant au vert ; nouveau test
+  `e2e/fonts-self-hosted.spec.ts` confirme 0 requête réseau vers
+  `fonts.googleapis.com`/`fonts.gstatic.com` au chargement. **Point de
+  vigilance pour l'intégration finale** : `build.mjs` (élément F) ne copie
+  pas encore `fonts/` vers `dist/fonts/` (action D11/D-E§2.2 déjà spécifiée
+  par E) — sans ce `cpSync`, `dist/fonts/fonts.css` répond 404 en
+  production réelle (régression visuelle silencieuse, pas une fuite,
+  l'app retombant sur les polices système). Voir `docs/audit/DECISIONS-D.md`
+  §1.
+- **D19** — Élément D : politique de confidentialité (`privacyIntro`,
+  Variante A proposée par E en `DECISIONS-E.md` §4, puisque D18 rend
+  l'affirmation vraie) corrigée dans les 18 langues de
+  `src/i18n/translations.ts`. Langues à confiance de traduction réduite
+  signalées : `ar`, `ja`, `ko`, `zh` (nuances de registre les moins sûres) ;
+  confiance modérée pour `ru`, `tr`, `fi`, `sv`, `da`, `nb`. Revérifié avec
+  `tests/translations.test.ts` (élément A) : 4/4 verts, aucune clé
+  manquante dans aucune langue. Voir `docs/audit/DECISIONS-D.md` §2.
+- **D20** — Élément D : accessibilité généralisée à `index.html` (P1 #4 du
+  constat initial, 1 seul attribut aria/role dans tout le fichier
+  auparavant) : rôles ARIA (`dialog`/`alertdialog`, `aria-live="assertive"`
+  sur les annonces de fin de partie) sur les 7 boîtes de dialogue/overlays
+  principales, `aria-label` traduit dynamiquement (7 nouvelles clés i18n
+  dans les 18 langues) sur les 12 boutons ne portant qu'une icône/un
+  symbole, `aria-hidden` sur les icônes purement décoratives, focus clavier
+  visible (`:focus-visible`) généralisé, tailles de texte illisibles
+  remontées (7px/8px/9px → 9-10px, 8 sélecteurs, aucune casse de mise en
+  page vérifiée par capture d'écran), coche non chromatique ajoutée sur le
+  seul bouton où deux états opposés (Gain/Perte) ne se distinguaient que
+  par la couleur (D-CLAUDE-2/D-PREF-1) — les autres distinctions par
+  couleur de l'interface (chips/cartes sélectionnées) ont déjà, à l'audit,
+  une vraie différence de luminance et/ou une coche existante, donc
+  laissées telles quelles. `#elim-anim-skull{font-size:4px}` volontairement
+  non modifié (état de départ d'une animation JS, pas un texte lu au repos).
+  5 nouveaux tests e2e (`e2e/accessibility-basics.spec.ts`), chacun
+  mutation-testé manuellement (règle cassée puis restaurée, échec confirmé
+  avant restauration). Voir `docs/audit/DECISIONS-D.md` §3.
+- **D21** — Élément D : émojis système comme icônes (💀 🏆 🔒 🏁 ☠️, P1 #7
+  du constat initial) — **dette documentée, non traitée** : `src/icons.ts`
+  ne contient aucune icône SVG équivalente, et la plupart des occurrences
+  sont assignées dynamiquement par `src/game.ts` (élément B) et
+  `src/recap-pdf.ts` (élément E), hors du périmètre de l'élément D ; un
+  remplacement partiel limité à `index.html` créerait une incohérence
+  (l'icône changerait de style en cours de partie). Nécessite un tour
+  coordonné B+D+E. Voir `docs/audit/DECISIONS-D.md` §4.
+- **D22** — Élément D : correctif du défaut cross-cutting documenté par
+  l'élément B en D13/`DECISIONS-B.md` §4, dans la partie qui était de mon
+  périmètre : `src/i18n.ts:160`, `FlashBtn._flashTimer` retypé
+  `ReturnType<typeof setTimeout> | null` (au lieu de `number | null`) —
+  l'erreur `TS2322` correspondante sous `tsc -p tsconfig.test.json` a bien
+  disparu, revérifié avant/après. Les erreurs restantes du même programme
+  (`src/game.ts`/`src/animations.ts` : `window._xxx` introuvable ;
+  `src/i18n.ts:22` : `navigator.userLanguage`) partagent une racine commune
+  identifiée indépendamment : `src/globals.d.ts` (augmentation ambiante,
+  élément B) n'est jamais inclus dans le programme
+  `tsconfig.test.json` (`tests/**/*.ts` + `e2e/**/*.ts` uniquement) tant
+  qu'aucun fichier de ce programme ne le référence explicitement — un
+  `import` de valeur ne suffit pas à tirer une augmentation globale.
+  Correctif possible dans `tsconfig.test.json` (élément A) ou
+  `src/globals.d.ts` (élément B), ni l'un ni l'autre dans mon périmètre.
+  Voir `docs/audit/DECISIONS-D.md` §7.
