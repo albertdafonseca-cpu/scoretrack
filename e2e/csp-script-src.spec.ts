@@ -1,11 +1,23 @@
 // Élément G (audit AAA, round 3) — vérification réelle du resserrement de
-// la CSP de `vercel.json` : retrait de `'unsafe-inline'` de `script-src`
-// UNIQUEMENT (`style-src` le garde, à cause du `<style>` inline
-// d'`index.html`, hors périmètre de ce chantier — voir docs/audit/
-// DECISIONS-G.md). Ce retrait n'était possible qu'une fois les 65 attributs
-// `onclick="..."` remplacés par `addEventListener` (src/main.ts) : c'était
-// la seule raison documentée (DECISIONS-F.md §4, D7) de garder
-// `'unsafe-inline'` dans `script-src`.
+// la CSP de `vercel.json` : retrait de `'unsafe-inline'` de `script-src`,
+// rendu possible une fois les 65 attributs `onclick="..."` remplacés par
+// `addEventListener` (src/main.ts) — c'était la seule raison documentée
+// (DECISIONS-F.md §4, D7) de garder `'unsafe-inline'` dans `script-src`.
+//
+// Complété ensuite (fermeture de dette post-audit) pour `style-src` : le
+// `<style>` inline d'`index.html` a été extrait vers `css/app.css` (un vrai
+// fichier, servi par un `<link>`), ce qui a permis de découvrir — en testant
+// réellement, pas en supposant — qu'une CSP `style-src` sans
+// `'unsafe-inline'` bloque aussi les innombrables mutations `.style.xxx=`
+// (CSSOM) faites en JS dans tout le projet (dice-ui.ts, animations.ts,
+// game.ts), contrairement à une hypothèse initiale répandue selon laquelle
+// seuls les attributs `style=""` écrits en HTML et les `<style>` inline
+// seraient concernés. Retenu à la place : les directives CSP de niveau 3
+// `style-src-elem 'self'` (bloque tout `<style>`/`<link>` injecté, y
+// compris par un futur bug d'injection HTML) et `style-src-attr
+// 'unsafe-inline'` (autorise les mutations `.style.xxx=` légitimes, qui ne
+// dépendent d'aucune donnée utilisateur non échappée). Voir la preuve du
+// blocage réel plus bas (« un `<style>` injecté est bien bloqué »).
 //
 // Sert `dist/` en HTTP avec EXACTEMENT les en-têtes de `vercel.json` (lus
 // dynamiquement depuis ce fichier, jamais dupliqués en dur ici, pour que ce
@@ -221,6 +233,96 @@ test('CSP resserrée : fermeture du lanceur de dés par glissement tactile, sans
 
     expect(violations, `violations CSP relevées : ${JSON.stringify(violations, null, 2)}`).toEqual([]);
     expect(pageErrors, `erreurs JS relevées : ${JSON.stringify(pageErrors, null, 2)}`).toEqual([]);
+  } finally {
+    await server.close();
+  }
+});
+
+// Fermeture de dette style-src (post-audit) : l'animation d'élimination
+// (src/animations.ts) est le code qui a révélé le besoin de style-src-attr
+// — elle mutait `skull.style.cssText=...` (attribut style entier, restreint)
+// à chaque frame. Corrigée pour muter des propriétés CSSOM individuelles
+// (`.style.fontSize=`, `.opacity=`, `.filter=`, `.transform=`), autorisées
+// par `style-src-attr 'unsafe-inline'`. Ce test la laisse jouer JUSQU'AU
+// BOUT (pas d'arrêt anticipé) pour couvrir réellement chaque mutation de
+// chaque frame, contrairement aux tests fonctionnels existants qui arrêtent
+// l'animation immédiatement (`stopElimAnim`) pour ne pas dépendre de sa durée.
+test("CSP resserrée : l'animation d'élimination (mutations de style par frame) ne déclenche aucune violation", async ({ page }) => {
+  const server = await startStaticServer();
+  try {
+    const violations: string[] = [];
+    const pageErrors: string[] = [];
+    page.on('pageerror', err => pageErrors.push(String(err)));
+    await page.addInitScript(() => {
+      document.addEventListener('securitypolicyviolation', (e) => {
+        (window as unknown as { __cspViolations: string[] }).__cspViolations ??= [];
+        (window as unknown as { __cspViolations: string[] }).__cspViolations.push(
+          `${e.violatedDirective} :: ${e.blockedURI}`,
+        );
+      });
+    });
+
+    await page.goto(server.url);
+    await page.locator('#btn-privacy-accept').click();
+
+    // Configure une partie en mode élimination (comme
+    // e2e/onclick-wiring.spec.ts::configureCustomGame) : 2 joueurs, 0 point
+    // de départ, objectif "Défaite" à 0 -> le premier ajustement négatif
+    // déclenche #elim-modal, exactement comme un vrai coup joué.
+    await page.locator('#players-grid .player-chip', { hasText: /^2$/ }).click();
+    await page.locator('#start-presets .points-chip[data-val="0"]').click();
+    await page.locator('#obj-elim').click();
+    await page.locator('#objectif-presets .points-chip[data-oval="0"]').click();
+    await expect(page.locator('#go-btn')).toBeEnabled();
+    await page.locator('#go-btn').click();
+    await page.locator('#names-go-btn').click();
+    await expect(page.locator('.pcard .score').first()).toBeVisible();
+
+    // Déclenche l'élimination réelle via l'API exposée (comme
+    // e2e/onclick-wiring.spec.ts), puis laisse l'animation jouer entièrement
+    // (T_TOTAL ~1.8s + marge) au lieu de l'interrompre.
+    await page.evaluate(() => (window as unknown as { ScoreTrack: { game: { adjust: (i: number, d: number) => void } } }).ScoreTrack.game.adjust(0, -1));
+    await expect(page.locator('#elim-modal')).not.toHaveClass(/\bhidden\b/, { timeout: 5000 });
+    await page.locator('#btn-elim-confirm-txt').click();
+    await expect(page.locator('#elim-anim-overlay')).toHaveCSS('display', 'flex');
+    await page.waitForTimeout(2500); // laisse l'animation (fragments + flash + fondu) jouer entièrement
+
+    const collected = await page.evaluate(() => (window as unknown as { __cspViolations?: string[] }).__cspViolations || []);
+    violations.push(...collected);
+
+    expect(violations, `violations CSP relevées : ${JSON.stringify(violations, null, 2)}`).toEqual([]);
+    expect(pageErrors, `erreurs JS relevées : ${JSON.stringify(pageErrors, null, 2)}`).toEqual([]);
+  } finally {
+    await server.close();
+  }
+});
+
+// Preuve que `style-src-elem 'self'` bloque réellement un `<style>` injecté
+// (par exemple par un futur bug d'injection HTML) — sans cette preuve,
+// retirer 'unsafe-inline' de style-src-elem pourrait sembler correct alors
+// qu'il n'aurait aucun effet réel (mesuré, pas supposé — même principe que
+// la preuve équivalente pour script-src plus haut dans ce fichier).
+test("CSP resserrée : un <style> injecté est bien bloqué par style-src-elem", async ({ page }) => {
+  const server = await startStaticServer();
+  try {
+    await page.goto(server.url);
+    const result = await page.evaluate(() => new Promise<{ blocked: boolean; violatedDirective: string | null }>((resolve) => {
+      let violatedDirective: string | null = null;
+      document.addEventListener('securitypolicyviolation', (e) => { violatedDirective = e.violatedDirective; }, { once: true });
+      const marker = '__csp_style_injection_probe__';
+      const style = document.createElement('style');
+      style.textContent = `body::before{content:'${marker}';}`;
+      document.head.appendChild(style);
+      // Un `<style>` bloqué n'a aucun effet observable : son contenu ne
+      // s'applique jamais, contrairement à une simple lecture du DOM (qui
+      // verrait l'élément présent même bloqué).
+      setTimeout(() => {
+        const applied = getComputedStyle(document.body, '::before').content.includes(marker);
+        resolve({ blocked: !applied, violatedDirective });
+      }, 200);
+    }));
+    expect(result.violatedDirective).toBe('style-src-elem');
+    expect(result.blocked, 'le <style> injecté a été appliqué : style-src-elem ne bloque rien').toBe(true);
   } finally {
     await server.close();
   }

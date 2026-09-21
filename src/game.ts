@@ -770,7 +770,7 @@ export function renderGame(){
     let cell: HTMLDivElement;
     if(i===-1){
       cell=document.createElement('div');
-      cell.style.cssText='background:var(--bg2);overflow:hidden;min-width:0;min-height:0;';
+      cell.className='grid-spacer-cell'; // règle dans css/app.css (simplification, ex `.style.cssText=`)
     } else {
       cell=buildCard(i,rot!);
     }
@@ -1419,7 +1419,7 @@ export function openScoreModal(pi: number, forceRot?: CardRot){
 
     // Lire les safe-areas via élément sentinelle
     const _sa=document.createElement('div');
-    _sa.style.cssText='position:fixed;top:env(safe-area-inset-top,0px);left:env(safe-area-inset-left,0px);right:env(safe-area-inset-right,0px);bottom:env(safe-area-inset-bottom,0px);pointer-events:none;';
+    _sa.className='safe-area-probe'; // règle dans css/app.css (simplification, ex `.style.cssText=`)
     document.body.appendChild(_sa);
     const _sar=_sa.getBoundingClientRect();
     const safeL=_sar.left, safeR=vw-_sar.right, safeT=_sar.top, safeB=vh-_sar.bottom;

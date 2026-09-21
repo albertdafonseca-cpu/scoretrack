@@ -745,6 +745,60 @@ jamais réutilisée même si une décision est amendée.)
   preuve formelle d'exhaustivité contre toute géométrie de contournement
   future (limite assumée, cf. D-CLAUDE-2/D-PREF-1 et §12/§13.2/§15.8/§17
   de `DECISIONS-H.md`).
+- **D35** — Intégration (fermeture de dette, sur demande explicite de
+  l'utilisateur, post-clôture des éléments A-H) : quatre points de dette
+  documentée traités directement par l'orchestrateur, hors du formalisme
+  élément/critique (petits correctifs bien spécifiés, chacun revérifié
+  typecheck/lint/tests unitaires/build/e2e après coup) :
+  1. **Licence** : `"license":"UNLICENSED"` + fichier `LICENSE` (choix
+     explicite de l'utilisateur : propriétaire, tous droits réservés).
+  2. **Émoji cadenas dans `src/i18n/translations.ts`** : retiré des 36
+     chaînes (18 langues × 2 clés) ; `game.ts::_fixLockIcon` ne dépend plus
+     de détecter un préfixe émoji, pose l'icône SVG de façon
+     inconditionnelle et idempotente (mutation testée : sans la garde
+     d'idempotence, le `MutationObserver` boucle réellement à l'infini —
+     reproduit et confirmé en environnement isolé).
+  3. **`fillText('🏁',…)` mort dans `animations.ts`** (confirmé sans impact
+     visuel par deux critiques indépendants de l'élément H) : retiré.
+  4. **9 affectations `element.onclick=fn`** (dette de l'élément G,
+     `DECISIONS-G.md` §4) : converties en `addEventListener`. 8 sur des
+     éléments fraîchement créés (sans risque) ; la 9e (`recap-close-btn`,
+     élément STATIQUE réaffecté à chaque `showRecap()`) extraite en
+     `game.closeRecap()` et câblée une seule fois dans
+     `main.ts::wireHandlers()` (même principe que les 65 attributs déjà
+     migrés) — un `addEventListener` naïf au même endroit aurait empilé un
+     gestionnaire à chaque ouverture du récapitulatif.
+- **D36** — Intégration (fermeture de dette style-src, dernier point de la
+  dette documentée) : le `<style>` inline d'`index.html` (1351 lignes, dont
+  une police auto-hébergée en base64) extrait vers `css/app.css` (copié
+  vers `dist/css/` par `build.mjs`, même principe que `fonts/`). Les 2
+  attributs `style="display:none;"` restants remplacés par une règle CSS
+  ciblée. Visuellement identique avant/après (captures octet pour octet
+  sur les écrans démarrage/thème/jeu ; l'écran des dés diffère mais
+  s'est avéré non déterministe même sans aucun changement — aperçu 3D non
+  figé — donc non probant, écarté).
+  **Défaut de fond découvert en testant réellement** (pas supposé) : retirer
+  `'unsafe-inline'` de `style-src` bloque aussi les innombrables mutations
+  `.style.xxx=` (CSSOM) faites en JS dans tout le projet (dice-ui.ts,
+  animations.ts, game.ts) — pas seulement les attributs `style=""` écrits en
+  HTML et les `<style>` inline, contrairement à une hypothèse répandue.
+  Mesuré : des centaines de violations `style-src-attr` sur un simple
+  parcours de l'app. Retenu à la place : les directives CSP de niveau 3
+  `style-src-elem 'self'` (bloque tout `<style>`/`<link>` injecté — vérifié
+  qu'un `<style>` injecté est bien bloqué, test committé) et `style-src-attr
+  'unsafe-inline'` (autorise les mutations `.style.xxx=`, qui ne dépendent
+  d'aucune donnée utilisateur non échappée). En parallèle, remplacé 6
+  affectations `.style.cssText=`/`setAttribute('style',…)` par des règles
+  CSS + `classList`/propriétés individuelles — **simplification de code,
+  PAS une exigence de la CSP** (vérifié après coup : `style-src-attr
+  'unsafe-inline'` autorise `cssText=` tout autant que des affectations de
+  propriété individuelles ; les commentaires du code corrigés en
+  conséquence pour ne pas laisser une fausse causalité). Nouveaux tests e2e
+  dans `e2e/csp-script-src.spec.ts` : l'animation d'élimination (le code
+  qui a révélé le problème) jouée jusqu'au bout sans violation, et la
+  preuve que `style-src-elem` bloque bien un `<style>` injecté.
+  Revérifié : typecheck, lint, 124/124 tests unitaires, build, 44/44 tests
+  e2e (`--workers=1`), tous verts.
 
 ## 8. Élément G (round 3, post-clôture) — retrait des `onclick` inline
 

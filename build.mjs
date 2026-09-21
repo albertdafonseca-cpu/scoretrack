@@ -21,6 +21,11 @@ const copyHtmlPlugin = {
       // Polices auto-hébergées (index.html référence ./fonts/fonts.css) : sans
       // cette copie, dist/ servi seul (Vercel) renverrait un 404 sur les polices.
       cpSync('fonts', 'dist/fonts', { recursive: true });
+      // Feuille de style (index.html référence ./css/app.css, extraite de
+      // l'ancien <style> inline pour permettre le retrait de 'unsafe-inline'
+      // de style-src, voir audit AAA) : même raison, sans cette copie
+      // dist/ servi seul renverrait un 404 sur tout le CSS de l'app.
+      cpSync('css', 'dist/css', { recursive: true });
     });
   },
 };

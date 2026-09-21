@@ -169,6 +169,19 @@ type RGB = [number, number, number];
   const T_GROW=1800,T_FLASH=1950,T_TEXT=1950,T_FADE=4400,T_TOTAL=5000;
   function maxSize(): number { return Math.min(window.innerWidth,window.innerHeight)*1.60; }
 
+  /** Retire les propriétés CSSOM individuelles muées pendant l'animation
+   *  (fontSize/opacity/filter/transform), pour retomber sur les valeurs de
+   *  la règle CSS #elim-anim-skull (css/app.css) — remplace l'ancien
+   *  `skull.style.cssText=''`. Simplification de code (moins de propriétés
+   *  à réaffecter au repos, cohérente avec la nouvelle règle CSS externe),
+   *  PAS une exigence de la CSP : `style-src-attr 'unsafe-inline'`
+   *  (vercel.json) autorise indifféremment `cssText=`/`setAttribute('style',…)`
+   *  et les affectations de propriété individuelles — vérifié en pratique,
+   *  voir docs/audit/BRIEF.md (fermeture de dette style-src). */
+  function _resetSkullStyle(el: HTMLElement): void {
+    el.style.fontSize=''; el.style.opacity=''; el.style.filter=''; el.style.transform='';
+  }
+
   // Point d'entrée — appelé depuis elimDirect
   playElimAnim = function(playerIdx:number): void {
     clearAll();
@@ -204,7 +217,17 @@ type RGB = [number, number, number];
     overlay.style.clipPath='';
     overlay.style.transition='none';
     overlay.style.display='flex';
-    skull.style.cssText=`position:absolute;z-index:3;line-height:1;transform-origin:center center;font-size:4px;opacity:1;filter:none;transform:rotate(${rotDeg}deg);`;
+    // position/z-index/line-height/transform-origin/font-size de départ/couleur
+    // déjà posés par la règle CSS #elim-anim-skull (css/app.css) : seules les
+    // propriétés réellement dynamiques sont mutées ici, par souci de
+    // simplicité (moins de duplication avec la CSS) — la CSP
+    // (`style-src-attr 'unsafe-inline'`, vercel.json) autorise de toute
+    // façon aussi bien ceci que l'ancienne affectation `cssText=`, vérifié
+    // en pratique (voir docs/audit/BRIEF.md, fermeture de dette style-src).
+    skull.style.fontSize='4px';
+    skull.style.opacity='1';
+    skull.style.filter='none';
+    skull.style.transform=`rotate(${rotDeg}deg)`;
 
     const curve   = buildCurve(1800);
     const startT  = performance.now();
@@ -250,7 +273,7 @@ type RGB = [number, number, number];
           overlay.style.display='none';
           overlay.style.clipPath='';
           overlay.style.transition='';
-          skull.style.cssText='';
+          _resetSkullStyle(skull);
           frags=[];
           resetTexts();
           if(window._afterElimAnim) window._afterElimAnim();
@@ -268,7 +291,7 @@ type RGB = [number, number, number];
     const ov=$opt('elim-anim-overlay');
     if(ov){ ov.style.animation=''; ov.style.display='none'; ov.style.clipPath=''; ov.style.transition=''; }
     const skull=$opt('elim-anim-skull');
-    if(skull) skull.style.cssText='';
+    if(skull) _resetSkullStyle(skull);
     if(window._afterElimAnim) window._afterElimAnim();
   };
 })();
