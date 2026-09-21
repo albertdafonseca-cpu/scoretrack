@@ -607,3 +607,10 @@ copier littéralement).
 Périmètre : `index.html`, `src/game.ts`, `src/recap-pdf.ts`, `src/icons.ts`
 (ou un nouveau fichier `src/ui-icons.ts` si plus propre), nouveaux tests,
 `docs/audit/DECISIONS-H.md`, `docs/audit/H-critique-round*.md`.
+
+**Extension de périmètre pour le round 2** (suite au verdict AAA : non de
+`H-critique-round1.md`) : `src/animations.ts` est ajouté au périmètre
+autorisé, mais UNIQUEMENT pour remplacer `#elim-anim-skull` (☠️, l'émoji le
+plus visible de toute l'app pendant l'animation d'élimination, mécanisme de
+dimensionnement déjà prouvé réutilisable par le même commit) — aucune autre
+modification d'`animations.ts` n'est dans le mandat.
