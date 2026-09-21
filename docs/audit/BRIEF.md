@@ -483,3 +483,23 @@ jamais réutilisée même si une décision est amendée.)
   `npm run typecheck`/`lint`/`test` (87/87)/`build`/`playwright test`
   (12/12) tous revérifiés verts. Voir `docs/audit/DECISIONS-D.md` §10 pour
   le détail complet.
+
+## 8. Élément G (round 3, post-clôture) — retrait des `onclick` inline
+
+Les six éléments A-F ont chacun atteint AAA (§7 ci-dessus). Sur demande
+explicite de l'utilisateur après clôture de l'audit, un septième chantier
+ciblé traite un point de dette documenté comme non bloquant à l'époque
+(P1 #4 du constat initial, note de l'élément F dans `docs/AUDIT-V2.md`) :
+les 65 attributs `onclick="..."` statiques d'`index.html` empêchent de
+retirer `'unsafe-inline'` de `script-src` dans la CSP de `vercel.json`
+(confirmé : aucun `<script>` inline dans `index.html`, seulement
+`<script src="dist/app.js">` — les attributs `onclick` sont la seule
+raison restante). Le `<style>` inline (P1 #4, `style-src 'unsafe-inline'`)
+n'est PAS dans le périmètre de ce chantier, uniquement les `onclick`.
+
+Périmètre exclusif de cette tâche : `index.html`, `src/main.ts`,
+`vercel.json` (CSP uniquement, en toute fin de tâche une fois les onclick
+retirés), `docs/audit/DECISIONS-G.md`, `docs/audit/G-critique-round*.md`.
+Ne touche à aucun autre fichier (`game.ts`, `dice-ui.ts`, `animations.ts`,
+`i18n*`, `sw*.ts`, `recap-pdf.ts`, `dice3d/*`, `build.mjs`, `.gitignore`,
+`README.md`, `package.json`, tests existants sauf ajout de nouveaux tests).
