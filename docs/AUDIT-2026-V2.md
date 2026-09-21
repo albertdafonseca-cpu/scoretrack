@@ -36,7 +36,7 @@ bonnes pratiques Three.js/WebGL (gestion mémoire GPU). C'est une différence
 honnête à signaler par rapport à l'esprit initial de la demande d'audit, et
 elle est documentée ici plutôt que tue.
 
-## Résultat : 7/7 éléments AAA
+## Résultat : 8/8 éléments AAA
 
 | Élément | Périmètre | Rounds | Verdict final |
 |---|---|---|---|
@@ -47,11 +47,34 @@ elle est documentée ici plutôt que tue.
 | E | PWA, dépendances externes, vie privée | 2 | AAA — `E-critique-round2.md` |
 | F | CI/CD, déploiement, documentation | 2 | AAA — `F-critique-round2.md` |
 | G | Retrait des `onclick` inline, CSP `script-src` (round 3, post-clôture) | 1 | AAA — `G-critique-round1.md` |
+| H | Émojis système → icônes SVG (round 4, post-clôture) | 5 + 1 correctif | AAA — `H-critique-round5.md` + correctif D34 |
 
 État vérifié sur le dernier commit de la branche `claude/audit-qualite-aaa-lmthte` :
 `npm run typecheck` (3 configurations), `npm run lint` (0 erreur),
-`npm run test` (87 tests unitaires), `npm run build`, et
-`npx playwright test` (28 tests e2e) — tous verts.
+`npm run test` (122 tests unitaires), `npm run build`, et
+`npx playwright test` (42 tests e2e) — tous verts.
+
+## Élément H (round 4, post-clôture, ajouté sur demande explicite)
+
+Les émojis système utilisés comme icônes fonctionnelles (🏆 victoire, 🏁
+fin de manche, 💀 élimination, 🔒 confidentialité, plus deux occurrences
+non inventoriées au départ dans des animations canvas) ont été remplacés
+par des icônes SVG/vectorielles dessinées à la main, distinguables par la
+forme seule sans dépendre de la couleur (D-PREF-1/D-CLAUDE-2). Ce chantier
+a nécessité 5 rounds constructeur/critique : à chaque round, le critique a
+trouvé un contournement réel et démontré (jamais théorique) du test censé
+garantir la distinction daltonienne — d'abord des métriques géométriques
+globales trop permissives, puis un dessin en contour fin exploitant un
+seuillage relatif à la luminance de chaque image, puis une silhouette
+ronde exploitant l'absence de mesure de la structure interne, puis enfin
+un test de topologie des trous internes lui-même trop permissif (seuil
+relatif au lieu d'absolu) — chacun corrigé et revérifié avant de passer au
+suivant. Un dernier contournement mineur trouvé au round 5 a été corrigé
+directement par l'orchestrateur (seuil resserré, mutation testée) plutôt
+que de rouvrir un round complet. Limite assumée et documentée à chaque
+étape : ce n'est pas une preuve formelle d'impossibilité contre toute
+géométrie adverse future, seulement un effort sérieux et répété. Détail
+complet : `docs/audit/DECISIONS-H.md`, `docs/audit/BRIEF.md` §9.
 
 ## Élément G (round 3, post-clôture, ajouté sur demande explicite)
 
@@ -135,9 +158,6 @@ le geste de fermeture par glissement tactile du lanceur de dés. Détail :
 
 ## Dette restante, documentée et assumée (non bloquante pour AAA)
 
-- Émojis système comme icônes (💀 🏆 🔒) : nécessite un tour coordonné
-  B+D+E (répartis entre plusieurs fichiers), non traité (`BRIEF.md` D21).
-- Licence absente de `package.json` (P2, hors périmètre d'édition assigné).
 - Le `<style>` inline d'`index.html` oblige `style-src` à garder
   `'unsafe-inline'` dans la CSP (`script-src` n'en a plus besoin depuis
   l'élément G) : non traité, changement de structure plus large qu'un
@@ -154,6 +174,14 @@ le geste de fermeture par glissement tactile du lanceur de dés. Détail :
   `typescript-eslint` ne supporte pas TypeScript 7.
 - Validation de la CSP faite en local (serveur HTTP + Playwright), pas
   encore sur un déploiement Vercel réel.
+- `src/i18n/translations.ts` porte encore l'émoji cadenas en dur dans le
+  texte source des 18 langues (neutralisé à l'écran par un
+  `MutationObserver`, élément H) : la source elle-même n'a pas été
+  nettoyée, hors périmètre d'édition de cet élément.
+- `win-anim-trophy-canvas` (`src/animations.ts`) contient un `fillText('🏁',...)`
+  mort (overlay parent toujours masqué sur ce chemin), confirmé sans impact
+  visuel réel par deux critiques indépendants — nettoyage de code
+  recommandé pour un futur tour ayant mandat sur ce fichier.
 
 ## Conclusion
 
@@ -162,8 +190,10 @@ injection HTML, absence totale d'outillage de vérification) sont corrigés
 et couverts par des tests qui échouent réellement si le correctif est
 annulé (vérifié par mutation testing sur chaque élément, deux fois
 indépendamment — une fois par le constructeur, une fois par le critique).
-Les sept éléments (les six de l'audit initial, plus le chantier de retrait
-des `onclick` inline ajouté ensuite sur demande explicite) ont atteint un
-verdict AAA au sens de la méthodologie de cet audit (`BRIEF.md` §6), sans
-aucune régression sur le rendu du moteur de dés ni sur les préférences
-permanentes de l'utilisateur.
+Les huit éléments (les six de l'audit initial, plus les deux chantiers de
+dette ajoutés ensuite sur demande explicite — retrait des `onclick` inline
+et remplacement des émojis système) ont atteint un verdict AAA au sens de
+la méthodologie de cet audit (`BRIEF.md` §6), sans aucune régression sur le
+rendu du moteur de dés ni sur les préférences permanentes de l'utilisateur.
+La licence du projet (propriétaire, tous droits réservés) a également été
+ajoutée sur décision explicite de l'utilisateur.
