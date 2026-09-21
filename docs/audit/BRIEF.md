@@ -683,6 +683,51 @@ jamais réutilisée même si une décision est amendée.)
   consigne explicite). Voir `docs/audit/DECISIONS-H.md` §13-§14 pour le
   détail complet, notamment le tableau des 7 tentatives de contournement.
 
+- **D33** — Élément H, round 5 : réponse à `docs/audit/H-critique-round4.md`
+  (verdict round 4 : AAA non, 3e contournement, marge confortable). Le
+  correctif round 4 est confirmé par le critique, ainsi que le jugement du
+  constructeur sur les 2 cas limites hachurés. Mais un 3e contournement est
+  trouvé : la reproduction indépendante de la « configuration E » que le
+  constructeur avait lui-même décrite au round 3 (`DECISIONS-H.md` §12,
+  corps « gélule » + anse pleine taille + 2 trous/nez façon crâne), mesurée
+  à l'époque (aHash≈60, passant) mais **jamais rendue ni regardée** avant
+  d'être jugée narrativement comme un cadenas plausible — jugement erroné,
+  confirmé par le critique (rendue : sans ambiguïté un visage à deux yeux).
+  Erreur de méthode reconnue et corrigée : désormais toute géométrie décrite
+  comme « pourrait être trompeuse » DOIT être rendue et regardée avant
+  classement, sans exception. Correctif : 4e test dans
+  `e2e/icon-shape-metrics.spec.ts` — la piste suggérée par le coordinateur
+  (rapport coque convexe/aire de la silhouette entière) est essayée en
+  premier et mesurée comme INSUFFISANTE seule (le cadenas réel a le rapport
+  le plus proche de 1 des 4 icônes légitimes ; une géométrie à corps
+  octogonal construite pour ce round passe cette mesure tout en se lisant,
+  une fois rendue, comme un visage). Correctif retenu : topologie des trous
+  internes du corps (composantes de fond enfermées dans l'encre, comptées
+  par propagation depuis les bords du canevas, anse retirée avant mesure) —
+  le cadenas réel n'a qu'UN trou (cercle+triangle fusionnés), toutes les
+  géométries de contournement (config E, config D — également rendue pour
+  la première fois —, l'octogone, une variante elliptique) en ont TROIS
+  (2 yeux + 1 nez, topologie du crâne). Mesure sensible à la résolution de
+  rasterisation (documenté : à 24×24 elle ne fonctionne pas, d'où l'usage
+  de 48×48 pour ce test précis) mais l'inégalité relative
+  `holeCount(lock) < holeCount(skull)` tient à 7 résolutions testées
+  (32 à 96). Mutation testing : la configuration E exacte du critique
+  échoue bien le nouveau test ; l'octogone échoue le nouveau test ET
+  l'average hash existant (double couverture) ; une tentative délibérée de
+  contourner spécifiquement ce nouveau test (« fused », un unique trou
+  englobant yeux et nez) fait passer les 4 tests mais se lit, une fois
+  rendue, comme un cadenas légitime à trou large — pas un contournement.
+  Toutes les mutations restaurées, `diff` byte-à-byte confirmé à chaque
+  fois. Aucun fichier de production touché ce round (correctif entièrement
+  dans le test e2e). `npm run typecheck`/`lint` (inchangé)/`test`
+  (122/122)/`build` tous verts ; `npx playwright test --workers=1` 42/42
+  verts sur 4 exécutions sur 5 (1 échec isolé sans rapport avec ce round,
+  sur `#dice-overlay`, non reproduit ensuite — même limite d'environnement
+  documentée dans `CLAUDE.md`, non retouchée). Conformément à la note du
+  coordinateur, ce round est le dernier tour de durcissement pur demandé
+  pour ce test. Voir `docs/audit/DECISIONS-H.md` §15-§16 pour le détail
+  complet.
+
 ## 8. Élément G (round 3, post-clôture) — retrait des `onclick` inline
 
 Les six éléments A-F ont chacun atteint AAA (§7 ci-dessus). Sur demande

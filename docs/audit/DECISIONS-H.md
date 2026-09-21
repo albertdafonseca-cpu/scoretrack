@@ -1009,18 +1009,272 @@ test.
   aucun fichier de production touché ce round (le correctif est entièrement
   côté test, la contrainte visuelle des 4 icônes elle-même n'a pas changé).
 
-## 14. Dette restante mise à jour (après round 4)
+## 15. Round 5 — réponse à `docs/audit/H-critique-round4.md` (verdict : AAA non, 3e contournement, marge confortable)
+
+Le critique round 4 a confirmé le correctif round 4 (taux d'encre absolu,
+§13.1) et a été d'accord avec les 2 cas limites hachurés documentés en
+§13.2 (pas de vraie violation D-PREF-1). Mais il a trouvé un 3e
+contournement, avec une marge confortable cette fois : la reproduction
+indépendante d'une configuration que **moi-même** j'avais décrite au round
+3 (§12, « configuration E » — corps « gélule » à grand rayon d'arrondi +
+anse à sa taille originale + 2 trous/nez positionnés comme le crâne),
+mesurée à l'époque (aHash≈60, passant) et jugée narrativement comme « se
+lisant aussi comme un vrai cadenas plausible » **sans jamais l'avoir
+rendue ni regardée**. Rendue par le critique : sans ambiguïté une tête
+ronde à deux yeux et un nez, aucun indice de cadenas.
+
+**Erreur de méthode reconnue** : au round 3, j'ai classé une géométrie
+comme acceptable sur la seule foi d'un chiffre, en violation du principe
+que j'appliquais pourtant systématiquement ailleurs (round 4 §13.2 : les 2
+cas limites hachurés AVAIENT été rendus et regardés avant d'être jugés
+acceptables). Le critique a raison : le jugement sur la configuration E
+était optimiste, non appuyé par une preuve visuelle. La règle du
+coordinateur pour ce round — tout ce qui est décrit comme « pourrait être
+trompeur » DOIT être rendu et regardé avant classement, sans exception,
+même pour une configuration déjà mesurée à un round antérieur — est
+adoptée ici de façon permanente pour tous les rounds futurs.
+
+### 15.1 Retour en arrière : rendu réel de la configuration E (jamais faite au round 3)
+
+Rendue ici pour la première fois (SVG isolé à 150px et à la taille réelle
+d'usage 24×24, sur le fond violet réel du thème par défaut) :
+**confirmé** — une tête ronde blanche avec deux grands yeux et un petit
+nez triangulaire, l'anse se confondant visuellement avec le haut de la
+silhouette de la tête plutôt que de se détacher comme une poignée. Aucune
+lecture plausible comme cadenas, à aucune des deux échelles. Le jugement
+du round 3 était erroné ; celui du critique est confirmé.
+
+Également rendue pour la première fois à cette occasion, la
+« configuration D » du même tableau round 3 (§12 : corps circulaire, pas
+gélule, anse pleine taille) — elle aussi, une fois vue, se lit sans
+ambiguïté comme une tête ronde à deux yeux. Elle avait déjà été
+**détectée** par l'average hash à l'époque (40 < 48), donc ce n'était pas
+un défaut de couverture de test, mais la retrouver visuellement confirme
+que le jugement narratif implicite (« détecté donc pas la peine de
+regarder ») était correct dans ce cas précis — contrairement à E, qui
+avait échappé au filet ET au regard.
+
+### 15.2 Cause racine : identifiée par le critique, jamais transformée en garde automatisée
+
+Le facteur commun aux 3 contournements réussis (round 2, round 3, et
+celui-ci) est une silhouette de **corps** globalement ronde/ovale plutôt
+qu'anguleuse/rectangulaire — un facteur que j'avais moi-même repéré à la
+main dès le round 3 (§12 : « le facteur discriminant réel... est la forme
+du corps ») sans jamais le vérifier par un test automatisé. Correctif
+demandé pour ce round : une mesure de convexité/angularité de la
+silhouette.
+
+### 15.3 Première piste essayée, EXACTEMENT celle suggérée — mesurée et jugée insuffisante seule
+
+Rapport aire de la coque convexe (algorithme de Graham/Andrew, « monotone
+chain ») sur l'aire réelle de la silhouette PLEINE (les trous internes —
+orbites, trou de serrure — rebouchés par propagation depuis les bords du
+canevas, pour ne mesurer que les concavités de la silhouette EXTÉRIEURE,
+pas les trous internes qui existent dans toutes les icônes). Mesuré à
+48×48 sur les 4 icônes légitimes (icône entière, anse comprise) :
+
+```
+trophy=1.4241   flag=1.4167   skull=1.0774   lock=1.0518
+```
+
+**Constat inattendu et mesuré honnêtement** : le cadenas RÉEL a le rapport
+le PLUS PROCHE de 1 (la silhouette la plus « convexe ») des 4 icônes —
+plus proche de 1 que le crâne lui-même. Ce n'est pas ce que l'intuition
+« un cadenas anguleux devrait avoir un rapport élevé » laissait présager :
+mesuré, pas supposé. Étendu avec 2 métriques complémentaires (circularité
+`4π·aire/périmètre²` sur la silhouette pleine, et rapport coque convexe /
+boîte englobante) pour former un espace de mesure à 3 dimensions, avec
+distance euclidienne mesurée entre les 4 icônes (minimum légitime :
+`trophy↔flag=0,133`).
+
+**Tentative de contournement construite pour ce round, distincte de toutes
+celles des rounds 2-4** : un corps OCTOGONAL (coins nettement coupés, pas
+arrondis) + anse pleine taille + 2 trous/nez positionnés comme le crâne.
+Distance mesurée à l'espace à 3 dimensions ci-dessus : `octogone↔skull =
+0,135` — supérieure de peu au plancher légitime (0,133), donc **passe**
+cette mesure. Rendue et regardée à la taille réelle (400×400 et 24×24) :
+**sans ambiguïté un visage rond à deux yeux et un nez**, les coupes de
+coin de l'octogone n'étant pas assez marquées pour évoquer un cadenas.
+**Constat honnête : la convexité globale de la silhouette (anse comprise),
+telle que suggérée par le coordinateur, ne sépare pas de façon fiable ce
+contournement — la piste littérale suggérée est insuffisante seule**,
+exactement le même type de leçon que la grille fine du round 2 (§11.1) :
+mesurer avant de conclure, y compris sur la piste suggérée elle-même.
+
+*Précision : ce contournement octogonal, une fois appliqué réellement
+dans `src/ui-icons.ts` et testé contre la suite RÉELLE committée
+(pas seulement contre mon espace de mesure de calibration), s'est révélé
+déjà détecté par le test average hash existant du round 3
+(`skull↔lock=46 < 48`) — voir §15.5. Il ne s'agit donc pas d'un
+contournement réel de la suite committée, seulement d'une limite de mon
+outil de calibration exploratoire ; documenté ici par transparence
+méthodologique.*
+
+### 15.4 Correctif retenu : topologie des trous internes du corps
+
+Cause structurelle plus directe : le cadenas réel n'a qu'**UN SEUL** trou
+interne (le trou de serrure — un cercle et un triangle qui se
+CHEVAUCHENT et fusionnent en un seul contour fermé par construction), alors
+que **toutes** les géométries de contournement mesurées ici (config E,
+config D, l'octogone, une variante elliptique construite pour ce round)
+ont **TROIS** trous internes distincts (2 yeux séparés + 1 nez séparé) —
+exactement la topologie du crâne (2 orbites + 1 nez, également 3 trous
+distincts).
+
+Mesure : composantes connexes de fond enfermées dans l'encre (propagation
+4-connexe depuis les bords du canevas), sur le corps REMPLI seul — les
+éléments en `fill="none"` (l'anse du cadenas, les anses du trophée) sont
+retirés avant rasterisation, car l'anse forme sa propre boucle fermée avec
+le haut du corps (un « trou » sans rapport avec la question posée : yeux
+et nez, ou trou de serrure ?). Mesuré à 48×48 (voir §15.4.1 pour la
+justification de cette résolution, différente des 24×24 des 3 tests
+précédents) :
+
+```
+trophy=0   flag=6   skull=3   lock=1
+configE=3   configD=3   octogone=3   ellipse=3
+```
+
+Séparation nette : les 4 géométries de contournement valent toutes 3,
+identique au crâne, et strictement au-dessus du cadenas réel (1).
+
+#### 15.4.1 Sensibilité à la résolution — mesurée honnêtement
+
+Cette mesure est sensible à la résolution de rasterisation, parce que la
+zone de chevauchement cercle/triangle du vrai trou de serrure ne fait
+qu'environ 0,2 unité de haut sur les 24 de la vue — une fraction de pixel
+à basse résolution. Mesuré à 7 résolutions (32 à 96) :
+
+```
+résolution   32   40   48   56   64   80   96
+lock          1    2    1    2    2    2    1
+skull         3    3    3    3    3    3    3
+```
+
+**`lock` vaut 1 ou 2 selon la résolution (l'anti-aliasing fait basculer la
+fusion cercle/triangle), mais reste TOUJOURS strictement inférieur à
+`skull` (constant à 3 à toutes les résolutions testées)** — d'où une
+comparaison RELATIVE (`holeCount(lock) < holeCount(skull)`) dans le test
+committé, robuste au choix exact de résolution, plutôt qu'un seuil absolu
+fixe sur la valeur de `lock` seule.
+
+**À 24×24 (la taille réelle d'usage, utilisée par les 3 tests
+précédents), cette mesure ne fonctionne PAS** : mesuré, `lock=2` à cette
+résolution, **identique** à toutes les géométries de contournement
+(`configE=2`, etc.) — le fin chevauchement cercle/triangle ne survit pas à
+un rééchantillonnage aussi grossier. D'où le choix de 48×48 pour ce test
+spécifique (plus fine que la taille d'affichage réelle) : ce test mesure
+la topologie du TRACÉ VECTORIEL réel, une propriété géométrique fixe,
+indépendante de l'échelle d'affichage finale — contrairement au taux
+d'encre (round 4) qui doit précisément mesurer l'apparence à la taille
+réelle. Documenté ici pour qu'un futur tour comprenne pourquoi ce test
+utilise une résolution différente des trois autres.
+
+### 15.5 Mutation testing
+
+Trois géométries appliquées réellement dans `src/ui-icons.ts` (sauvegarde
+`cp`, restauration `cp` + `diff` byte-à-byte confirmée après chaque essai,
+rebuild réel à chaque étape) :
+
+1. **Configuration E exacte du critique** (`H-critique-round4.md` §3.3) :
+   le nouveau test échoue (`lock=3`, `Expected: < 3`), les 3 tests
+   précédents restent verts — cohérent avec le rapport du critique
+   (passait les 3 tests d'alors).
+2. **Octogone** (ma tentative round 5, §15.3) : le nouveau test échoue
+   (`lock=3`) **et** le test average hash du round 3 échoue aussi
+   (`skull↔lock=46 < 48`) — cette géométrie était donc déjà couverte par
+   la suite existante avant même ce correctif ; double couverture
+   confirmée.
+3. **« fused »** (tentative round 5 ciblant spécifiquement le nouveau
+   test — un unique trou rectangulaire arrondi englobant les 2 positions
+   d'yeux et le nez, garanti topologiquement UN seul trou) : les 4 tests
+   PASSENT (`holeCount=1`, comme le vrai cadenas). Rendue et regardée :
+   se lit sans ambiguïté comme un cadenas à trou de serrure large et
+   arrondi — **pas un contournement**, une variante stylistique légitime,
+   exactement le comportement attendu (le test ne doit pas rejeter tout
+   corps à 1 seul trou, seulement la topologie « 2 yeux + nez » des
+   contournements réels).
+
+Après chacun des 3 essais : `cp` de restauration, `diff` byte-à-byte
+confirmé identique, `git diff --stat src/ui-icons.ts` vide confirmé,
+rebuild, 4/4 tests d'`icon-shape-metrics.spec.ts` re-verts.
+
+### 15.6 Autres tentatives de contournement (avant de committer)
+
+| Géométrie | holeCount (sans anse, 48×48) | Rendue et regardée | Verdict |
+|---|---|---|---|
+| Ellipse (corps ovale allongé, pas circulaire, + anse pleine taille + yeux/nez façon crâne) | 3 | Oui — tête ovale à deux yeux | **Détecté** (3 = skull) |
+| Balayage rx (corps gélule, rx de 6 à 2,5, le rx ORIGINAL du vrai cadenas) + yeux/nez façon crâne | 3 à chaque rx testé | Oui, rx=6/5/4,5/4/3,5/3/2,5 tous rendus (voir §15.6.1) | **Détecté à TOUS les rx**, y compris rx=2,5 identique à l'arrondi du vrai cadenas — la topologie des trous (pas le rayon du corps) est ce qui compte |
+| Pont fin entre les 2 yeux (0,15 à 1,4 unité d'épaisseur), pour tenter une fusion partielle | 2 à 4 selon l'épaisseur (jamais 1) | Non nécessaire (jamais passé) | **Détecté à toutes les épaisseurs testées** |
+| « fused » (trou unique large englobant yeux+nez) | 1 | Oui (§15.5) | **Non détecté — mais pas un contournement réel** (voir §15.5) |
+| Octogone | 3 | Oui (§15.3) | **Détecté** (et déjà par l'average hash round 3) |
+
+#### 15.6.1 Balayage rx — les corps « gélule » restent des visages à TOUS les rayons testés
+
+Rendu réel (24×24, fond violet) de rx=6, 5, 4,5, 4, 3,5, 3 et 2,5 (ce
+dernier étant l'arrondi EXACT du vrai `ICON_LOCK` en production) : les 7
+rendus se lisent **tous** comme un visage rond à deux yeux et un nez,
+**y compris à rx=2,5** — la seule chose qui change selon rx est le degré
+d'arrondi des coins de la tête, pas la lecture « visage ». Confirme que le
+vrai facteur de confusion est la topologie des trous (2 yeux + nez separés,
+comme le crâne) bien plus que l'arrondi du corps en tant que tel — le
+corps du round 3 §12 (« gélule ») n'était qu'UN chemin parmi d'autres pour
+arriver à cette même topologie de trous.
+
+### 15.7 Vérifications finales round 5
+
+- `npm run typecheck` : 0 erreur (3 projets : app, service worker, tests).
+- `npm run lint` : 0 erreur (560 avertissements `no-var` préexistants,
+  sans rapport, inchangés).
+- `npm run build` : OK.
+- `npm run test` (Vitest) : 122/122.
+- `npx playwright test --workers=1` : 42/42 sur 4 exécutions complètes sur
+  5 ; la 5e exécution a produit un échec **isolé et sans rapport** avec ce
+  round (`accessibility-basics.spec.ts` : piège de focus de
+  `#dice-overlay`), non reproduit à l'exécution suivante — cohérent avec
+  la flakiness d'environnement déjà documentée aux rounds précédents
+  (limite Playwright/contextes WebGL notée dans `CLAUDE.md`), **hors
+  mandat, non retouchée**.
+- `git diff --stat` : seul `e2e/icon-shape-metrics.spec.ts` modifié (+
+  ce fichier et `BRIEF.md` pour la documentation) ; `src/ui-icons.ts`,
+  `src/game.ts`, `src/recap-pdf.ts`, `index.html`, `src/animations.ts`
+  inchangés (restaurés byte-à-byte après chaque essai de mutation, `diff`
+  confirmé à chaque fois).
+
+### 15.8 Limite honnête, inchangée dans son principe depuis le round 2
+
+Cette 4e vérification, comme les 3 précédentes, n'est pas une preuve
+formelle d'impossibilité — elle formalise en test automatisé le facteur
+« corps rond + 2 trous + nez » qui a motivé les 3 contournements réussis
+jusqu'ici, avec une marge réelle mesurée (holeCount du cadenas
+systématiquement ≤ 2 quelle que soit la résolution testée, contre 3 pour
+le crâne et pour toutes les géométries de contournement essayées). Une
+géométrie suffisamment différente (ex. un visage à 1 seul trou composite,
+comme « fused » — mais qui, une fois rendue, ne se lit PAS comme un
+visage) pourrait en théorie continuer d'échapper à la lettre du test tout
+en restant dans son esprit (pas de confusion réelle) ; documenté ici, avec
+la même honnêteté que les rounds précédents. Conformément à la note du
+coordinateur, ce round est le dernier tour de durcissement pur demandé
+pour ce test — le niveau de robustesse atteint (4 tests indépendants,
+chacun motivé par un contournement réel démontré et corrigé avec preuve
+de mutation testing) est considéré comme un effort sérieux et honnête,
+pas une preuve d'exhaustivité.
+
+## 16. Dette restante mise à jour (après round 5)
 
 1. **`src/i18n/translations.ts`** — inchangé depuis le round 1 (§4/§9.2).
 2. **`src/recap-pdf.ts`** — inchangé depuis le round 1/2 (§6/§9.3).
 3. **`win-anim-trophy-canvas` : `fillText('🏁',...)` mort** (ligne ~822,
    confirmé sans impact visuel réel par les critiques round 2 et round 3) :
-   **volontairement non traité**, hors mandat strict des rounds 3/4.
+   **volontairement non traité**, hors mandat strict des rounds 3/4/5.
    Nettoyage de code recommandé pour un futur tour ayant mandat sur
    `animations.ts`.
-4. **La méthode de test elle-même (§11.1/§12/§14)** : l'average hash 16×16
-   combiné à la bande de taux d'encre absolu est une amélioration réelle et
-   mesurée par rapport aux moments globaux seuls puis à l'average hash
-   seul, mais reste, comme documenté en §12 et §13.2, sans garantie
-   formelle d'exhaustivité contre toute géométrie de contournement future —
-   limite assumée et documentée, pas cachée.
+4. **La méthode de test elle-même (§11.1/§12/§13/§15)** : 4 tests
+   indépendants (moments globaux, average hash, taux d'encre absolu,
+   topologie des trous du corps) forment une amélioration réelle et
+   mesurée à chaque round, chacun motivé par un contournement réel
+   démontré, mais reste, comme documenté explicitement en §12, §13.2 et
+   §15.8, sans garantie formelle d'exhaustivité contre toute géométrie de
+   contournement future — limite assumée et documentée, pas cachée.
+   Conformément à la note du coordinateur, le round 5 est le dernier tour
+   de durcissement pur demandé pour ce test précis.

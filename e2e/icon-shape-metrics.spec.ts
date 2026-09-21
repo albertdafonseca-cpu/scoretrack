@@ -258,6 +258,136 @@ const AVERAGE_HASH_MIN_DISTANCE = 48;
 const MIN_ABS_INK_RATIO = 0.15;
 const MAX_ABS_INK_RATIO = 0.45;
 
+// ── Topologie des trous internes du CORPS (round 5, H-critique-round4.md) ──
+// Le critique round 4 a démontré un 3e contournement, avec marge confortable
+// cette fois : une reproduction indépendante de la « configuration E » que
+// LE CONSTRUCTEUR lui-même avait décrite (DECISIONS-H.md §12, round 3) sans
+// jamais la rendre ni la regarder — corps « gélule » (arrondi extrême) + anse
+// à sa taille ORIGINALE + 2 trous ronds + nez positionnés comme le crâne.
+// Rendue réellement : une tête ronde à deux yeux, aucun indice de cadenas.
+// Facteur commun aux 3 contournements réussis depuis le round 2 (identifié
+// par le critique, et déjà repéré à la main par le constructeur en round 3
+// sans jamais en tirer de garde automatisée) : une silhouette de CORPS
+// globalement ronde/ovale plutôt qu'anguleuse.
+//
+// Première piste essayée pour ce round, EXACTEMENT celle suggérée par le
+// coordinateur (rapport aire de la coque convexe / aire réelle de la
+// silhouette totale, icône entière anse comprise) — mesurée et NON retenue
+// seule : sur les 4 icônes légitimes à 48×48, ce rapport donne
+// trophy=1.4241, flag=1.4167, skull=1.0774, **lock=1.0518** — le cadenas
+// RÉEL est la silhouette la PLUS proche de 1 (la plus « convexe ») des
+// 4 icônes, plus proche de 1 que le crâne lui-même. Une géométrie de
+// contournement construite pour ce round (corps OCTOGONAL anguleux, coins
+// coupés, + anse pleine taille + 2 trous/nez façon crâne, jamais tentée
+// aux rounds précédents) mesure une distance à ce même espace de mesure
+// (rapport de coque convexe + circularité + rapport coque/boîte
+// englobante) de seulement 0,135 par rapport au crâne — supérieure de peu
+// au plancher légitime (0,133, la paire trophée/drapeau) — et donc PASSE
+// cette mesure alors que, rendue et regardée à la taille réelle (24×24,
+// capture ci-dessous dans DECISIONS-H.md §15), elle est sans ambiguïté un
+// visage à deux yeux et un nez, pas un cadenas. **Constat honnête : la
+// convexité globale de la silhouette (anse comprise), telle que suggérée,
+// ne sépare pas de façon fiable ce contournement-ci.**
+//
+// Correctif retenu, plus proche de la vraie cause structurelle : le cadenas
+// réel n'a qu'UN SEUL trou interne (le trou de serrure — un cercle et un
+// triangle qui se CHEVAUCHENT et fusionnent en un seul contour fermé) alors
+// que TOUTES les géométries de contournement mesurées ici (la config E du
+// critique, l'octogone ci-dessus, une variante elliptique, et la config D du
+// round 3 jamais rendue non plus) ont TROIS trous internes distincts (2 yeux
+// séparés + 1 nez séparé) — exactement la topologie du crâne
+// (`ICON_SKULL` : 2 orbites + 1 nez, également 3 trous distincts). Compter
+// les composantes connexes de fond enfermées dans l'encre (remplissage par
+// propagation depuis les bords du canevas, 4-connexité) donne, sur le corps
+// REMPLI seul (l'anse retirée avant rasterisation : sinon l'anse, qui forme
+// sa propre boucle fermée avec le haut du corps, ajoute un trou sans rapport
+// avec la question posée) :
+//   trophy=0   flag=6   skull=3   **lock=1**   (mesuré à 48×48)
+// Testé à 8 résolutions différentes (32/40/48/56/64/80/96, voir
+// DECISIONS-H.md §15) : `lock` vaut 1 ou 2 selon la résolution (la fine
+// zone de chevauchement cercle/triangle est sensible à l'anti-aliasing),
+// mais reste TOUJOURS strictement inférieur à `skull` (constant à 3 à
+// toutes les résolutions testées) — d'où une comparaison RELATIVE
+// (`holeCount(lock) < holeCount(skull)`) plutôt qu'un seuil absolu fixe,
+// robuste au choix exact de résolution. Résolution retenue ici : 48×48,
+// plus fine que la taille d'usage réelle (24×24, utilisée par les 3 tests
+// précédents) — mesuré et documenté : à 24×24 le fin chevauchement
+// cercle/triangle du vrai cadenas ne survit PAS à la rasterisation
+// (`lock=2`, identique à TOUTES les géométries de contournement, `2`
+// également) — la résolution de 48×48 est nécessaire ici pour refléter la
+// topologie réelle du tracé vectoriel plutôt qu'un artefact de sous-
+// échantillonnage à la taille d'affichage.
+const HOLE_SIZE = 48;
+
+/** Retire les éléments en CONTOUR SEUL (`fill="none"`, l'anse du cadenas,
+ *  les anses du trophée) avant rasterisation, pour isoler la topologie de
+ *  trous du CORPS REMPLI seul (voir commentaire ci-dessus). */
+function stripStrokeOnly(svg: string): string {
+  return svg.replace(/<path[^>]*\bfill="none"[^>]*\/>/g, '');
+}
+
+/** Compte les composantes connexes de fond (alpha ≤ seuil) qui ne sont PAS
+ *  atteintes par une propagation 4-connexe depuis les bords du canevas —
+ *  donc des trous réellement ENFERMÉS dans l'encre, pas le fond extérieur.
+ *  Un filtre d'aire (≥ 2 px) ignore le bruit d'anti-aliasing résiduel. */
+async function measureHoleCount(page: Page, svg: string): Promise<number> {
+  return page.evaluate(async ({ svg, size }) => {
+    const img = new Image();
+    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+    await new Promise<void>((resolve, reject) => { img.onload = () => resolve(); img.onerror = reject; });
+    const canvas = document.createElement('canvas');
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d')!;
+    ctx.clearRect(0, 0, size, size);
+    ctx.drawImage(img, 0, 0, size, size);
+    const { data } = ctx.getImageData(0, 0, size, size);
+    const ALPHA_THRESHOLD = 40;
+    const ink = new Uint8Array(size * size);
+    for (let i = 0; i < size * size; i++) ink[i] = data[i * 4 + 3] > ALPHA_THRESHOLD ? 1 : 0;
+
+    // Propagation depuis les bords sur le fond : marque tout ce qui est
+    // atteignable de l'EXTÉRIEUR de la silhouette.
+    const outside = new Uint8Array(size * size);
+    const stack: number[] = [];
+    for (let x = 0; x < size; x++) { stack.push(x); stack.push((size - 1) * size + x); }
+    for (let y = 0; y < size; y++) { stack.push(y * size); stack.push(y * size + size - 1); }
+    while (stack.length) {
+      const idx = stack.pop()!;
+      if (idx < 0 || idx >= size * size || ink[idx] || outside[idx]) continue;
+      outside[idx] = 1;
+      const x = idx % size;
+      if (x > 0) stack.push(idx - 1);
+      if (x < size - 1) stack.push(idx + 1);
+      if (idx - size >= 0) stack.push(idx - size);
+      if (idx + size < size * size) stack.push(idx + size);
+    }
+
+    // Composantes connexes du fond RESTANT (ni encre, ni atteint depuis
+    // l'extérieur) : ce sont les trous enfermés.
+    const visited = new Uint8Array(size * size);
+    let holeCount = 0;
+    for (let i = 0; i < size * size; i++) {
+      if (ink[i] || outside[i] || visited[i]) continue;
+      let area = 0;
+      const st = [i];
+      visited[i] = 1;
+      while (st.length) {
+        const idx = st.pop()!;
+        area++;
+        const x = idx % size;
+        const neigh = [idx - 1, idx + 1, idx - size, idx + size];
+        for (const n of neigh) {
+          if (n < 0 || n >= size * size) continue;
+          if (Math.abs((n % size) - x) > 1) continue; // pas de faux voisin par rebouclage de ligne
+          if (!ink[n] && !outside[n] && !visited[n]) { visited[n] = 1; st.push(n); }
+        }
+      }
+      if (area >= 2) holeCount++;
+    }
+    return holeCount;
+  }, { svg: prepareSvgForRaster(svg), size: HOLE_SIZE });
+}
+
 test.describe('Icônes SVG — distinction géométrique réelle mesurée sur les pixels (élément H, round 2 §P1-2, round 3 renforcement, round 4 anti-contour-fin)', () => {
   test('les 4 icônes ont des métriques globales de forme séparées par une marge réelle (round 2)', async ({ page }) => {
     const server = await startStaticServer();
@@ -322,6 +452,25 @@ test.describe('Icônes SVG — distinction géométrique réelle mesurée sur le
         expect(inkRatio, `taux d'encre de ${name} hors bande [${MIN_ABS_INK_RATIO}, ${MAX_ABS_INK_RATIO}] — tous mesurés :\n${ratios.join('\n')}`)
           .toBeLessThanOrEqual(MAX_ABS_INK_RATIO);
       }
+    } finally {
+      await server.close();
+    }
+  });
+
+  test('le corps du cadenas garde une topologie de trous distincte de celle du crâne (round 5, anti-corps-rond)', async ({ page }) => {
+    const server = await startStaticServer();
+    try {
+      await page.goto(server.url);
+      const icons = { trophy: ICON_TROPHY, flag: ICON_FLAG, skull: ICON_SKULL, lock: ICON_LOCK };
+      const holeCounts: Record<string, number> = {};
+      for (const [name, svg] of Object.entries(icons)) holeCounts[name] = await measureHoleCount(page, stripStrokeOnly(svg));
+
+      const report = Object.entries(holeCounts).map(([name, n]) => `${name} = ${n}`).join('\n');
+      // Comparaison RELATIVE (pas un seuil absolu fixe) : mesurée stable sur
+      // 7 résolutions différentes (32 à 96, voir DECISIONS-H.md §15), alors
+      // que la valeur absolue de `lock` seule (1 ou 2) ne l'est pas.
+      expect(holeCounts.lock, `le corps du cadenas (anse retirée) a ${holeCounts.lock} trou(s), pas strictement moins que le crâne — topologie de trous mesurée pour les 4 icônes :\n${report}`)
+        .toBeLessThan(holeCounts.skull);
     } finally {
       await server.close();
     }
