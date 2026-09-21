@@ -333,7 +333,7 @@ export function renderPresets(){
     const c=document.createElement('div');
     c.className='preset-card'+(idx===selectedPresetIdx?' on':'');
     c.innerHTML=`<div class="preset-card-name">${t(p.nameKey)}</div><div class="preset-card-detail">${t(p.detailKey)}</div>`;
-    c.onclick=()=>applyPreset(idx);
+    c.addEventListener('click',()=>applyPreset(idx));
     g.appendChild(c);
   });
 }
@@ -346,13 +346,13 @@ export function renderThemeGrid(){
     card.className='theme-card'+(selectedTheme===th.id?' selected':'');
     card.style.background=th.bg;
     card.innerHTML=`<div class="theme-check">✓</div><div class="theme-card-name" style="color:${th.a}">${t(th.nameKey)}</div><div class="theme-swatches"><div class="theme-swatch" style="background:${th.a};box-shadow:0 0 6px ${th.a}"></div><div class="theme-swatch" style="background:${th.b};box-shadow:0 0 6px ${th.b}"></div><div class="theme-swatch" style="background:${th.bg};border:1px solid ${th.a}44"></div></div>`;
-    card.onclick=()=>{
+    card.addEventListener('click',()=>{
       $$<HTMLElement>('.theme-card').forEach(c=>c.classList.remove('selected'));
       card.classList.add('selected');selectedTheme=th.id;applyTheme(th.id);
       applyScreenMaterial(th.id);
       settings.theme=th.id;
       try{localStorage.setItem('scoretrack_settings',JSON.stringify(settings));}catch(e){}
-    };
+    });
     g.appendChild(card);
   });
   applyScreenMaterial(selectedTheme);
@@ -554,7 +554,7 @@ export function renderProfileChips(){
     const del=document.createElement('span');del.className='profile-chip-del';del.textContent='✕';
     del.addEventListener('click',e=>{e.stopPropagation();deleteProfile(name);});
     chip.appendChild(label);chip.appendChild(del);
-    chip.onclick=()=>fillName(name);
+    chip.addEventListener('click',()=>fillName(name));
     list.appendChild(chip);
   });
 }
@@ -1839,9 +1839,14 @@ export function showRecap(){
   });
   if(!html)html=`<div style="color:var(--muted2);text-align:center;margin-top:48px;font-family:Share Tech Mono,monospace;font-size:14px;">${t('recapEmpty')}</div>`;
   $('recap-body').innerHTML=html;
-  $('recap-close-btn').onclick=()=>$('recap').classList.add('hidden');
   $('recap').classList.remove('hidden');
 }
+/** Ferme le récapitulatif (bouton `recap-close-btn`, câblé une fois au
+ *  chargement par `src/main.ts` — la précédente affectation `.onclick=`
+ *  était refaite à chaque `showRecap()`, un pattern qu'un `addEventListener`
+ *  câblé une seule fois évite ; voir élément G, docs/audit/DECISIONS-G.md,
+ *  même principe déjà appliqué aux 65 attributs `onclick` statiques). */
+export function closeRecap(){ $('recap').classList.add('hidden'); }
 
 
 // ── NOUVELLE PARTIE — mêmes noms et réglages, direct au compteur ──
@@ -2023,15 +2028,15 @@ export function confirmReset(){
   const g=$('players-grid');
   for(let i=1;i<=12;i++){
     const d=document.createElement('div');d.className='player-chip';d.textContent=String(i);
-    d.onclick=()=>{
+    d.addEventListener('click',()=>{
       $$<HTMLElement>('#players-grid .player-chip').forEach(c=>c.classList.remove('on'));
       d.classList.add('on');numPlayers=i;checkGoBtn();
       selectedPresetIdx=-1;
       $$<HTMLElement>('.preset-card').forEach(c=>c.classList.remove('on'));
-    };
+    });
     g.appendChild(d);
   }
-  $$<HTMLElement>('#start-presets .points-chip').forEach(c=>{c.onclick=()=>{$$<HTMLElement>('#start-presets .points-chip').forEach(x=>x.classList.remove('on'));c.classList.add('on');startPoints=parseInt(c.dataset.val!);$<HTMLInputElement>('points-custom').value='';checkGoBtn();selectedPresetIdx=-1;$$<HTMLElement>('.preset-card').forEach(x=>x.classList.remove('on'));};});
+  $$<HTMLElement>('#start-presets .points-chip').forEach(c=>{c.addEventListener('click',()=>{$$<HTMLElement>('#start-presets .points-chip').forEach(x=>x.classList.remove('on'));c.classList.add('on');startPoints=parseInt(c.dataset.val!);$<HTMLInputElement>('points-custom').value='';checkGoBtn();selectedPresetIdx=-1;$$<HTMLElement>('.preset-card').forEach(x=>x.classList.remove('on'));});});
   $<HTMLInputElement>('points-custom').addEventListener('input',function(){$$<HTMLElement>('#start-presets .points-chip').forEach(x=>x.classList.remove('on'));selectedPresetIdx=-1;$$<HTMLElement>('.preset-card').forEach(c=>c.classList.remove('on'));const v=parseInt(this.value);startPoints=isNaN(v)?-1:v;checkGoBtn();});
   const kp=$('modal-keypad');
   [7,8,9,4,5,6,1,2,3,'⌫',0,'00'].forEach(k=>{

@@ -345,9 +345,17 @@ test.describe('Câblage des anciens onclick — écran de jeu', () => {
       const idsAfter = await page.locator('.pcard').evaluateAll(els => els.map(el => el.id));
       expect(idsAfter).not.toEqual(idsBefore);
 
-      await page.locator('#bar-recap-btn').click();
-      await expect(page.locator('#recap')).not.toHaveClass(/\bhidden\b/);
-      await page.locator('#recap').evaluate(el => el.classList.add('hidden')); // nettoyage (recap-close-btn hors périmètre)
+      // recap-close-btn : câblé une fois par main.ts (plus une réaffectation
+      // `.onclick=` refaite à chaque showRecap(), voir game.ts::closeRecap) —
+      // ouvre/ferme deux fois pour prouver l'absence de double-déclenchement
+      // qu'un `addEventListener` mal câblé (empilé à chaque appel) aurait pu
+      // introduire par rapport à l'ancienne affectation `.onclick=`.
+      for (let i = 0; i < 2; i++) {
+        await page.locator('#bar-recap-btn').click();
+        await expect(page.locator('#recap')).not.toHaveClass(/\bhidden\b/);
+        await page.locator('#recap-close-btn').click();
+        await expect(page.locator('#recap')).toHaveClass(/\bhidden\b/);
+      }
 
       await page.locator('#bar-theme-btn').click();
       await expect(page.locator('#settings-page')).toHaveClass(/\bactive\b/);

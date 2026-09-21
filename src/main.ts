@@ -132,6 +132,7 @@ function wireHandlers(): void {
     ['bar-rotate-btn', () => game.rotatePlayers()],
     ['bar-recap-btn', () => game.showRecap()],
     ['bar-theme-btn', () => game.showThemeFromGame()],
+    ['recap-close-btn', () => game.closeRecap()],
     ['dice-fab', () => diceUi.openDice()],
     ['dice-config-toggle', () => diceUi.diceToggleConfig()],
     ['dice-roll-btn', () => diceUi.rollDice()],

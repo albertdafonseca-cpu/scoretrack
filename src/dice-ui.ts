@@ -154,7 +154,7 @@ export function diceRenderConfig(): void {
     var b=document.createElement('button');
     b.className='dice-quick'+(diceConfig.faces===f?' on':'');
     b.textContent='d'+f;
-    b.onclick=function(){ if(_diceRolling) _diceCancelRoll(); diceConfig.faces=f; diceSaveCfg(); _diceRolled=false; diceRenderConfig(); };
+    b.addEventListener('click',function(){ if(_diceRolling) _diceCancelRoll(); diceConfig.faces=f; diceSaveCfg(); _diceRolled=false; diceRenderConfig(); });
     q.appendChild(b);
   });
   // désactiver les steps de nombre pour le d100 (paire de d10 fixe)
@@ -577,7 +577,7 @@ export function dicePickPlayer(mode: string): void {
     var nm=document.createElement('span'); nm.textContent=p.playerName||('#'+(i+1));
     var sc=document.createElement('span'); sc.className='sc'; sc.textContent=String(p.score);
     b.appendChild(num); b.appendChild(nm); b.appendChild(sc);
-    b.onclick=function(){ diceApplyToPlayer(i, mode); };
+    b.addEventListener('click',function(){ diceApplyToPlayer(i, mode); });
     listEl.appendChild(b);
   });
   $('dice-post').style.display='none';
