@@ -645,6 +645,43 @@ jamais réutilisée même si une décision est amendée.)
   rapport avec ce round — même contention d'infrastructure que documentée
   au round 2, levée par la mesure en série). Voir
   `docs/audit/DECISIONS-H.md` §11-§13 pour le détail complet.
+- **D32** — Élément H, round 4 : réponse à `docs/audit/H-critique-round3.md`
+  (verdict round 3 : AAA non, un seul défaut). Fragments canvas, animation
+  finisher, absence de nouvel émoji manqué et flakiness Playwright tous
+  confirmés non bloquants par le critique (flakiness explicitement jugée
+  limite d'environnement documentée dans `CLAUDE.md`, à ne pas retoucher —
+  consigne suivie). Seul défaut : l'average hash du round 3 restait
+  contournable par une famille différente — un cadenas en CONTOUR fin
+  (`stroke`, sans remplissage), qui exploite le seuillage par luminance
+  MOYENNE DE L'IMAGE ELLE-MÊME (pas un seuil fixe) : un dessin à faible
+  taux d'encre s'en tire différemment d'un dessin plein, indépendamment de
+  sa silhouette réelle (mesuré : `skull↔lock=52 >= 48`). Correctif :
+  troisième test dans `e2e/icon-shape-metrics.spec.ts`, un taux d'encre
+  ABSOLU (seuil d'alpha fixe, déjà calculé par le test du round 2 mais
+  jamais vérifié par lui-même) dans une bande calibrée sur les 4 icônes
+  légitimes (mesurées : trophée 0,34, drapeau 0,19, crâne 0,32, cadenas
+  0,32 — bande retenue [0,15 ; 0,45]) ; les trois tests du fichier
+  réalisent un ET logique (le fichier n'est vert que si tous le sont).
+  Mutation testing : la géométrie exacte du critique appliquée réellement
+  détecte l'échec sur ce nouveau test uniquement (les deux précédents
+  restent verts, cohérent avec la mesure du critique). Tentative
+  personnelle de contournement de la version combinée avant de committer :
+  7 géométries supplémentaires mesurées (motif de points, contour épais +
+  remplissage partiel, damier rond, anneaux concentriques, corps
+  rectangulaire hatché à 2 densités, corps rond hatché à 2 densités) —
+  2 géométries passent numériquement les deux gardes mais, rendues et
+  regardées réellement, se lisent comme un cadenas à motif damier ou un
+  motif pixelisé abstrait, ni l'un ni l'autre confondable avec le crâne :
+  aucune régression réelle de D-PREF-1 trouvée. Limite honnête documentée :
+  toujours pas une preuve formelle d'impossibilité. Aucun fichier de
+  production touché ce round (correctif entièrement dans le test e2e).
+  `npm run typecheck`/`lint` (inchangé)/`test` (122/122, inchangé)/`build`
+  tous verts ; `npx playwright test --workers=1` 41/41 verts sur 3
+  exécutions consécutives (après un échec isolé non reproductible sur un
+  test préexistant sans rapport, même limite d'environnement documentée
+  dans `CLAUDE.md` que jugée par le critique round 3, non retouchée sur
+  consigne explicite). Voir `docs/audit/DECISIONS-H.md` §13-§14 pour le
+  détail complet, notamment le tableau des 7 tentatives de contournement.
 
 ## 8. Élément G (round 3, post-clôture) — retrait des `onclick` inline
 

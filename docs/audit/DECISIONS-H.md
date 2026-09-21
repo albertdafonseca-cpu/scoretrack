@@ -878,17 +878,149 @@ dangereuse (le corps rond). Documenté ici, y compris l'échec partiel de la
 première approche (grille fine), pour qu'un futur tour n'ait pas à
 redécouvrir ce chemin.
 
-## 13. Dette restante mise à jour (après round 3)
+## 13. Round 4 — réponse à `docs/audit/H-critique-round3.md` (verdict : AAA non, 1 seul défaut)
+
+Le critique round 3 a confirmé les fragments canvas, l'animation finisher,
+l'absence de nouvel émoji manqué et la flakiness Playwright comme non
+bloquants (le dernier point explicitement « à ne pas retoucher », consigne
+suivie ici). Un seul défaut restait : un contournement de
+`e2e/icon-shape-metrics.spec.ts` d'une famille différente de celle du round
+3 — un cadenas dessiné en **contour fin** (`stroke`, sans remplissage :
+cercle-tête, 2 petits cercles-yeux, un nez, une anse), qui exploite le fait
+que l'average hash seuille par rapport à la **luminance moyenne de l'image
+elle-même**, pas un seuil fixe — un dessin à faible taux d'encre se comporte
+différemment d'un dessin plein indépendamment de sa silhouette réelle.
+Mesuré par le critique et reproduit ici : `skull↔lock = 52` (>= 48).
+
+### 13.1 Correctif : taux d'encre ABSOLU, en ET logique avec l'average hash
+
+Nouveau troisième test dans `e2e/icon-shape-metrics.spec.ts` : le champ
+`inkRatio` déjà calculé par `measureIcon` (round 2, seuil d'alpha FIXE à 40
+sur 255, indépendant de la luminance moyenne propre à chaque image — donc
+déjà « absolu » au sens où le critique l'entend, simplement jamais vérifié
+par lui-même jusqu'ici) doit rester dans une bande calibrée sur les 4
+icônes légitimes actuelles, mesurée réellement à la taille d'usage
+(24×24) :
+
+```
+trophy = 0.3403   flag = 0.1944   skull = 0.3229   lock = 0.3247
+```
+
+Bande retenue : **[0,15 ; 0,45]** — marge de 0,044 (23 %) sous le minimum
+légitime (le drapeau, à cause de son damier à moitié transparent) et marge
+large au-dessus du maximum légitime (le trophée, plein). Les trois tests du
+fichier (métriques globales round 2, average hash round 3, bande de taux
+d'encre round 4) sont des `test()` Playwright séparés dans le même
+fichier : le fichier n'est vert que si les trois le sont, ce qui réalise le
+ET logique demandé sans mécanisme supplémentaire.
+
+**Mutation testing** : la géométrie exacte du critique (cadenas en contour
+fin, §1.2/1.3 de `H-critique-round3.md`) appliquée réellement dans
+`src/ui-icons.ts`, build réel, suite rejouée : le nouveau test de bande
+échoue bien (`lock inkRatio = 0.1215`, sous la borne basse 0,15), tandis
+que les deux tests précédents (métriques globales ET average hash)
+restent verts — cohérent avec la mesure du critique
+(`skull↔lock=52 >= 48`, l'average hash seul ne suffisait pas, exactement
+pourquoi ce troisième test existe). Restauré, `git diff --stat
+src/ui-icons.ts` vide confirmé, 122/122 et tous les e2e re-verts.
+
+### 13.2 Ma propre tentative de contournement de la version combinée (avant de committer)
+
+Conformément à la consigne (« essaie TOI-MÊME... au moins 2-3 géométries
+différentes des 3 déjà tentées par le critique »), 7 géométries
+supplémentaires construites et mesurées avec la méthode exacte des deux
+tests combinés (average hash 16×16 + taux d'encre absolu 24×24), toutes
+contre `ICON_SKULL` réel :
+
+| Géométrie | vs crâne (aHash) | Taux d'encre | Dans la bande ? | Passe les DEUX gardes ? |
+|---|---|---|---|---|
+| 1 — motif de points (tête ronde en pointillés + amas d'yeux denses) | 32 | 0,1632 | oui | **Non** (aHash < 48) |
+| 2 — contour épais + petit remplissage partiel (yeux/nez pleins) | 38 | 0,2257 | oui | **Non** (aHash < 48) |
+| 3 — damier rond façon drapeau, silhouette de tête | 36 | 0,2066 | oui | **Non** (aHash < 48) |
+| 4 — corps RECTANGULAIRE hatché/damier (grille 7×6) + anse pleine taille | 44 | 0,2656 | oui | **Non** (aHash < 48, de justesse) |
+| 5 — anneaux concentriques dans un disque + anse | 30 | 0,2587 | oui | **Non** (aHash < 48) |
+| 4b — même corps rectangulaire hatché, grille 6×5 | **53** | 0,2726 | oui | **Oui — passe les deux gardes** |
+| 4c — même corps rectangulaire hatché, grille 4×3 | **53** | 0,2396 | oui | **Oui — passe les deux gardes** |
+| 6 — corps ROND hatché (grille 4×4 puis 3×3, dans une ellipse) + anse | 48 (pile au seuil) | 0,1649 / 0,2465 | oui | **Oui — passe les deux gardes (à la limite)** |
+
+**Analyse honnête des deux cas qui passent** : contrairement aux
+contournements des rounds 2 et 3 (démontrés avec une capture réelle
+montrant une confusion effective avec le crâne), les géométries 4b/4c/6 qui
+passent numériquement les deux gardes ont été **rendues et regardées
+réellement** (captures produites, pas seulement mesurées) :
+- **4b/4c (corps rectangulaire hatché)** : se lit sans ambiguïté comme un
+  **cadenas à motif damier** — corps rectangulaire reconnaissable, anse
+  ouverte en haut, aucune ressemblance avec un visage ou un crâne. Pas un
+  contournement de la contrainte D-PREF-1 : c'est une variante stylistique
+  du cadenas, pas une confusion avec une autre icône.
+- **6 (corps rond hatché, sans détail d'yeux distinct)** : se lit comme un
+  **motif pixelisé abstrait** (une texture en croix/damier), sans trait de
+  visage identifiable (pas d'yeux ni de nez distincts, juste une texture
+  uniforme) — ni confondable avec le crâne (qui a deux orbites nettes et un
+  nez), ni avec quoi que ce soit d'autre de reconnaissable. Encore une fois
+  pas une violation de D-PREF-1 : aucun observateur ne le lirait comme
+  « une tête de mort ».
+
+**Conclusion de cette recherche** : sur les 10 géométries testées dans ce
+round (les 5 premières + les 2 raffinements du corps rectangulaire hatché
++ les 2 du corps rond hatché, en comptant les paliers du balayage), **la
+totalité des géométries qui restent visuellement confusables avec le
+crâne** (silhouette ronde + deux points/orbites + nez, la famille qui a
+motivé ce correctif) **sont détectées** par la version combinée ; les
+seules qui échappent aux deux gardes cessent, en pratique, d'être des
+tentatives de confusion — elles devraient plutôt être lues comme des
+cadenas ou des motifs abstraits différents, pas comme des crânes. Documenté
+intégralement ici, y compris les cas où la recherche a « réussi »
+numériquement mais pas visuellement, pour la même raison de transparence
+que `DECISIONS-H.md` §12.
+
+**Limite honnête, inchangée depuis le round 3** : ceci reste une mesure
+perceptuelle grossière, pas une preuve géométrique formelle. Le seuil
+average hash de 48 est franchi de justesse par la géométrie 6 (exactement
+48, à la limite), ce qui laisse penser qu'une recherche plus poussée
+pourrait affiner encore une géométrie proche de cette limite — mais comme
+elle ne serait, sur la base de cette recherche, pas plus confondante
+visuellement avec le crâne (au contraire, moins : la texture pixelisée
+uniforme est déjà moins lisible comme un visage que les tentatives rondes
+1/2/3/5, qui elle sont pourtant toutes détectées), ceci n'est pas traité
+comme un défaut actionnable dans ce round. Cohérent avec la note du
+coordinateur : ce tour est le dernier de durcissement pur attendu pour ce
+test.
+
+### 13.3 Vérifications finales round 4
+
+- `npm run typecheck` : vert (3 programmes).
+- `npm run lint` : 0 erreur, 560 avertissements (inchangé, aucun code de
+  production modifié hors `e2e/icon-shape-metrics.spec.ts`, un fichier de
+  test).
+- `npm run test` (Vitest) : 122/122 verts (inchangé — ce round ne touche
+  aucun fichier sous `tests/`, uniquement un test e2e).
+- `npm run build` : vert, poids inchangé.
+- `npx playwright test --workers=1` (41 = 40 du round 3 + 1 nouveau test de
+  bande de taux d'encre) : une première exécution a montré un échec isolé
+  et non reproductible sur `e2e/onclick-wiring.spec.ts` (test préexistant,
+  sans rapport avec ce round — repasse au vert immédiatement rejoué seul) ;
+  **41/41 verts sur les 3 exécutions consécutives suivantes**. Cohérent
+  avec le jugement du critique round 3 (§10.5/§5 de `H-critique-round3.md`) :
+  une limite d'environnement documentée dans `CLAUDE.md`, pas une
+  régression — non retouchée, conformément à la consigne explicite du
+  coordinateur pour ce round.
+- `git status --short` : seul `e2e/icon-shape-metrics.spec.ts` modifié —
+  aucun fichier de production touché ce round (le correctif est entièrement
+  côté test, la contrainte visuelle des 4 icônes elle-même n'a pas changé).
+
+## 14. Dette restante mise à jour (après round 4)
 
 1. **`src/i18n/translations.ts`** — inchangé depuis le round 1 (§4/§9.2).
 2. **`src/recap-pdf.ts`** — inchangé depuis le round 1/2 (§6/§9.3).
 3. **`win-anim-trophy-canvas` : `fillText('🏁',...)` mort** (ligne ~822,
-   confirmé sans impact visuel réel par le critique round 2 §8 — l'overlay
-   parent reste `display:none` pour tout appel où ce code s'exécute) :
-   **volontairement non traité**, hors mandat strict du round 3 (les deux
-   seules zones autorisées sont §11.2/§11.3). Nettoyage de code recommandé
-   pour un futur tour ayant mandat sur `animations.ts`.
-4. **La méthode de test elle-même (§11.1/§12)** : l'average hash 16×16 est
-   une amélioration réelle et mesurée par rapport à la grille fine et aux
-   métriques globales, mais reste, comme documenté en §12, sans garantie
-   formelle d'exhaustivité contre toute géométrie de contournement future.
+   confirmé sans impact visuel réel par les critiques round 2 et round 3) :
+   **volontairement non traité**, hors mandat strict des rounds 3/4.
+   Nettoyage de code recommandé pour un futur tour ayant mandat sur
+   `animations.ts`.
+4. **La méthode de test elle-même (§11.1/§12/§14)** : l'average hash 16×16
+   combiné à la bande de taux d'encre absolu est une amélioration réelle et
+   mesurée par rapport aux moments globaux seuls puis à l'average hash
+   seul, mais reste, comme documenté en §12 et §13.2, sans garantie
+   formelle d'exhaustivité contre toute géométrie de contournement future —
+   limite assumée et documentée, pas cachée.

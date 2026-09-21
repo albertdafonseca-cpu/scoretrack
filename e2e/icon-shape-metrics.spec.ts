@@ -226,7 +226,39 @@ function hammingDistance(a: boolean[], b: boolean[]): number {
 // cadenas », ce qui est exactement la distinction sémantique recherchée.
 const AVERAGE_HASH_MIN_DISTANCE = 48;
 
-test.describe('Icônes SVG — distinction géométrique réelle mesurée sur les pixels (élément H, round 2 §P1-2, round 3 renforcement)', () => {
+// ── Taux d'encre ABSOLU (round 4, H-critique-round3.md) ─────────────────
+// L'average hash ci-dessus seuille chaque image par rapport à SA PROPRE
+// luminance moyenne — un dessin à faible taux d'encre (contour fin, sans
+// remplissage) a une moyenne très différente d'un dessin plein, ce qui
+// déplace le comportement du seuillage indépendamment de la silhouette
+// réelle. Démontré par le critique : un cadenas dessiné entièrement en
+// `stroke` (cercle-tête + 2 petits cercles-yeux + nez + anse, sans aucun
+// `fill`) mesure `skull↔lock = 52` (>= 48, donc PASSE l'average hash) tout
+// en se lisant, à l'écran réel, comme un petit visage rond plutôt qu'un
+// cadenas.
+//
+// Contre-mesure : un taux d'encre ABSOLU (fraction de pixels dont le canal
+// alpha dépasse un seuil FIXE, indépendant de la luminance propre de
+// l'image — c'est exactement le champ `inkRatio` déjà calculé par
+// `measureIcon` ci-dessus pour les 8 métriques globales du round 2, jamais
+// jusqu'ici vérifié par lui-même contre une bande absolue) doit rester dans
+// une bande calibrée sur les 4 icônes légitimes actuelles, à la taille
+// réelle d'usage (24×24) :
+//   trophy=0.3403  flag=0.1944  skull=0.3229  lock=0.3247
+// (le drapeau, avec son damier à moitié transparent, a le taux le plus
+// bas ; le trophée, plein, le plus haut). Bande retenue : [0.15, 0.45] —
+// marge d'environ 0,044 (23 %) sous le minimum légitime (0,194) et marge
+// large au-dessus du maximum légitime (0,340), pour ne pas braquer sur les
+// 4 valeurs actuelles tout en excluant nettement un dessin en contour fin :
+// le cadenas-contour du critique mesure 0,1215, sous la borne basse. Les
+// DEUX vérifications (average hash ET bande de taux d'encre) doivent
+// passer — un test Playwright séparé par condition, toutes deux dans le
+// même fichier, réalisent cette exigence en ET logique (le fichier n'est
+// vert que si tous ses tests le sont).
+const MIN_ABS_INK_RATIO = 0.15;
+const MAX_ABS_INK_RATIO = 0.45;
+
+test.describe('Icônes SVG — distinction géométrique réelle mesurée sur les pixels (élément H, round 2 §P1-2, round 3 renforcement, round 4 anti-contour-fin)', () => {
   test('les 4 icônes ont des métriques globales de forme séparées par une marge réelle (round 2)', async ({ page }) => {
     const server = await startStaticServer();
     try {
@@ -271,6 +303,25 @@ test.describe('Icônes SVG — distinction géométrique réelle mesurée sur le
       }
       expect(minPairDistance, `distances de Hamming (aHash ${HASH_SIZE}×${HASH_SIZE}) mesurées :\n${pairDistances.join('\n')}`)
         .toBeGreaterThanOrEqual(AVERAGE_HASH_MIN_DISTANCE);
+    } finally {
+      await server.close();
+    }
+  });
+
+  test('les 4 icônes ont un taux d\'encre absolu dans la bande calibrée (round 4, anti-contour-fin)', async ({ page }) => {
+    const server = await startStaticServer();
+    try {
+      await page.goto(server.url);
+      const icons = { trophy: ICON_TROPHY, flag: ICON_FLAG, skull: ICON_SKULL, lock: ICON_LOCK };
+      const ratios: string[] = [];
+      for (const [name, svg] of Object.entries(icons)) {
+        const { inkRatio } = await measureIcon(page, svg);
+        ratios.push(`${name} = ${inkRatio.toFixed(4)}`);
+        expect(inkRatio, `taux d'encre de ${name} hors bande [${MIN_ABS_INK_RATIO}, ${MAX_ABS_INK_RATIO}] — tous mesurés :\n${ratios.join('\n')}`)
+          .toBeGreaterThanOrEqual(MIN_ABS_INK_RATIO);
+        expect(inkRatio, `taux d'encre de ${name} hors bande [${MIN_ABS_INK_RATIO}, ${MAX_ABS_INK_RATIO}] — tous mesurés :\n${ratios.join('\n')}`)
+          .toBeLessThanOrEqual(MAX_ABS_INK_RATIO);
+      }
     } finally {
       await server.close();
     }
