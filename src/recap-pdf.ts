@@ -36,6 +36,50 @@ export function exportRecapPDF(){
   const C_BG_HDR: RGB = [240, 240, 240];
   const C_WIN:    RGB = [30,  120, 40];
   const C_ELIM:   RGB = [150, 150, 150];
+  // Fond de page (blanc) : sert à « creuser » les détails des icônes
+  // vectorielles ci-dessous (orbites du crâne, trou de serrure) par recouvrement
+  // — aucune ligne du tableau des scores n'a de remplissage propre, ce blanc
+  // correspond donc toujours au fond réellement visible derrière l'icône.
+  const C_PAGE_BG: RGB = [255, 255, 255];
+
+  // ── Icônes vectorielles (remplace les émojis trophée/crâne, P1 #7 — voir docs/audit/DECISIONS-H.md §4) ──
+  // Un émoji système n'a pas de rendu fiable dans un PDF (police absente du
+  // lecteur, tofu, ou glyphe couleur non supporté par certains moteurs) : on
+  // dessine ici une version vectorielle minimaliste des mêmes silhouettes que
+  // les icônes SVG de l'interface (`src/ui-icons.ts`), pour rester cohérent
+  // et rester identifiable par la FORME seule (D-CLAUDE-2/D-PREF-1), pas par
+  // la couleur — testé en niveaux de gris, voir DECISIONS-H.md §3.
+  /** Trophée : coupe (triangle inversé) + anses (traits) + socle à deux étages. */
+  function drawTrophyIcon(x: number, yBaseline: number, size: number, color: RGB){
+    const top=yBaseline-size, w=size, h=size*0.62;
+    doc.setFillColor(...color);
+    doc.triangle(x, top, x+w, top, x+w/2, top+h, 'F');
+    doc.setDrawColor(...color);
+    doc.setLineWidth(0.15);
+    doc.line(x-0.3, top+h*0.12, x-0.9, top+h*0.5);
+    doc.line(x+w+0.3, top+h*0.12, x+w+0.9, top+h*0.5);
+    doc.rect(x+w/2-0.3, top+h, 0.6, size*0.16, 'F');
+    doc.rect(x+w/2-size*0.26, top+h+size*0.16, size*0.52, size*0.12, 'F');
+  }
+  // Pas d'icône « drapeau à damier » ici : le récap PDF n'a jamais distingué
+  // champion/finisher (toujours le même statut « winner », voir plus bas) —
+  // seuls les émojis trophée (victoire) et tête de mort (élimination)
+  // apparaissaient dans ce fichier avant cet élément (inventaire initial,
+  // docs/audit/DECISIONS-H.md §1) ; ajouter une distinction visuelle inédite
+  // ici sortirait du périmètre de ce chantier (remplacer des émojis
+  // existants, pas changer le contenu du PDF).
+  /** Crâne : disque + mâchoire pleins, orbites et nez « creusés » en blanc. */
+  function drawSkullIcon(x: number, yBaseline: number, size: number, color: RGB){
+    const r=size/2, cx=x+r, cy=yBaseline-r;
+    doc.setFillColor(...color);
+    doc.circle(cx, cy, r, 'F');
+    doc.rect(x, cy, size, r*0.8, 'F');
+    doc.setFillColor(...C_PAGE_BG);
+    doc.circle(cx-r*0.42, cy-r*0.05, r*0.26, 'F');
+    doc.circle(cx+r*0.42, cy-r*0.05, r*0.26, 'F');
+    doc.triangle(cx-r*0.13, cy+r*0.12, cx+r*0.13, cy+r*0.12, cx, cy+r*0.5, 'F');
+  }
+  const STATUS_ICON_W=4.4; // décalage du texte de statut pour laisser la place à l'icône
 
   // ── En-tête ──
   doc.setFont('helvetica','bold');
@@ -134,8 +178,8 @@ export function exportRecapPDF(){
       const name = p.playerName||(t('player')+' '+(i+1));
       const score = p.finalScore!==undefined?p.finalScore:p.score;
       let status='';
-      if(p.winner)status='🏆 '+t('winner')+(players.length>2?' #'+(p.winRank||1):'');
-      else if(p.eliminated)status='💀 '+(players.length>2?'#'+(p.elimRank||''):''+t('btnEliminate'));
+      if(p.winner)status=t('winner')+(players.length>2?' #'+(p.winRank||1):'');
+      else if(p.eliminated)status=(players.length>2?'#'+(p.elimRank||''):''+t('btnEliminate'));
 
       doc.setFont('helvetica','bold');
       doc.setFontSize(9);
@@ -144,10 +188,11 @@ export function exportRecapPDF(){
 
       doc.setFont('helvetica','normal');
       doc.setFontSize(8);
-      if(p.winner)doc.setTextColor(...C_WIN);
-      else if(p.eliminated)doc.setTextColor(...C_ELIM);
+      let statusX=colStatus+1;
+      if(p.winner){doc.setTextColor(...C_WIN); drawTrophyIcon(colStatus+1, y-0.3, 2.6, C_WIN); statusX+=STATUS_ICON_W;}
+      else if(p.eliminated){doc.setTextColor(...C_ELIM); drawSkullIcon(colStatus+1, y-0.3, 2.6, C_ELIM); statusX+=STATUS_ICON_W;}
       else doc.setTextColor(...C_SUB);
-      doc.text(status, colStatus+1, y);
+      doc.text(status, statusX, y);
 
       doc.setFont('helvetica','bold');
       doc.setFontSize(10);

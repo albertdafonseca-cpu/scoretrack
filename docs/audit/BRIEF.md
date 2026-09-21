@@ -524,6 +524,46 @@ jamais réutilisée même si une décision est amendée.)
   dans `docs/audit/DECISIONS-G.md` §2/§4 ; D27 n'est pas réécrit, cette
   entrée l'amende conformément à la règle du préambule de ce document.
 
+- **D29** — Élément H (round 4, post-clôture) : les émojis système utilisés
+  comme icônes fonctionnelles (🏆 victoire, 🏁 fin de manche / dernier
+  perdant, 💀 élimination, 🔒 confidentialité — P1 #7 du constat initial,
+  dette documentée en D21) remplacés par de vraies icônes SVG inline
+  dessinées à la main, un seul nouveau fichier (`src/ui-icons.ts`, séparé
+  d'`icons.ts` qui reste dédié à l'icône d'app/favicon/manifest — deux
+  responsabilités différentes). 4 silhouettes structurellement distinctes
+  (trophée à anses/socle, drapeau à damier, crâne à orbites/nez/dents,
+  cadenas à anse/trou de serrure), toutes en `currentColor` (sauf le
+  damier, volontairement achromatique noir/blanc-transparent, cohérent
+  avec un vrai drapeau à damier) : distinction vérifiée par capture
+  Playwright désaturée (`filter:grayscale(100%)`) — les 4 formes restent
+  individuellement reconnaissables en niveaux de gris (D-CLAUDE-2/D-PREF-1).
+  `src/recap-pdf.ts` : émojis remplacés par un dessin vectoriel minimaliste
+  via l'API de dessin de jsPDF (`doc.triangle`/`doc.circle`/`doc.rect`), pas
+  par du texte ni par un SVG (sans rendu fiable dans un PDF) ; pas d'icône
+  « drapeau » ajoutée là où aucune distinction champion/finisher n'existait
+  déjà (pas un manque introduit par ce chantier). Cas particulier du
+  cadenas : `src/i18n/translations.ts` (18 langues, hors périmètre, élément
+  D) préfixe encore sa traduction par l'émoji — neutralisé à l'exécution
+  par un `MutationObserver` posé dans `src/game.ts` (aucune modification
+  d'`i18n.ts`/`translations.ts`), qui remplace ce préfixe par l'icône SVG
+  dès qu'il apparaît, quel que soit l'appelant (`loadSettings()` au
+  démarrage ou le sélecteur de langue d'`i18n.ts`). `#elim-anim-skull`
+  (☠️, `src/animations.ts`) volontairement non traité : état de départ
+  d'une animation JS (agrandissement calculé), hors périmètre d'édition de
+  ce chantier — documenté comme dette pour un futur tour qui aurait mandat
+  sur `animations.ts`. 26 nouveaux tests unitaires (`tests/ui-icons.test.ts`,
+  `tests/game.icons.test.ts`) + 7 tests e2e
+  (`e2e/functional-icons.spec.ts`, build réel + Chromium, parties
+  réellement jouées jusqu'à victoire/élimination) ; 3 mutations testées
+  (cassées puis restaurées, échec confirmé avant restauration : polarité
+  `victoryIcon`, point de code de l'émoji surveillé, mapping icône↔état sur
+  la tuile d'élimination — cette dernière détectée à la fois en unitaire et
+  en e2e). `npm run typecheck`/`lint` (0 erreur, même total d'avertissements
+  qu'avant)/`test` (113/113)/`build` tous verts ; les 35 tests e2e
+  (28 préexistants + 7 nouveaux) tous verts sans modification des specs
+  existantes. Voir `docs/audit/DECISIONS-H.md` pour le détail complet,
+  l'inventaire exhaustif des 16 occurrences trouvées et la dette restante.
+
 ## 8. Élément G (round 3, post-clôture) — retrait des `onclick` inline
 
 Les six éléments A-F ont chacun atteint AAA (§7 ci-dessus). Sur demande

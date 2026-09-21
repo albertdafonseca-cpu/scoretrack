@@ -654,7 +654,7 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
 .delta-flash.go{animation:flashUp 0.9s ease-out forwards;}
 @keyframes flashUp{0%{opacity:1;transform:translateY(0)}70%{opacity:1}100%{opacity:0;transform:translateY(-3vmin)}}
 .elim-tag{position:absolute;inset:0;z-index:4;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;background:rgba(0,0,0,0.85);gap:0.15em;}
-.elim-icon{line-height:1;}
+.elim-icon{line-height:1;color:#fff;}
 .elim-label{font-family:var(--btn-font);font-weight:700;letter-spacing:0.22em;color:#fff;text-transform:uppercase;opacity:0.9;}
 .elim-name{font-family:var(--btn-font);letter-spacing:0.1em;color:rgba(255,255,255,0.5);text-transform:uppercase;}
 
@@ -714,7 +714,11 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
 .simple-modal-sub{font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--muted2);margin-bottom:20px;line-height:1.6;}
 .simple-modal-btns{display:flex;flex-direction:column;gap:8px;width:100%;}
 .simple-modal-btns .modal-btn,.winner-btns .modal-btn{font-size:16px;padding:16px 8px;width:100%;line-height:1.3;}
-.winner-icon{font-size:40px;margin-bottom:12px;text-align:center;}
+.winner-icon{font-size:40px;margin-bottom:12px;text-align:center;color:var(--text);}
+/* Icônes SVG fonctionnelles (élément H, remplace les émojis trophée/drapeau/
+   crâne/cadenas) : taille suit le font-size du conteneur (1em), couleur =
+   currentColor du conteneur. */
+.ui-icon{width:1em;height:1em;display:inline-block;vertical-align:-0.125em;flex-shrink:0;}
 .winner-name{font-family:var(--btn-font);font-size:22px;font-weight:700;color:var(--accent);margin-bottom:6px;text-shadow:0 0 16px var(--accent);text-align:center;width:100%;}
 .winner-sub{font-family:'Share Tech Mono',monospace;font-size:16px;color:var(--muted2);margin-bottom:20px;text-align:center;width:100%;}
 .winner-btns{display:flex;flex-direction:column;gap:8px;width:100%;margin-top:8px;}
@@ -844,7 +848,7 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
 .win-rank{font-family:var(--score-font);color:var(--accent);letter-spacing:0.1em;}
 .tag-score{font-family:var(--score-font);color:rgba(255,255,255,0.9);letter-spacing:0.05em;line-height:1;}
 .win-tag{position:absolute;inset:0;z-index:4;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;background:rgba(0,0,0,0.85);gap:0.15em;}
-.win-icon{line-height:1;}
+.win-icon{line-height:1;color:var(--accent);}
 .win-label{font-family:var(--btn-font);font-weight:700;letter-spacing:0.2em;color:var(--accent);text-transform:uppercase;}
 /* ── Export PDF ───────────────────────────────────────────────── */
 .pdf-panel{margin:12px 12px 0;background:var(--surface);border-radius:8px;border:1px solid var(--border);padding:14px;}
@@ -1502,14 +1506,14 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
     <div class="themes-grid" id="themes-grid"></div>
   </div>
   <div class="save-confirm" id="save-confirm"></div>
-  <button class="save-btn btn-privacy-link" id="btn-privacy-txt">🔒 Politique de confidentialité</button>
+  <button class="save-btn btn-privacy-link" id="btn-privacy-txt"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M8.2 10V7.4a3.8 3.8 0 0 1 7.6 0V10"/><path fill="currentColor" fill-rule="evenodd" d="M7.5 10 H16.5 A2.5 2.5 0 0 1 19 12.5 V18.5 A2.5 2.5 0 0 1 16.5 21 H7.5 A2.5 2.5 0 0 1 5 18.5 V12.5 A2.5 2.5 0 0 1 7.5 10 Z M13.5 14.5 A1.5 1.5 0 1 0 10.5 14.5 A1.5 1.5 0 1 0 13.5 14.5 Z M11 15.7 L13 15.7 L13.7 18.6 L10.3 18.6 Z"/></svg> Politique de confidentialité</button>
 </div>
 
 <div class="page" id="privacy-modal">
   <div class="page-top-spacer"></div>
   <div class="settings-header">
     <button class="back-btn" id="privacy-back-btn" aria-label="Retour">←</button>
-    <div class="settings-title" id="privacy-title-txt">🔒 Confidentialité</div>
+    <div class="settings-title" id="privacy-title-txt"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M8.2 10V7.4a3.8 3.8 0 0 1 7.6 0V10"/><path fill="currentColor" fill-rule="evenodd" d="M7.5 10 H16.5 A2.5 2.5 0 0 1 19 12.5 V18.5 A2.5 2.5 0 0 1 16.5 21 H7.5 A2.5 2.5 0 0 1 5 18.5 V12.5 A2.5 2.5 0 0 1 7.5 10 Z M13.5 14.5 A1.5 1.5 0 1 0 10.5 14.5 A1.5 1.5 0 1 0 13.5 14.5 Z M11 15.7 L13 15.7 L13.7 18.6 L10.3 18.6 Z"/></svg> Confidentialité</div>
   </div>
   <div class="logo-lang" id="lang-picker-privacy">
     <button class="lang-flag-btn" id="lang-flag-btn-privacy" aria-label="Changer de langue">🇬🇧</button>
@@ -1668,7 +1672,7 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
 
 <div class="modal-overlay hidden" id="winner-modal" role="alertdialog" aria-modal="true" aria-live="assertive" aria-labelledby="winner-name" tabindex="-1">
   <div class="modal-box winner-modal-box">
-    <div class="winner-icon" id="winner-icon" aria-hidden="true">🏆</div>
+    <div class="winner-icon" id="winner-icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M6 3H18V6C18 9.87 15.31 13 12 13C8.69 13 6 9.87 6 6V3Z"/><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" d="M6 4.6C2.5 4.6 2.5 9.4 6.35 10"/><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" d="M18 4.6C21.5 4.6 21.5 9.4 17.65 10"/><rect fill="currentColor" x="11" y="13" width="2" height="3"/><rect fill="currentColor" x="9" y="16.2" width="6" height="1.6" rx="0.8"/><rect fill="currentColor" x="7" y="18.2" width="10" height="2.3" rx="1.15"/></svg></div>
     <div class="winner-name" id="winner-name">—</div>
     <div class="winner-sub" id="winner-sub">—</div>
     <div class="winner-btns">
@@ -1692,7 +1696,7 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
 
 <div class="modal-overlay hidden" id="elim-modal" role="alertdialog" aria-modal="true" aria-labelledby="elim-confirm-name" aria-describedby="elim-confirm-sub" tabindex="-1">
   <div class="simple-modal-box">
-    <div class="winner-icon" aria-hidden="true">💀</div>
+    <div class="winner-icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M12 2.4C7.6 2.4 4.9 5.6 4.9 9.5C4.9 12 5.9 13.5 6.7 14.3L6.7 16.1C6.7 16.8 7.2 17.3 7.8 17.3L7.8 18.6L9.2 18.6L9.2 17.3L10.5 17.3L10.5 18.6L13.5 18.6L13.5 17.3L14.8 17.3L14.8 18.6L16.2 18.6L16.2 17.3C16.8 17.3 17.3 16.8 17.3 16.1L17.3 14.3C18.1 13.5 19.1 12 19.1 9.5C19.1 5.6 16.4 2.4 12 2.4Z M10.9 9.6 A1.7 1.7 0 1 0 7.5 9.6 A1.7 1.7 0 1 0 10.9 9.6 Z M16.5 9.6 A1.7 1.7 0 1 0 13.1 9.6 A1.7 1.7 0 1 0 16.5 9.6 Z M12 11.3L10.85 13.7L13.15 13.7Z"/></svg></div>
     <div class="winner-name" id="elim-confirm-name">—</div>
     <div class="winner-sub" id="elim-confirm-sub">Score à 0 — confirmer l'élimination ?</div>
     <div class="simple-modal-btns">
@@ -1704,7 +1708,7 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
 
 <div class="modal-overlay hidden" id="endgame-modal" role="alertdialog" aria-modal="true" aria-labelledby="endgame-modal-title" aria-describedby="endgame-modal-sub" tabindex="-1">
   <div class="simple-modal-box">
-    <div class="winner-icon" id="endgame-modal-icon" aria-hidden="true">🏁</div>
+    <div class="winner-icon" id="endgame-modal-icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect fill="currentColor" x="5" y="2" width="1.6" height="20" rx="0.8"/><g><rect x="6.6" y="3" width="3" height="2.6667" fill="currentColor" stroke="currentColor" stroke-width="0.25"/><rect x="9.6" y="3" width="3" height="2.6667" fill="none" stroke="currentColor" stroke-width="0.25"/><rect x="12.6" y="3" width="3" height="2.6667" fill="currentColor" stroke="currentColor" stroke-width="0.25"/><rect x="15.6" y="3" width="3" height="2.6667" fill="none" stroke="currentColor" stroke-width="0.25"/><rect x="6.6" y="5.6667" width="3" height="2.6667" fill="none" stroke="currentColor" stroke-width="0.25"/><rect x="9.6" y="5.6667" width="3" height="2.6667" fill="currentColor" stroke="currentColor" stroke-width="0.25"/><rect x="12.6" y="5.6667" width="3" height="2.6667" fill="none" stroke="currentColor" stroke-width="0.25"/><rect x="15.6" y="5.6667" width="3" height="2.6667" fill="currentColor" stroke="currentColor" stroke-width="0.25"/><rect x="6.6" y="8.3333" width="3" height="2.6667" fill="currentColor" stroke="currentColor" stroke-width="0.25"/><rect x="9.6" y="8.3333" width="3" height="2.6667" fill="none" stroke="currentColor" stroke-width="0.25"/><rect x="12.6" y="8.3333" width="3" height="2.6667" fill="currentColor" stroke="currentColor" stroke-width="0.25"/><rect x="15.6" y="8.3333" width="3" height="2.6667" fill="none" stroke="currentColor" stroke-width="0.25"/></g></svg></div>
     <div class="winner-name" id="endgame-modal-title">Fin de partie</div>
     <div class="winner-sub" id="endgame-modal-sub">Confirmer la fin de la partie ?</div>
     <div class="simple-modal-btns">

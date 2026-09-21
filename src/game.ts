@@ -2,6 +2,7 @@ import { _detectLang, _flashBtnLabel, _getFooterBtn, applyLang, currentLang, set
 import { playElimAnim, playWinAnim } from './animations';
 import { diceRenderPreview, diceResetPreview, diceUpdateFab } from './dice-ui';
 import { $, $opt, $$, $q, escapeHtml } from './dom';
+import { ICON_FLAG, ICON_LOCK, ICON_SKULL, ICON_TROPHY, victoryIcon } from './ui-icons';
 import type { BloquerMode, CardRot, GameConfig, GamePreset, GameSave, HistoryGroup, ObjectifMode, Player, Settings, Theme, UndoSnapshot } from './types';
 
 /** Overlay du modal de score : porte l'orientation courante et l'état de glissement. */
@@ -76,6 +77,43 @@ export function fmtNum(n: number){
   return n.toLocaleString('fr-FR');
 }
 
+// ── ICÔNES FONCTIONNELLES (P1 #7 du constat initial, élément H) ────
+// `btn-privacy-txt`/`privacy-title-txt` reçoivent leur texte via
+// `src/i18n.ts` (`_setText`, hors périmètre de cet élément) qui préfixe
+// encore la chaîne traduite par l'émoji cadenas dans les 18 langues de
+// `src/i18n/translations.ts` (également hors périmètre — dette documentée,
+// voir docs/audit/DECISIONS-H.md §5). Comme `_setText` fait
+// `el.textContent=val` (donc écrase tout enfant existant, y compris un
+// SVG posé à l'avance) et peut être appelé aussi bien depuis `loadSettings`
+// ci-dessous que directement depuis le sélecteur de langue d'`i18n.ts`
+// (hors de notre portée), un MutationObserver — plutôt qu'un correctif au
+// seul point d'appel connu — remplace ce préfixe par l'icône SVG dès qu'il
+// réapparaît, quel que soit l'appelant.
+// Émoji reconstruit par point de code (pas de littéral dans ce fichier) :
+// évite de réintroduire l'émoji système dans le source vérifié par
+// `grep` (voir docs/audit/DECISIONS-H.md §1, preuve de vérification).
+const LOCK_EMOJI=String.fromCodePoint(0x1F512);
+const LOCK_PREFIX_RE=new RegExp('^\\s*'+LOCK_EMOJI+'\\uFE0F?\\s*','u');
+export function _fixLockIcon(el: HTMLElement){
+  const txt=el.textContent||'';
+  if(!LOCK_PREFIX_RE.test(txt))return;
+  const rest=txt.replace(LOCK_PREFIX_RE,'');
+  el.innerHTML=ICON_LOCK+' '+escapeHtml(rest);
+}
+function _watchLockIcon(id: string){
+  const el=$opt(id);
+  if(!el)return;
+  _fixLockIcon(el);
+  new MutationObserver(()=>_fixLockIcon(el)).observe(el,{childList:true,subtree:true,characterData:true});
+}
+/** À appeler une fois au démarrage (voir `loadSettings`) : pose la surveillance
+ *  de l'icône cadenas SVG, résiliente aux appels d'`applyLang` hors de notre
+ *  périmètre. */
+export function initFunctionalIcons(){
+  _watchLockIcon('btn-privacy-txt');
+  _watchLockIcon('privacy-title-txt');
+}
+
 // ── SETTINGS ──────────────────────────────────────────────────────
 export function loadSettings(){
   const raw=localStorage.getItem('scoretrack_settings');
@@ -94,6 +132,7 @@ export function loadSettings(){
   // Langue persistée
   setCurrentLang(settings.lang || _detectLang());
   applyLang(currentLang);
+  initFunctionalIcons();
   checkFirstLaunch();
 
   defPlayers=settings.defPlayers||0;
@@ -859,7 +898,7 @@ export function buildCard(pi: number,rot: CardRot){
     const multiWin = winnerCount > 1;
     const modeUnique = !!(singleWinner || (elimPoints!==null && !lastLoser));
     const isChampCard = p.winRank===1 && modeUnique && !multiWin;
-    const winIcon = isChampCard ? '🏆' : '🏁';
+    const winIcon = victoryIcon(isChampCard);
     const winLabel = isChampCard ? t('winner') : t('finisher');
     const winRankStr=multiWin?`<div class="win-rank">#${p.winRank||'?'}</div>`:'';
     tag.innerHTML=`<div class="win-icon">${winIcon}</div><div class="win-label">${winLabel}</div>${nameStr}${winRankStr}${scoreStr}`;
@@ -875,7 +914,7 @@ export function buildCard(pi: number,rot: CardRot){
     const nameStr=p.playerName?`<div class="elim-name">${escapeHtml(p.playerName)}</div>`:'';
     const rankStr=p.elimRank?`<div class="elim-rank">#${p.elimRank}</div>`:'';
     const elimScore=p.finalScore!==undefined?p.finalScore:p.score;
-    tag.innerHTML=`<div class="elim-icon">💀</div><div class="elim-label">${t('eliminated')}</div>${nameStr}${rankStr}<div class="tag-score">${fmtNum(elimScore)}</div>`;
+    tag.innerHTML=`<div class="elim-icon">${ICON_SKULL}</div><div class="elim-label">${t('eliminated')}</div>${nameStr}${rankStr}<div class="tag-score">${fmtNum(elimScore)}</div>`;
     inner.appendChild(tag);
   }
   card.appendChild(inner);return card;
@@ -1143,7 +1182,7 @@ export function updateDisplay(i: number,zone: HTMLElement|null|undefined,delta: 
 
       if(singleWinner){
         const winnerName=p.playerName||(t('player')+' '+(i+1));
-        $('endgame-modal-icon').textContent='🏆';
+        $('endgame-modal-icon').innerHTML=ICON_TROPHY;
         $('endgame-modal-title').textContent=winnerName;
         $('endgame-modal-sub').textContent=(t('singleWinnerConfirm')||'Fin de partie — les autres joueurs sont perdants. Confirmer ?');
         $('endgame-modal').classList.remove('hidden');
@@ -1165,7 +1204,7 @@ export function updateDisplay(i: number,zone: HTMLElement|null|undefined,delta: 
         const loserIdx=players.indexOf(loser);
         const winnerName=p.playerName||(t('player')+' '+(i+1));
         const loserName=loser.playerName||(t('player')+' '+(loserIdx+1));
-        $('endgame-modal-icon').textContent='🏁';
+        $('endgame-modal-icon').innerHTML=ICON_FLAG;
         $('endgame-modal-title').textContent=winnerName;
         $('endgame-modal-sub').textContent=loserName+' '+(t('lastLoserConfirm')||'sera désigné perdant. Confirmer ?');
         $('endgame-modal').classList.remove('hidden');
@@ -1739,7 +1778,7 @@ export function confirmEndgame(){
       playElimAnim(eg.loserIdx);
       window._afterElimAnim=function(){
         const loserName=loser.playerName||(t('player')+' '+(eg.loserIdx+1));
-        $('winner-icon').textContent='💀';
+        $('winner-icon').innerHTML=ICON_SKULL;
         $('winner-name').textContent=loserName;
         $('winner-sub').textContent=fmtNum(loser.finalScore ?? loser.rawScore ?? loser.score)+' pts';
         $('winner-modal').classList.remove('hidden');
@@ -1753,7 +1792,7 @@ export function confirmEndgame(){
 }
 
 export function showWinnerModal(isChampion: boolean){
-  $('winner-icon').textContent=isChampion?'🏆':'🏁';
+  $('winner-icon').innerHTML=victoryIcon(isChampion);
   $('winner-modal').classList.remove('hidden');
 }
 export function showRecap(){
@@ -1777,7 +1816,7 @@ export function showRecap(){
     const isFinisherMode = multiWin || !modeUniqueWinnerRecap;
     let statusBadge='';
     if(p.winner){
-      const icon=isFinisherMode?'🏁':'🏆';
+      const icon=victoryIcon(!isFinisherMode);
       const label=isFinisherMode?(t('finisher')||'Finisher'):(t('winner')||'Winner');
       const rankStr=(multiWin||isFinisherMode)?' #'+p.winRank:'';
       statusBadge=`<div class="recap-status win">${icon} ${label}${rankStr}</div>`;
@@ -1785,7 +1824,7 @@ export function showRecap(){
     else if(p.eliminated){
       const showRank=players.length>2 && !lastLoser && !singleWinner;
       const ordinal = p.elimRank===1?t('elimFirst1'):((p.elimRank as number)+t('elimFirstN'));
-      statusBadge=`<div class="recap-status elim">💀 ${t('eliminated')}${showRank?' · '+ordinal:''}</div>`;
+      statusBadge=`<div class="recap-status elim">${ICON_SKULL} ${t('eliminated')}${showRank?' · '+ordinal:''}</div>`;
     }
     const recapPlayerName=p.playerName?escapeHtml(p.playerName):(t('player')+' '+(pi+1));
     html+=`<div class="recap-player"><div class="recap-player-header"><div class="recap-player-dot" style="background:${COLORS[pi%12]};box-shadow:0 0 6px ${COLORS[pi%12]}"></div><div class="recap-player-name">${recapPlayerName}</div>${statusBadge}</div>`;

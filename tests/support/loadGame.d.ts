@@ -50,6 +50,13 @@ export interface GameTestFacade {
   applyPreset(idx: number): void;
   applyObjectif(): void;
   selectObjectif(mode: ObjectifMode): void;
+  // Ajouts élément H (icônes fonctionnelles SVG, docs/audit/DECISIONS-H.md) :
+  // même principe que le reste de ce fichier, un sous-ensemble minimal
+  // recopié à la main pour les besoins de `tests/game.icons.test.ts`, sans
+  // réintroduire le conflit de types documenté en tête de ce fichier.
+  showWinnerModal(isChampion: boolean): void;
+  initFunctionalIcons(): void;
+  _fixLockIcon(el: HTMLElement): void;
 }
 
 /** Charge le vrai `src/game.ts` au runtime (voir `loadGame.js`). */
