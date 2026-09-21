@@ -823,19 +823,17 @@ playWinAnim = function(playerIdx:number): void {
   var modeUniqueWinner = !!(singleWinner || (elimPoints!==null && !lastLoser));
   var isChamp = p.winRank===1 && modeUniqueWinner;
   var msg = isChamp ? (t('winAnimMsg')||'VICTOIRE !') : (t('finisher')||'FINISHEUR')+' #'+p.winRank;
+  // Le troph\u00E9e n'est dessin\u00E9 (et #win-anim-overlay affich\u00E9) que pour le
+  // champion : le cas finisher retourne plus bas vers `playFinAnim`, qui a
+  // son propre overlay/canvas \u2014 voir docs/audit/DECISIONS-H.md \u00A716.3
+  // (l'ancien dessin ici pour le finisher, un drapeau emoji, \u00E9tait mort :
+  // cet overlay reste `display:none` sur ce chemin, confirm\u00E9 par deux
+  // critiques ind\u00E9pendants via `getComputedStyle`).
   var _tc=$opt<HTMLCanvasElement>('win-anim-trophy-canvas');
-  if(_tc){
+  if(_tc && isChamp){
     var _tSz=Math.min(window.innerWidth*0.22,140);
     _tc.width=_tSz; _tc.height=_tSz;
-    if(isChamp){ _drawTrophy(_tc); }
-    else{
-      // Drapeau damier pour finisher
-      var _ctx=_tc.getContext('2d')!;
-      _ctx.clearRect(0,0,_tSz,_tSz);
-      _ctx.font=(_tSz*0.72)+'px serif';
-      _ctx.textAlign='center'; _ctx.textBaseline='middle';
-      _ctx.fillText('\uD83C\uDFC1',_tSz/2,_tSz/2);
-    }
+    _drawTrophy(_tc);
   }
 
   $('win-anim-name').textContent=name;
