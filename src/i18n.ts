@@ -34,6 +34,13 @@ export function t(key: TKey): string {
   return (T[currentLang]&&T[currentLang][k]) || T['en'][k] || key;
 }
 
+/** Numéro de version affiché dans la politique de confidentialité, lu depuis
+ *  la source unique <meta name="app-version"> (celle qui invalide le cache du
+ *  service worker) : pas de numéro à maintenir séparément à chaque build. */
+export function appVersion(): string {
+  return document.querySelector('meta[name="app-version"]')?.getAttribute('content') || '';
+}
+
 export function applyLang(code: LangCode){
   currentLang = code;
   document.documentElement.lang = code;
@@ -122,7 +129,7 @@ export function applyLang(code: LangCode){
   _setText('privacy-s4',          t('privacyS4'));
   _setText('privacy-s5t',         t('privacyS5t'));
   _setText('btn-cleardata',       t('btnDeleteData'));
-  _setText('privacy-date',        t('privacyDate'));
+  _setText('privacy-date',        t('privacyDate').replace('{v}', appVersion()));
   _setText('btn-privacy-txt',     t('btnPrivacy'));
   _setText('btn-privacy-accept',   t('btnGotIt'));
   // Accessibilité : libellés accessibles des boutons ne portant qu'une icône
