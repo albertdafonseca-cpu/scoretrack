@@ -156,32 +156,40 @@ le geste de fermeture par glissement tactile du lanceur de dés. Détail :
   (`docs/audit/BRIEF.md` D24). Un futur tour pourrait rouvrir ce compromis
   en migrant tout le build vers l'ESM avec découpage de code réel.
 
-## Dette restante, documentée et assumée (non bloquante pour AAA)
+## Dette fermée après la clôture initiale (sur demande explicite)
 
-- Le `<style>` inline d'`index.html` oblige `style-src` à garder
-  `'unsafe-inline'` dans la CSP (`script-src` n'en a plus besoin depuis
-  l'élément G) : non traité, changement de structure plus large qu'un
-  simple retrait d'attribut.
-- 9 affectations `element.onclick = fn` en JavaScript (pas des attributs
-  HTML) subsistent dans `game.ts`/`dice-ui.ts`/`sw.ts` : mesuré sans
-  incidence sur la CSP resserrée (élément G, `DECISIONS-G.md` §4), non
-  refactorisées par cohérence de style avec `addEventListener`.
+Six points de dette documentée ci-dessus ont depuis été traités directement
+par l'orchestrateur (hors du formalisme élément/critique, pour des
+correctifs bien spécifiés et à faible risque, chacun revérifié
+typecheck/lint/tests unitaires/build/e2e) — détail complet dans
+`docs/audit/BRIEF.md` D35-D36 :
+
+- Licence du projet ajoutée (propriétaire, choix explicite de l'utilisateur).
+- Émoji cadenas retiré des 18 langues de `src/i18n/translations.ts` (source
+  nettoyée, plus seulement neutralisé à l'écran).
+- `fillText('🏁',...)` mort retiré de `src/animations.ts`.
+- 9 affectations `element.onclick = fn` converties en `addEventListener`
+  (dont une, `recap-close-btn`, migrée vers un câblage unique dans
+  `main.ts` plutôt qu'une conversion naïve — l'ancien pattern
+  `.onclick=` y évitait justement un empilement de gestionnaires à
+  chaque ouverture du récapitulatif).
+- Le `<style>` inline d'`index.html` extrait vers `css/app.css`, et
+  `'unsafe-inline'` retiré de `style-src` — remplacé par les directives CSP
+  de niveau 3 `style-src-elem 'self'` / `style-src-attr 'unsafe-inline'`
+  après avoir mesuré (pas supposé) qu'un retrait complet casserait les
+  innombrables mutations `.style.xxx=` légitimes du projet.
+
+## Dette restante, documentée et assumée (non bloquante pour AAA, hors de portée de cet audit)
+
 - 4 langues (arabe, japonais, coréen, chinois) signalées par leur propre
   traducteur (élément D) comme à confiance de traduction réduite, faute de
   relecture par un locuteur natif — sémantiquement correctes à la lecture
-  du critique, mais non garanties idiomatiques.
+  du critique, mais non garanties idiomatiques. Nécessite un locuteur natif.
 - Lint en mode syntaxe uniquement (pas type-aware) tant que
-  `typescript-eslint` ne supporte pas TypeScript 7.
+  `typescript-eslint` ne supporte pas TypeScript 7. Dépend d'une mise à
+  jour amont hors du contrôle du projet.
 - Validation de la CSP faite en local (serveur HTTP + Playwright), pas
-  encore sur un déploiement Vercel réel.
-- `src/i18n/translations.ts` porte encore l'émoji cadenas en dur dans le
-  texte source des 18 langues (neutralisé à l'écran par un
-  `MutationObserver`, élément H) : la source elle-même n'a pas été
-  nettoyée, hors périmètre d'édition de cet élément.
-- `win-anim-trophy-canvas` (`src/animations.ts`) contient un `fillText('🏁',...)`
-  mort (overlay parent toujours masqué sur ce chemin), confirmé sans impact
-  visuel réel par deux critiques indépendants — nettoyage de code
-  recommandé pour un futur tour ayant mandat sur ce fichier.
+  encore sur un déploiement Vercel réel. Nécessite un déploiement effectif.
 
 ## Conclusion
 
@@ -195,5 +203,10 @@ dette ajoutés ensuite sur demande explicite — retrait des `onclick` inline
 et remplacement des émojis système) ont atteint un verdict AAA au sens de
 la méthodologie de cet audit (`BRIEF.md` §6), sans aucune régression sur le
 rendu du moteur de dés ni sur les préférences permanentes de l'utilisateur.
-La licence du projet (propriétaire, tous droits réservés) a également été
-ajoutée sur décision explicite de l'utilisateur.
+Six points de dette supplémentaires ont ensuite été fermés directement
+(licence, émoji cadenas en source, code mort, style de câblage des
+évènements, extraction du `<style>` inline et resserrement de `style-src`).
+Il ne reste que de la dette qui dépasse la portée de cet audit : la
+relecture de 4 traductions par un locuteur natif, une limite d'un outil
+tiers (`typescript-eslint`) hors du contrôle du projet, et la validation de
+la CSP sur un déploiement réel.
