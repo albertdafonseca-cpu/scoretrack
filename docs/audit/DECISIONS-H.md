@@ -415,15 +415,240 @@ avant restauration, `diff` vide confirmé après restauration :
 - `git status --short` en fin de tâche : seuls les fichiers du périmètre
   déclaré sont modifiés/ajoutés (voir en-tête de ce document).
 
-## 9. Dette restante (résumé)
+## 9. Dette restante (résumé, round 1 — voir §10 pour les correctifs round 2)
 
-1. **`#elim-anim-skull` (☠️, `src/animations.ts`)** — non traité,
+1. ~~**`#elim-anim-skull` (☠️, `src/animations.ts`)** — non traité,
    volontairement (§5) : hors périmètre d'édition de ce chantier, dépendance
-   probable à des métriques de glyphe texte pour l'animation.
+   probable à des métriques de glyphe texte pour l'animation.~~ **Traité au
+   round 2, voir §10.3** — le périmètre a été étendu par le coordinateur
+   spécifiquement pour ce point.
 2. **`src/i18n/translations.ts`** — 18×2 chaînes portent encore l'émoji
    cadenas en dur dans leur code source (§4), neutralisé à l'exécution par
    un `MutationObserver` dans `game.ts`, mais pas retiré à la racine (hors
-   périmètre, propriété de l'élément D).
+   périmètre, propriété de l'élément D). **Reste non traité au round 2**
+   (toujours hors périmètre).
 3. **`src/recap-pdf.ts`** — aucune icône « drapeau à damier » (§6),
    cohérent avec le comportement préexistant (jamais de distinction
    champion/finisher dans le PDF), pas un manque introduit par ce chantier.
+   **Inchangé au round 2.**
+
+---
+
+## 10. Round 2 — réponse à `docs/audit/H-critique-round1.md` (verdict : AAA non, 3 P1 + 1 P2)
+
+Le critique indépendant a confirmé le cœur du correctif (4 icônes
+distinguables sans couleur, à l'échelle réelle, dans toutes les langues
+testées, aucune régression d'accessibilité/onclick/CSP) mais a démontré, par
+mutation testing indépendant sur des cas différents des miens, trois
+défauts P1 réels et un défaut P2. Détail des correctifs ci-dessous, chacun
+avec preuve de mutation testing reproduite (cassé, confirmé en échec,
+restauré).
+
+### 10.1 P1-1 — Zéro couverture de test sur l'association icône↔statut dans `src/recap-pdf.ts`
+
+Le critique a démontré qu'inverser `drawTrophyIcon`/`drawSkullIcon` dans le
+`if(p.winner){...}else if(p.eliminated){...}` de `exportRecapPDF` passait
+les 113 tests unitaires et 35 tests e2e du round 1 sans un seul échec.
+
+**Correctif** : extraction du mapping en fonction pure et exportée,
+`statusIconKind(p): 'trophy'|'skull'|null`, utilisée dans le dispatch à la
+place du `if/else if` inline — même principe que `victoryIcon()` dans
+`src/ui-icons.ts` au round 1. Deux niveaux de test ajoutés
+(`tests/recap-pdf.icons.test.ts`, nouveau fichier, 5 tests, via un nouveau
+`tests/support/loadRecapPdf.{js,d.ts}` — même façade que
+`tests/support/loadGame.{js,d.ts}` pour la même raison, voir ce fichier) :
+1. `statusIconKind` testée directement (pure, sans jsPDF).
+2. Un vrai `exportRecapPDF()` exécuté, avec les méthodes `circle`/
+   `triangle` de l'instance jsPDF réellement construite espionnées (le
+   constructeur `jsPDF` exporté par le module `jspdf` est remplacé
+   temporairement par une version qui construit le vrai document mais
+   attache les espions sur l'instance avant de la retourner — `circle`/
+   `triangle` sont des propriétés propres à l'instance, pas sur
+   `jsPDF.prototype`, donc `vi.spyOn(jsPDF.prototype, ...)` ne fonctionne
+   pas ici, vérifié empiriquement avant d'écrire le test). `drawTrophyIcon`
+   dessine 1 `triangle`/0 `circle` ; `drawSkullIcon` dessine 1 `triangle`/
+   3 `circle` (tête + 2 orbites) — un compte de `circle` à 0 vs 3 distingue
+   sans ambiguïté laquelle des deux fonctions a réellement dessiné,
+   indépendamment de l'implémentation interne de `statusIconKind`.
+
+**Mutation testing** (`src/recap-pdf.ts`, cassé puis restauré,
+`git diff --stat` vide confirmé après) :
+- Inversion du dispatch (exactement la mutation du critique,
+  `drawTrophyIcon`/`drawSkullIcon` échangées dans le `if/else if`) : 2 des
+  5 tests échouent (les deux tests à un seul statut à la fois — le test
+  combiné winner+eliminated ne bouge pas, par construction, voir le
+  commentaire du test).
+- Inversion à l'intérieur de `statusIconKind` elle-même (`if(p.winner)
+  return 'skull'`) : 3 des 5 tests échouent (les deux précédents + le test
+  dédié à `statusIconKind`).
+
+### 10.2 P1-2 — La distinction non chromatique n'était protégée par aucun test répétable
+
+Le critique a démontré qu'une mutation purement géométrique du cadenas
+(rayon d'arrondi du corps porté à 7, anse réduite) — qui rapproche
+visuellement sa silhouette de celle du crâne — ne changeait ni le nombre de
+`<path>`/`<rect>`/`fill-rule`/`stroke` (donc passe le test de « signature
+structurelle » du round 1 sans broncher) ni, par coïncidence, la plupart des
+autres tests (un seul échouait, pour une raison sans rapport avec la
+distinguabilité).
+
+**Correctif** : nouveau test e2e `e2e/icon-shape-metrics.spec.ts`, qui
+rastérise réellement chaque icône (SVG → `<img>` en URI `data:` →
+`<canvas>` → `getImageData`) à la taille réelle d'usage de `.ui-icon`
+(24×24 px), sur les pixels RÉELLEMENT rendus par Chromium (méthodologie
+du brief §3.5), puis calcule 8 métriques de forme par icône : ratio de
+couverture d'encre, ratio largeur/hauteur de la boîte englobante de
+l'encre, centre de masse (x, y), et répartition de l'encre entre les 4
+quadrants. Les 4 icônes doivent rester séparées deux à deux par une
+distance euclidienne minimale dans cet espace de mesure (`MIN_DISTANCE =
+0.2`, fixé nettement sous le minimum réellement mesuré entre icônes
+d'origine — `skull↔lock = 0.276`, la paire la plus proche — marge
+d'environ 30 %, valeurs exactes documentées en commentaire dans le
+fichier de test).
+
+**Mutation testing**, avec une reproduction fidèle de la mutation du
+critique (même famille : corps du cadenas rendu quasi circulaire + anse
+réduite à un détail discret — reproduite avec des paramètres légèrement
+différents des siens faute d'accès à ses valeurs exactes, mais itérée
+jusqu'à obtenir un exemple réaliste et visuellement défendable de la même
+classe de régression, voir le détail ci-dessous) :
+- Première tentative (rayon 7 sur un corps de hauteur 11, anse quasi
+  invisible) : la géométrie obtenue est en réalité **invalide** (rayon >
+  moitié de la hauteur ⇒ le sous-chemin `_roundedRectSubpath` génère un
+  contour auto-intersectant, vérifié en inspectant le `d` produit) ; une
+  fois corrigée avec un rayon valide (5,4, presque une gélule), la
+  distance `skull↔lock` mesurée **augmente** (0.276 → 0.446) au lieu de
+  diminuer — preuve chiffrée que l'intuition visuelle seule (« ça a l'air
+  plus rond, donc plus proche ») peut se tromper sans mesure réelle,
+  exactement la raison d'être de ce correctif.
+- Itération avec un vrai script de mesure (rasterisation + 8 métriques,
+  3 candidats testés) pour trouver une variante de la même famille de
+  mutation qui rapproche RÉELLEMENT le cadenas du crâne dans l'espace de
+  mesure : corps quasi circulaire couvrant la quasi-totalité du viewBox
+  (rayon = exactement la moitié des dimensions ⇒ cercle valide, pas de
+  contour auto-intersectant) + anse réduite à un petit arc discret en haut
+  — silhouette qu'un observateur humain qualifierait raisonnablement de
+  « gros blob rond avec un petit détail au sommet », la même famille de
+  confusion visuelle que celle démontrée par le critique. Distance mesurée
+  `skull↔lock = 0.197`, sous le seuil de 0.2 : **le nouveau test échoue
+  bien** (`Expected: >= 0.2, Received: 0.19675...`). Restauré,
+  `git diff --stat src/ui-icons.ts` vide confirmé, `e2e/icon-shape-
+  metrics.spec.ts` re-vert (distances redevenues 0.470/0.323/0.551/0.333/
+  0.539/0.276).
+
+### 10.3 P1-3 — `#elim-anim-skull` (☠️) : l'émoji le plus visible de l'app
+
+Périmètre étendu par le coordinateur (`docs/audit/BRIEF.md` §9, extension
+round 2) à `src/animations.ts`, **uniquement** pour ce remplacement précis.
+
+**Correctif appliqué SANS modifier `src/animations.ts`** (`git diff --stat
+src/animations.ts` vide, confirmé après le correctif) : le mécanisme
+existant (`skull.style.fontSize = ...+'px'`, plus `filter`/`transform`/
+`opacity` — tous appliqués au conteneur `<div id="elim-anim-skull">`, pas au
+glyphe lui-même) fonctionne à l'identique pour un `<svg class="ui-icon">`
+enfant, exactement comme démontré au round 1 pour `.win-icon`/`.elim-icon`
+(§2.5) : `.ui-icon{width:1em;height:1em}` suit le `font-size` du parent quel
+que soit son contenu. Deux changements, tous les deux dans `index.html`
+(déjà dans mon périmètre depuis le round 1, aucune extension nécessaire
+pour ces deux lignes précises) :
+1. `<div id="elim-anim-skull">☠️</div>` → même contenu que `ICON_SKULL`
+   (`src/ui-icons.ts`), au lieu de l'émoji.
+2. `#elim-anim-skull{...}` (règle CSS existante) : ajout de `color:#fff`
+   — nécessaire car cette icône utilise `currentColor` mais son conteneur
+   n'a, contrairement aux modales, aucun fond de secours garanti (l'overlay
+   `#elim-anim-overlay` n'a pas de `background-color` propre, seulement un
+   canvas de bruit en fondu ; le fond visible pendant l'animation est celui
+   du plateau de jeu, potentiellement clair selon le thème/les couleurs des
+   cartes) — sans cette règle, l'icône aurait hérité de `--text`, sombre
+   dans les thèmes clairs, et serait devenue peu visible sur un fond clair.
+
+Vérifié réellement (nouveau test dans `e2e/functional-icons.spec.ts`,
+partie jouée jusqu'à une élimination réelle) : le `<svg class="ui-icon">`
+est bien présent et identique à `ICON_SKULL`, `getComputedStyle(...)
+.fontSize` croît bien entre deux instants de l'animation (mécanisme de
+grossissement intact), aucune erreur JS levée pendant toute la séquence.
+Capture d'écran prise en cours d'animation (`test-results/
+h-elim-anim-skull-svg.png`, non committée) : le crâne SVG remplit l'écran
+de façon cohérente avec le halo orange existant (`drop-shadow`), largement
+plus net et lisible que l'ancien rendu emoji (vecteur net vs glyphe
+raster/coloré dépendant de la police système de la plateforme — l'un des
+défauts d'origine, P1 #7 du constat initial, que ce remplacement corrige
+enfin ici aussi).
+
+**Dette residuelle découverte pendant ce correctif, non traitée (hors
+mandat strict)** : `src/animations.ts` contient une AUTRE occurrence de
+`☠️` (☠️, fonction `spawnFragments`, `fragCtx.fillText(...)`) —
+de petites copies de l'émoji dessinées comme particules d'explosion sur un
+`<canvas>` (pas un élément DOM), et une occurrence de `🏁` (🏁,
+l'un des 4 émojis d'origine du P1 #7) dans une autre animation
+(`_ctx.fillText('🏁',...)`, ligne ~822, sans rapport avec
+`#elim-anim-skull`). Le mandat du round 2 est explicitement limité à
+« UNIQUEMENT... remplacer `#elim-anim-skull` — aucune autre modification
+d'`animations.ts` n'est dans le mandat » : ces deux occurrences
+supplémentaires (l'une déjà connue comme motif secondaire du même emoji,
+l'autre un cas de P1 #7 qui n'avait encore jamais été inventorié) sont donc
+**volontairement laissées intactes**, documentées ici pour un futur tour
+qui obtiendrait un mandat plus large sur ce fichier. Remplacer les
+particules de `spawnFragments` par une icône vectorielle nécessiterait de
+dessiner `ICON_SKULL` sur un `<canvas>` (pas juste `fillText` d'un
+caractère), un changement plus substantiel que la simple substitution
+DOM/CSS faite ici — raison de plus pour le laisser à un tour dédié avec
+mandat explicite.
+
+### 10.4 P2-1 — Crâne PDF peu reconnaissable à l'échelle réelle d'impression (96 dpi)
+
+Confirmé en régénérant un PDF réel avec les paramètres d'origine (taille
+2,6 mm, orbites à 0,26×r, nez à 0,13×r de large) et en l'inspectant en
+pixels natifs à 96 dpi (`pdftoppm -r 96` puis crop agrandi en
+nearest-neighbor ×8/×10, aucun détail interpolé/inventé — même méthode que
+le critique) : nez et dents disparaissaient effectivement, le crâne se
+réduisait à un disque gris à deux points.
+
+**Correctif** : dans `drawSkullIcon` (`src/recap-pdf.ts`), orbites
+agrandies de 0,26×r à 0,34×r et nez agrandi/élargi (base 0,13×r → 0,2×r,
+hauteur 0,5×r → 0,62×r après le sommet). Au point d'appel, le crâne est en
+plus rendu à une taille (3,2 mm) légèrement supérieure à celle du trophée
+(2,6 mm, inchangée) — ses détails distinctifs (orbites/nez) ont besoin de
+plus de pixels que la silhouette pleine du trophée pour survivre à la
+réduction ; `STATUS_ICON_W` (décalage du texte de statut) inchangé, la
+colonne statut du tableau ayant assez de marge pour absorber la différence
+sans chevaucher la colonne score.
+
+**Revérifié réellement, même méthode qu'avant/qu'utilisée par le
+critique** : PDF régénéré avec les nouveaux paramètres, converti en PNG à
+96 dpi, crop en pixels natifs agrandi ×8 sans interpolation. Orbites et
+nez restent nettement visibles et distincts l'un de l'autre à cette
+échelle — le crâne se lit maintenant clairement comme un visage à deux
+yeux distincts avec une zone d'ombre en dessous (nez/mâchoire), plutôt que
+comme un disque générique à deux points. Non re-testé par un test
+automatisé au niveau pixel (la couverture automatisée de ce fichier reste
+au niveau du comptage de primitives de dessin, §10.1) : la preuve pour ce
+point précis reste une inspection visuelle réelle documentée ici, comme au
+round 1 pour les captures d'écran des icônes SVG (§3).
+
+### 10.5 Vérifications finales round 2
+
+- `npm run typecheck` : vert (3 programmes).
+- `npm run lint` : 0 erreur, 565 avertissements (identique au round 1,
+  aucun nouvel avertissement).
+- `npm run test` (Vitest) : 118/118 verts (113 du round 1 + 5 nouveaux,
+  `tests/recap-pdf.icons.test.ts`).
+- `npm run build` : vert, `dist/app.js` 1,6 Mo (poids inchangé).
+- `npx playwright test` : 37/37 verts sur 3 exécutions consécutives (une
+  4e exécution parallèle a montré un échec isolé et non reproductible de
+  `e2e/fonts-self-hosted.spec.ts`, un test préexistant sans rapport avec ce
+  chantier — confirmé flaky d'infrastructure de test, pas une régression,
+  en le relançant seul puis en relançant la suite complète deux fois de
+  suite : 37/37 les deux fois, cf. méthodologie du brief §3.5 sur la
+  non-déterminisme). 37 = 35 du round 1 + 2 nouveaux fichiers
+  (`e2e/icon-shape-metrics.spec.ts`, 1 test ; nouveau test dans
+  `e2e/functional-icons.spec.ts` pour `#elim-anim-skull`).
+- `git diff --stat src/animations.ts` : vide (confirmé, §10.3).
+- `git status --short` : seuls les fichiers du périmètre déclaré (étendu
+  temporairement à `src/animations.ts` pour §10.3, in fine non modifié)
+  sont touchés ; deux fichiers PDF générés par erreur pendant l'écriture
+  des tests (`ScoreTrack_recap.pdf`, `test.pdf` — `jsPDF.save()` écrit
+  réellement sur le disque sous Node/jsdom, faute de mécanisme de
+  téléchargement navigateur) supprimés et neutralisés dans le test lui-même
+  (`doc.save` remplacé par un no-op dans `spyOnJsPdfDrawing`) avant le
+  commit final.

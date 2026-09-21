@@ -287,4 +287,64 @@ test.describe('Icônes fonctionnelles SVG (élément H) — remplacement des ém
     const prints = [ICON_TROPHY, ICON_FLAG, ICON_SKULL, ICON_LOCK].map(fingerprint);
     expect(new Set(prints).size, `signatures attendues toutes différentes : ${prints.join(', ')}`).toBe(4);
   });
+
+  test('round 2 (H-critique-round1.md, P1-3) : #elim-anim-skull utilise ICON_SKULL, plus l\'émoji ☠️, animation intacte', async ({ page }) => {
+    // `#elim-anim-skull` (l'émoji le plus visible de toute l'app pendant
+    // l'animation d'élimination, occupant la quasi-totalité de l'écran)
+    // était volontairement laissé de côté au round 1 (voir
+    // docs/audit/DECISIONS-H.md §5) : périmètre étendu par le coordinateur
+    // pour ce seul remplacement (BRIEF.md §9). Correctif appliqué
+    // UNIQUEMENT dans index.html (markup + une règle CSS `color`) —
+    // `src/animations.ts` reste totalement intact (`git diff --stat` vide,
+    // vérifié dans DECISIONS-H.md §8) : le mécanisme existant
+    // (`skull.style.fontSize=...`, `.ui-icon{width:1em;height:1em}`) suffit
+    // à faire grossir une icône SVG exactement comme il faisait grossir un
+    // caractère emoji.
+    const server = await startStaticServer();
+    try {
+      await gotoPastPrivacy(page, server.url);
+      await page.locator('.preset-card').nth(4).click(); // "Magic" : objectif elim à 0
+      await page.locator('#players-grid .player-chip').nth(1).click(); // 2 joueurs -> confirmation manuelle
+      await expect(page.locator('#go-btn')).toBeEnabled();
+      await page.locator('#go-btn').click();
+      await page.locator('#names-go-btn').click();
+      await page.locator('.pcard .score').first().waitFor();
+
+      const startScore = await page.evaluate(() =>
+        (window as unknown as { ScoreTrack: { game: { players: { score: number }[] } } })
+          .ScoreTrack.game.players[0].score);
+      await page.evaluate((delta) => {
+        (window as unknown as { ScoreTrack: { game: { adjust: (i: number, d: number) => void } } })
+          .ScoreTrack.game.adjust(0, delta);
+      }, -startScore);
+      await expect(page.locator('#elim-modal')).not.toHaveClass(/hidden/, { timeout: 5000 });
+      await page.locator('#btn-elim-confirm-txt').click();
+
+      // L'icône SVG remplace bien l'émoji, dès l'apparition de l'overlay.
+      await expect(page.locator('#elim-anim-skull svg.ui-icon')).toHaveCount(1, { timeout: 3000 });
+      const skullHtml = await page.locator('#elim-anim-skull').innerHTML();
+      expect(skullHtml).toBe(await normalizeSvgInBrowser(page, ICON_SKULL));
+      expect(skullHtml).not.toMatch(/☠️|💀/u);
+
+      // Animation intacte : la taille (pilotée par `fontSize`, mécanisme
+      // inchangé) grossit bien dans le temps, comme avant ce correctif.
+      const fontSizeAt = (ms: number) => page.waitForTimeout(ms).then(() =>
+        page.evaluate(() => parseFloat(getComputedStyle(document.getElementById('elim-anim-skull')!).fontSize)));
+      const early = await fontSizeAt(200);
+      const later = await fontSizeAt(500);
+      expect(later, `taille attendue croissante : ${early}px puis ${later}px`).toBeGreaterThan(early);
+
+      // Aucune erreur JS pendant toute la séquence (le mécanisme de taille
+      // dynamique/`drop-shadow`/rotation d'`animations.ts`, non modifié,
+      // continue de s'appliquer normalement à un <svg> plutôt qu'à du texte).
+      const pageErrors: string[] = [];
+      page.on('pageerror', e => pageErrors.push(String(e)));
+      await page.waitForTimeout(2000);
+      expect(pageErrors).toEqual([]);
+
+      await page.screenshot({ path: 'test-results/h-elim-anim-skull-svg.png' });
+    } finally {
+      await server.close();
+    }
+  });
 });

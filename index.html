@@ -884,7 +884,7 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
   gap:16px;pointer-events:auto;overflow:hidden;cursor:pointer;
 }
 #elim-anim-noise{position:absolute;inset:0;z-index:5;width:100%;height:100%;pointer-events:none;}
-#elim-anim-skull{position:absolute;z-index:3;line-height:1;transform-origin:center center;font-size:4px;}
+#elim-anim-skull{position:absolute;z-index:3;line-height:1;transform-origin:center center;font-size:4px;color:#fff;}
 #elim-anim-texts{
   position:relative;z-index:4;
   display:flex;flex-direction:column;align-items:center;gap:14px;
@@ -1759,7 +1759,7 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
 <!-- Overlay animation élimination -->
 <div id="elim-anim-overlay" role="alert" aria-live="assertive">
   <canvas id="elim-anim-noise"></canvas>
-  <div id="elim-anim-skull" aria-hidden="true">☠️</div>
+  <div id="elim-anim-skull" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M12 2.4C7.6 2.4 4.9 5.6 4.9 9.5C4.9 12 5.9 13.5 6.7 14.3L6.7 16.1C6.7 16.8 7.2 17.3 7.8 17.3L7.8 18.6L9.2 18.6L9.2 17.3L10.5 17.3L10.5 18.6L13.5 18.6L13.5 17.3L14.8 17.3L14.8 18.6L16.2 18.6L16.2 17.3C16.8 17.3 17.3 16.8 17.3 16.1L17.3 14.3C18.1 13.5 19.1 12 19.1 9.5C19.1 5.6 16.4 2.4 12 2.4Z M10.9 9.6 A1.7 1.7 0 1 0 7.5 9.6 A1.7 1.7 0 1 0 10.9 9.6 Z M16.5 9.6 A1.7 1.7 0 1 0 13.1 9.6 A1.7 1.7 0 1 0 16.5 9.6 Z M12 11.3L10.85 13.7L13.15 13.7Z"/></svg></div>
   <div id="elim-anim-texts">
     <div id="elim-anim-name"></div>
     <div id="elim-anim-msg"></div>

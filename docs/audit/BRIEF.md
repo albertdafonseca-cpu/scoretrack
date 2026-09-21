@@ -563,6 +563,47 @@ jamais réutilisée même si une décision est amendée.)
   (28 préexistants + 7 nouveaux) tous verts sans modification des specs
   existantes. Voir `docs/audit/DECISIONS-H.md` pour le détail complet,
   l'inventaire exhaustif des 16 occurrences trouvées et la dette restante.
+- **D30** — Élément H, round 2 : réponse à `docs/audit/H-critique-round1.md`
+  (verdict round 1 : AAA non, 3 P1 + 1 P2). P1-1 (aucun test sur
+  l'association icône↔statut de `src/recap-pdf.ts`, une inversion trophée/
+  crâne passait 113 tests unitaires + 35 e2e) : mapping extrait en fonction
+  pure exportée `statusIconKind()`, testée directement et via un vrai
+  `exportRecapPDF()` dont les appels `doc.circle`/`doc.triangle` sont
+  espionnés (nouveau `tests/recap-pdf.icons.test.ts` + façade
+  `tests/support/loadRecapPdf.{js,d.ts}`) ; 2 mutations testées (dispatch
+  inversé façon critique, puis `statusIconKind` elle-même inversée), les
+  deux détectées, restaurées. P1-2 (distinction non chromatique protégée
+  par aucun test répétable, une mutation géométrique du cadenas — corps
+  quasi circulaire, anse réduite — passait le test de « signature » du
+  round 1 sans broncher) : nouveau `e2e/icon-shape-metrics.spec.ts`,
+  rastérisation réelle des 4 icônes à 24×24 px (taille d'usage) et mesure
+  de 8 propriétés géométriques (couverture d'encre, aspect de la boîte
+  englobante, centre de masse, répartition par quadrant), seuil de distance
+  minimale entre chaque paire fixé avec marge sous le minimum réel mesuré
+  (0,276) ; reproduction fidèle de la mutation du critique itérée jusqu'à
+  confirmer un cas réaliste détecté (distance 0,197 < seuil 0,20), restauré.
+  P1-3 (`#elim-anim-skull`, l'émoji le plus visible de toute l'app pendant
+  l'animation d'élimination) : périmètre étendu à `src/animations.ts`
+  uniquement pour ce remplacement (voir §9) — traité SANS modifier ce
+  fichier (`git diff --stat` vide confirmé), le mécanisme existant
+  (`fontSize` dynamique + `.ui-icon{width:1em;height:1em}`) fonctionnant
+  à l'identique pour un `<svg>` que pour le glyphe emoji qu'il remplace ;
+  2 lignes changées dans `index.html` (markup + `color:#fff` pour garantir
+  la visibilité, ce conteneur n'ayant pas de fond de secours contrairement
+  aux modales). Dette découverte et documentée sans être traitée (hors
+  mandat strict) : deux autres occurrences d'émojis dans
+  `src/animations.ts` (☠️ en particules canvas dans `spawnFragments`, et
+  🏁 dans une autre animation, jamais inventorié au round 1). P2-1 (crâne
+  PDF peu lisible à l'échelle réelle d'impression, 96 dpi) : orbites et nez
+  agrandis dans `drawSkullIcon`, crâne rendu légèrement plus grand que le
+  trophée (3,2 mm vs 2,6 mm) ; revérifié par la même méthode que le
+  critique (PDF réel régénéré, crop en pixels natifs sans interpolation).
+  `npm run typecheck`/`lint` (0 erreur, même total)/`test` (118/118)/
+  `build` tous verts ; `npx playwright test` 37/37 verts sur 3 exécutions
+  consécutives (un échec isolé non reproductible d'un test préexistant sans
+  rapport, sous exécution parallèle, écarté après nouvelles exécutions
+  toutes vertes). Voir `docs/audit/DECISIONS-H.md` §10 pour le détail
+  complet et les preuves de mutation testing.
 
 ## 8. Élément G (round 3, post-clôture) — retrait des `onclick` inline
 

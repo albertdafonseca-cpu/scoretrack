@@ -4,6 +4,23 @@ import { fmtNum, history, lastGameConfig, players } from './game';
 import { $ } from './dom';
 import type { GameConfig, HistoryGroup, Player } from './types';
 
+/** Quelle icône vectorielle (voir `drawTrophyIcon`/`drawSkullIcon` plus bas)
+ *  correspond au statut d'un joueur dans le tableau des scores du PDF —
+ *  extrait en fonction PURE, exportée et testée indépendamment de tout
+ *  rendu jsPDF (`tests/recap-pdf.icons.test.ts`), pour que le mapping
+ *  victoire->trophée / élimination->crâne reste vérifiable même sans
+ *  générer un PDF. Round 2 (voir docs/audit/H-critique-round1.md, P1-1) :
+ *  ce mapping n'était auparavant qu'un `if/else if` inline dans
+ *  `exportRecapPDF`, jamais testé — une inversion complète des deux icônes
+ *  passait les 113 tests unitaires et 35 tests e2e de l'époque sans un seul
+ *  échec (démontré par mutation testing indépendant). */
+export type StatusIconKind = 'trophy' | 'skull' | null;
+export function statusIconKind(p: { winner?: boolean; eliminated?: boolean }): StatusIconKind {
+  if (p.winner) return 'trophy';
+  if (p.eliminated) return 'skull';
+  return null;
+}
+
 // ── EXPORT PDF RÉCAPITULATIF ──────────────────────────────────────
 // jsPDF est une dépendance npm bundlée par esbuild (voir docs/audit/DECISIONS-E.md,
 // §1) : plus de chargement CDN (cdnjs), l'export fonctionne hors ligne dès le
@@ -68,16 +85,24 @@ export function exportRecapPDF(){
   // docs/audit/DECISIONS-H.md §1) ; ajouter une distinction visuelle inédite
   // ici sortirait du périmètre de ce chantier (remplacer des émojis
   // existants, pas changer le contenu du PDF).
-  /** Crâne : disque + mâchoire pleins, orbites et nez « creusés » en blanc. */
+  /** Crâne : disque + mâchoire pleins, orbites et nez « creusés » en blanc.
+   *  Round 2 (H-critique-round1.md, P2-1) : à la taille réelle d'usage
+   *  (2,6 mm, 96 dpi), les orbites/le nez d'origine (rayon 0,26×r, nez de
+   *  0,13×r de large) descendaient sous le pixel et disparaissaient au
+   *  rendu — le crâne devenait un disque gris à peine distinct d'un visage
+   *  générique. Orbites et nez agrandis (0,34×r et 0,4×r de large
+   *  respectivement) : vérifié réellement en régénérant un PDF et en
+   *  l'inspectant en pixels natifs à 96 dpi (voir DECISIONS-H.md §6.1),
+   *  pas seulement en zoomant un rendu haute résolution. */
   function drawSkullIcon(x: number, yBaseline: number, size: number, color: RGB){
     const r=size/2, cx=x+r, cy=yBaseline-r;
     doc.setFillColor(...color);
     doc.circle(cx, cy, r, 'F');
     doc.rect(x, cy, size, r*0.8, 'F');
     doc.setFillColor(...C_PAGE_BG);
-    doc.circle(cx-r*0.42, cy-r*0.05, r*0.26, 'F');
-    doc.circle(cx+r*0.42, cy-r*0.05, r*0.26, 'F');
-    doc.triangle(cx-r*0.13, cy+r*0.12, cx+r*0.13, cy+r*0.12, cx, cy+r*0.5, 'F');
+    doc.circle(cx-r*0.42, cy-r*0.05, r*0.34, 'F');
+    doc.circle(cx+r*0.42, cy-r*0.05, r*0.34, 'F');
+    doc.triangle(cx-r*0.2, cy+r*0.18, cx+r*0.2, cy+r*0.18, cx, cy+r*0.62, 'F');
   }
   const STATUS_ICON_W=4.4; // décalage du texte de statut pour laisser la place à l'icône
 
@@ -189,8 +214,13 @@ export function exportRecapPDF(){
       doc.setFont('helvetica','normal');
       doc.setFontSize(8);
       let statusX=colStatus+1;
-      if(p.winner){doc.setTextColor(...C_WIN); drawTrophyIcon(colStatus+1, y-0.3, 2.6, C_WIN); statusX+=STATUS_ICON_W;}
-      else if(p.eliminated){doc.setTextColor(...C_ELIM); drawSkullIcon(colStatus+1, y-0.3, 2.6, C_ELIM); statusX+=STATUS_ICON_W;}
+      const iconKind=statusIconKind(p);
+      if(iconKind==='trophy'){doc.setTextColor(...C_WIN); drawTrophyIcon(colStatus+1, y-0.3, 2.6, C_WIN); statusX+=STATUS_ICON_W;}
+      // Crâne rendu légèrement plus grand que le trophée (3,2 mm plutôt que
+      // 2,6 mm) : P2-1 (H-critique-round1.md) — ses détails distinctifs
+      // (orbites, nez) ont besoin de plus de pixels que la silhouette pleine
+      // du trophée pour rester lisibles à l'échelle réelle d'impression.
+      else if(iconKind==='skull'){doc.setTextColor(...C_ELIM); drawSkullIcon(colStatus+1, y-0.1, 3.2, C_ELIM); statusX+=STATUS_ICON_W;}
       else doc.setTextColor(...C_SUB);
       doc.text(status, statusX, y);
 
