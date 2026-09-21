@@ -962,10 +962,13 @@ export function fitCard(card: HTMLElement){
     if(sc){
       sc.style.fontSize=scoreSz+'px';
       const swrap=sc.closest<HTMLElement>('.score-wrap')||sc.parentElement;
-      // Pas de marge : on remplit tout l'espace du wrap. Le bump déborde
-      // dans la carte (overflow du .score-wrap retiré côté CSS).
-      const availW=swrap?swrap.offsetWidth*0.98:usW*0.98;
-      const availH=swrap?swrap.offsetHeight*0.98:usH*0.55;
+      // Marge réelle autour du score (0.98 avant retirait toute respiration :
+      // chiffres collés aux bords de la carte, écart de centrage optique entre
+      // caractères d'autant plus visible que la taille est énorme — signalé
+      // par l'utilisateur). Le bump peut toujours légèrement déborder dans la
+      // carte (overflow du .score-wrap retiré côté CSS), la marge n'empêche pas ça.
+      const availW=swrap?swrap.offsetWidth*0.80:usW*0.80;
+      const availH=swrap?swrap.offsetHeight*0.72:usH*0.55;
       // Mesure sur le score RÉEL pour exploiter tout l'espace disponible.
       const fits=()=> sc.scrollWidth<=availW && sc.scrollHeight<=availH && scoreSz<=cap;
       let grow=0;
