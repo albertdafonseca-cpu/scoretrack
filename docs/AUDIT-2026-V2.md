@@ -36,7 +36,7 @@ bonnes pratiques Three.js/WebGL (gestion mémoire GPU). C'est une différence
 honnête à signaler par rapport à l'esprit initial de la demande d'audit, et
 elle est documentée ici plutôt que tue.
 
-## Résultat : 6/6 éléments AAA
+## Résultat : 7/7 éléments AAA
 
 | Élément | Périmètre | Rounds | Verdict final |
 |---|---|---|---|
@@ -46,11 +46,29 @@ elle est documentée ici plutôt que tue.
 | D | Accessibilité, interface, i18n | 2 | AAA — `D-critique-round2.md` |
 | E | PWA, dépendances externes, vie privée | 2 | AAA — `E-critique-round2.md` |
 | F | CI/CD, déploiement, documentation | 2 | AAA — `F-critique-round2.md` |
+| G | Retrait des `onclick` inline, CSP `script-src` (round 3, post-clôture) | 1 | AAA — `G-critique-round1.md` |
 
 État vérifié sur le dernier commit de la branche `claude/audit-qualite-aaa-lmthte` :
 `npm run typecheck` (3 configurations), `npm run lint` (0 erreur),
 `npm run test` (87 tests unitaires), `npm run build`, et
-`npx playwright test` (12 tests e2e) — tous verts.
+`npx playwright test` (28 tests e2e) — tous verts.
+
+## Élément G (round 3, post-clôture, ajouté sur demande explicite)
+
+Après clôture des six premiers éléments, l'utilisateur a demandé de traiter
+un point de dette documenté comme non bloquant : les 65 attributs
+`onclick="..."` statiques d'`index.html` obligeaient `vercel.json` à garder
+`'unsafe-inline'` dans `script-src` de sa Content-Security-Policy. Tous ont
+été remplacés par un câblage `addEventListener` explicite dans
+`src/main.ts` (même principe que `deleteProfile`, déjà posé par l'élément
+B), sans changement de comportement — prouvé par 15 nouveaux tests e2e
+couvrant chaque écran/parcours et par mutation testing (7 mutations
+distinctes entre constructeur et critique, toutes détectées). `'unsafe-inline'`
+a ensuite été retiré de `script-src` (`style-src` le garde, à cause du
+`<style>` inline d'`index.html`, hors périmètre de ce chantier), vérifié
+sans aucune violation CSP sur un parcours complet incluant l'export PDF et
+le geste de fermeture par glissement tactile du lanceur de dés. Détail :
+`docs/audit/DECISIONS-G.md`, `docs/audit/BRIEF.md` §8.
 
 ## Défauts P0 (bloquants) trouvés et corrigés
 
@@ -120,9 +138,14 @@ elle est documentée ici plutôt que tue.
 - Émojis système comme icônes (💀 🏆 🔒) : nécessite un tour coordonné
   B+D+E (répartis entre plusieurs fichiers), non traité (`BRIEF.md` D21).
 - Licence absente de `package.json` (P2, hors périmètre d'édition assigné).
-- 65 gestionnaires `onclick` inline dans `index.html` : non refactorisés
-  (risque de collision avec le travail concurrent de l'élément B sur
-  `game.ts`), la CSP compense partiellement via `'unsafe-inline'` assumé.
+- Le `<style>` inline d'`index.html` oblige `style-src` à garder
+  `'unsafe-inline'` dans la CSP (`script-src` n'en a plus besoin depuis
+  l'élément G) : non traité, changement de structure plus large qu'un
+  simple retrait d'attribut.
+- 9 affectations `element.onclick = fn` en JavaScript (pas des attributs
+  HTML) subsistent dans `game.ts`/`dice-ui.ts`/`sw.ts` : mesuré sans
+  incidence sur la CSP resserrée (élément G, `DECISIONS-G.md` §4), non
+  refactorisées par cohérence de style avec `addEventListener`.
 - 4 langues (arabe, japonais, coréen, chinois) signalées par leur propre
   traducteur (élément D) comme à confiance de traduction réduite, faute de
   relecture par un locuteur natif — sémantiquement correctes à la lecture
@@ -139,6 +162,8 @@ injection HTML, absence totale d'outillage de vérification) sont corrigés
 et couverts par des tests qui échouent réellement si le correctif est
 annulé (vérifié par mutation testing sur chaque élément, deux fois
 indépendamment — une fois par le constructeur, une fois par le critique).
-Les six éléments ont atteint un verdict AAA au sens de la méthodologie de
-cet audit (`BRIEF.md` §6), sans aucune régression sur le rendu du moteur de
-dés ni sur les préférences permanentes de l'utilisateur.
+Les sept éléments (les six de l'audit initial, plus le chantier de retrait
+des `onclick` inline ajouté ensuite sur demande explicite) ont atteint un
+verdict AAA au sens de la méthodologie de cet audit (`BRIEF.md` §6), sans
+aucune régression sur le rendu du moteur de dés ni sur les préférences
+permanentes de l'utilisateur.
