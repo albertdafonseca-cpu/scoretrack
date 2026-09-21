@@ -655,3 +655,23 @@ autorisé, mais UNIQUEMENT pour remplacer `#elim-anim-skull` (☠️, l'émoji l
 plus visible de toute l'app pendant l'animation d'élimination, mécanisme de
 dimensionnement déjà prouvé réutilisable par le même commit) — aucune autre
 modification d'`animations.ts` n'est dans le mandat.
+
+**Extension de périmètre pour le round 3** (suite au verdict AAA : non de
+`H-critique-round2.md`, qui a trouvé un contournement du test de distance
+géométrique ET deux émojis supplémentaires très visibles jamais
+inventoriés) : `src/animations.ts` reste dans le périmètre, cette fois
+UNIQUEMENT pour les deux points précis relevés par le critique :
+1. `spawnFragments`/`animateFragments` (fragments de l'explosion
+   d'élimination, dessinés sur `<canvas>`, PAS en DOM) : `☠️`
+   (☠️) dessiné ~28 fois par élimination via `fillText` — à remplacer par un
+   petit dessin vectoriel canvas (chemins/arcs, pas de texte emoji),
+   cohérent avec la silhouette du crâne déjà établie dans `src/ui-icons.ts`.
+2. L'animation du finisher (`_FIN_RACERS`, voitures 🏎️) a DÉJÀ un rendu
+   vectoriel de secours entièrement dessiné (`_finEmojiOk` false → une
+   silhouette de F1 complète par chemins canvas, déjà présente dans le
+   code) pour les plateformes sans emoji couleur — il suffit de forcer ce
+   chemin vectoriel en permanence et de retirer la détection
+   `_finEmojiOk`/la branche emoji devenue inutile, pas de dessiner une
+   nouvelle icône.
+Aucune autre modification d'`animations.ts` n'est dans le mandat (ne touche
+pas à la timing, aux autres animations, ni au reste du fichier).
