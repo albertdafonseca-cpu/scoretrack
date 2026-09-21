@@ -727,6 +727,24 @@ jamais réutilisée même si une décision est amendée.)
   coordinateur, ce round est le dernier tour de durcissement pur demandé
   pour ce test. Voir `docs/audit/DECISIONS-H.md` §15-§16 pour le détail
   complet.
+- **D34** — Intégration : réponse à `docs/audit/H-critique-round5.md`
+  (5e contournement trouvé sur le test de topologie des trous : la
+  comparaison relative `< holeCounts.skull` laissait passer 0/1/2 trous ;
+  une géométrie à 2 trous, sans nez, passait les 4 gardes avec marge et se
+  lisait comme un visage). Correctif ponctuel et bien spécifié appliqué
+  directement (pas un nouveau round complet) : seuil relatif remplacé par
+  un seuil ABSOLU (`holeCounts.lock <= 1`), après vérification directe que
+  le vrai `ICON_LOCK` mesure 1 seul trou, stable à la résolution utilisée
+  par ce test. Mutation testée avec la géométrie exacte du contournement
+  du critique (échec confirmé, restauré, `git diff` vide). Suite complète
+  revérifiée verte (typecheck/lint/122 tests unitaires/build/42 tests e2e
+  `--workers=1`). Clôt le cycle de durcissement de ce test (5 rounds
+  constructeur/critique + ce correctif). Voir `docs/audit/DECISIONS-H.md`
+  §17. **Élément H clos, AAA au sens de la méthodologie de cet audit** :
+  effort sérieux et documenté à chaque round, jamais présenté comme une
+  preuve formelle d'exhaustivité contre toute géométrie de contournement
+  future (limite assumée, cf. D-CLAUDE-2/D-PREF-1 et §12/§13.2/§15.8/§17
+  de `DECISIONS-H.md`).
 
 ## 8. Élément G (round 3, post-clôture) — retrait des `onclick` inline
 

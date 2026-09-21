@@ -466,11 +466,16 @@ test.describe('Icônes SVG — distinction géométrique réelle mesurée sur le
       for (const [name, svg] of Object.entries(icons)) holeCounts[name] = await measureHoleCount(page, stripStrokeOnly(svg));
 
       const report = Object.entries(holeCounts).map(([name, n]) => `${name} = ${n}`).join('\n');
-      // Comparaison RELATIVE (pas un seuil absolu fixe) : mesurée stable sur
-      // 7 résolutions différentes (32 à 96, voir DECISIONS-H.md §15), alors
-      // que la valeur absolue de `lock` seule (1 ou 2) ne l'est pas.
-      expect(holeCounts.lock, `le corps du cadenas (anse retirée) a ${holeCounts.lock} trou(s), pas strictement moins que le crâne — topologie de trous mesurée pour les 4 icônes :\n${report}`)
-        .toBeLessThan(holeCounts.skull);
+      // Round 5 (H-critique-round5.md) : la comparaison RELATIVE précédente
+      // (`< holeCounts.skull`, donc < 3) laissait passer 0, 1 OU 2 trous — un
+      // contournement à 2 trous (2 « yeux » sans nez, cadenas cerclé retiré)
+      // se lisait sans ambiguïté comme un visage tout en passant les 4
+      // gardes. Le vrai cadenas (anse retirée) mesure 1 trou, stable à la
+      // résolution HOLE_SIZE=48 utilisée ici (vérifié : mesure directe avant
+      // ce correctif). Seuil ABSOLU retenu : au plus 1 trou, pas seulement
+      // « moins que le crâne ».
+      expect(holeCounts.lock, `le corps du cadenas (anse retirée) a ${holeCounts.lock} trou(s), attendu au plus 1 — topologie de trous mesurée pour les 4 icônes :\n${report}`)
+        .toBeLessThanOrEqual(1);
     } finally {
       await server.close();
     }

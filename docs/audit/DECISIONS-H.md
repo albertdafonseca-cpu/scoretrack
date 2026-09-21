@@ -1278,3 +1278,32 @@ pas une preuve d'exhaustivité.
    contournement future — limite assumée et documentée, pas cachée.
    Conformément à la note du coordinateur, le round 5 est le dernier tour
    de durcissement pur demandé pour ce test précis.
+
+## 17. Correctif post-round-5, appliqué directement par l'orchestrateur
+
+Le critique du round 5 (`H-critique-round5.md`) a trouvé un 5e
+contournement : la garde de topologie des trous n'exigeait qu'une
+comparaison RELATIVE (`holeCounts.lock < holeCounts.skull`, soit `< 3`),
+laissant passer 0, 1 OU 2 trous. Sa géométrie (config E du round 4 moins
+le sous-chemin du nez — 2 « yeux » sans nez) mesure 2 trous, passe les 4
+gardes avec marge, et se lit sans ambiguïté comme un visage.
+
+Correctif appliqué directement (fix ponctuel et bien spécifié, pas un
+nouveau round complet) : vérifié que le vrai `ICON_LOCK` mesure **1 seul
+trou**, stable à la résolution `HOLE_SIZE=48` utilisée par ce test précis
+(mesure directe, pas déduite des tableaux précédents portant sur d'autres
+résolutions). La comparaison relative `.toBeLessThan(holeCounts.skull)`
+est remplacée par un seuil ABSOLU `.toBeLessThanOrEqual(1)`.
+
+Vérifié par mutation : la géométrie exacte du contournement du critique
+(§2.2 de `H-critique-round5.md`) appliquée réellement dans
+`src/ui-icons.ts`, rebuild réel — le test corrigé échoue bien
+(`Received: 2`, `Expected: <= 1`), les 3 autres tests du fichier restent
+verts. Restauré, `git diff --stat` vide confirmé. Suite complète
+revérifiée : typecheck/lint/122 tests unitaires/build/42 tests e2e
+(`--workers=1`) tous verts.
+
+Ce correctif clôt le cycle de durcissement de ce test (5 rounds
+constructeur/critique + ce fix ponctuel), conformément à la limite
+annoncée à l'avance : un effort sérieux et documenté à chaque round,
+jamais présenté comme une preuve formelle d'exhaustivité.
