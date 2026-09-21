@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { currentLang } from './i18n';
 import { adjust, players } from './game';
-import { $, $$, $opt, $q } from './dom';
+import { $, $opt, $q } from './dom';
 import type { DiceConfig, DiceRoll, Player } from './types';
 import type { DiceThreeState, Die3D } from './dice3d/types';
 import { _DIE_TARGET, _DIE_TARGET_D3 } from './dice3d/cube';
@@ -606,56 +606,6 @@ export function diceUpdateFab(): void {
   var gs=$opt('game-screen');
   var visible = gs && getComputedStyle(gs).display!=='none';
   if(visible)fab.classList.remove('hidden'); else fab.classList.add('hidden');
-}
-
-// Replace le bouton flottant « au centre du plateau » sans jamais recouvrir le
-// NOM d'un joueur. Suppose-t-on que le centre de l'écran tombe toujours sur une
-// coupure entre cartes ? Faux dans les deux sens : dès que le nombre de rangées
-// est impair (ex. 6 joueurs, grille 2x3), le centre tombe en plein milieu d'une
-// rangée ; et même sur une vraie coupure de grille, le nom d'une carte tournée
-// à 180°/0° (joueurs du haut/bas, cf. n=2) est un bandeau collé PILE sur cette
-// coupure (pour rester lisible « vers le centre de la table »), donc y atterrir
-// ne suffit pas non plus. La seule mesure fiable : les vrais rectangles `.pplayer`
-// rendus. On cherche, sur la colonne verticale que couvre le bouton, le plus
-// grand espace libre entre eux et on y place le bouton aussi proche que possible
-// du centre idéal du plateau. À appeler une fois la grille de cartes posée
-// (mise en page + redimensionnement/rotation d'écran).
-export function positionDiceFab(): void {
-  var fab=$opt('dice-fab');
-  var wrap=$opt('players-wrap');
-  if(!fab||!wrap)return;
-  // `.pplayer-ghost` (aucun nom saisi) a une largeur nulle : de fait exclu ci-dessous.
-  var names=$$<HTMLElement>('.pplayer',wrap).map(function(el){return el.getBoundingClientRect();})
-    .filter(function(r){return r.width>0&&r.height>0;});
-  if(!names.length){ fab.style.left=''; fab.style.top=''; return; } // repli CSS (50%/50%)
-  var wrapRect=wrap.getBoundingClientRect();
-  var cx=wrapRect.left+wrapRect.width/2;
-  var idealY=wrapRect.top+wrapRect.height/2;
-  var half=30; // moitié de la taille CSS du bouton (60px, voir .dice-fab) : marge de sécurité
-  // intervalles verticaux des noms dont l'emprise horizontale touche la colonne du bouton,
-  // élargis de `half` de chaque côté AVANT la fusion : deux noms séparés de moins de
-  // 2*half n'ont de toute façon pas la place d'accueillir le bouton entre eux, donc les
-  // traiter comme un seul obstacle (sinon la sortie calculée pour l'un peut retomber
-  // dans la marge de l'autre — ex. deux cartes empilées, chacune nommée près de la
-  // coupure qui les sépare, cf. tests e2e/dice-sheet-layout.spec.ts).
-  var intervals=names.filter(function(r){ return cx+half>r.left && cx-half<r.right; })
-    .map(function(r){ return {top:r.top-half,bottom:r.bottom+half}; })
-    .sort(function(a,b){return a.top-b.top;});
-  var merged: {top: number; bottom: number}[]=[];
-  intervals.forEach(function(iv){
-    var last=merged[merged.length-1];
-    if(last&&iv.top<=last.bottom) last.bottom=Math.max(last.bottom,iv.bottom);
-    else merged.push({top:iv.top,bottom:iv.bottom});
-  });
-  var y=idealY;
-  var hit=merged.find(function(m){return idealY>m.top&&idealY<m.bottom;});
-  if(hit){
-    // sort de l'obstruction par le bord le plus proche du centre idéal.
-    var yAbove=hit.top, yBelow=hit.bottom;
-    y=(idealY-yAbove<=yBelow-idealY)?yAbove:yBelow;
-  }
-  fab.style.left=cx+'px';
-  fab.style.top=y+'px';
 }
 
 

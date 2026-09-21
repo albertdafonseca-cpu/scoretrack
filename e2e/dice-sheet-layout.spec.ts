@@ -7,17 +7,18 @@
 //    icône ou un libellé court comme « d6 ») : le badge `#dice-type-badge`
 //    déborde des deux côtés dès qu'un type de dé s'écrit sur 3-4 caractères
 //    (d100, d120). Corrigé en `min-width` + padding horizontal (css/app.css).
-// 2. `#dice-fab` (bouton flottant « au centre du plateau ») était positionné
-//    en dur à `top:50%;left:50%` du viewport, en supposant que ce point tombe
-//    toujours sur une coupure entre cartes. Faux dans les deux sens : dès que
-//    le nombre de rangées est impair (6 joueurs, grille 2x3), le centre tombe
-//    en plein milieu d'une rangée ; et même quand il tombe sur une vraie
-//    coupure de grille (2 joueurs, cartes empilées), le NOM d'une carte
-//    tournée à 180°/0° est un bandeau collé pile sur cette coupure (pour
-//    rester lisible « vers le centre de la table »). Corrigé par
-//    `positionDiceFab()` (src/dice-ui.ts), qui mesure les vrais rectangles
-//    `.pplayer` rendus et cherche le plus grand espace libre entre eux,
-//    plutôt que de supposer la géométrie de la grille ou des cartes.
+// 2. `#dice-fab` (bouton flottant « au centre du plateau ») recouvrait le nom
+//    d'un joueur : `.pplayer` était placé (par construction du layout, voir
+//    buildCard) près du bord INTÉRIEUR de chaque carte — donc près du point
+//    central que le bouton occupe en permanence (`top:50%;left:50%` fixe,
+//    voulu ainsi : équidistant de tous les joueurs assis autour de l'appareil).
+//    Une première correction avait fait bouger le BOUTON pour éviter les noms
+//    (mesure des rectangles réels + recherche du plus grand espace libre) :
+//    fonctionnellement correcte mais jugée trop fragile/complexe par
+//    l'utilisateur, qui a préféré l'inverse — le bouton reste fixe, ce sont
+//    les CARTES qui changent : `.score-wrap` passe en premier visuellement
+//    (`order:1`) et `.pplayer` en second (`order:2`, css/app.css), plaçant le
+//    nom près du bord EXTÉRIEUR de chaque carte, loin du centre du plateau.
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import path, { extname } from 'node:path';
@@ -124,15 +125,11 @@ test.describe('Lanceur de dés — badge de type dans sa capsule', () => {
   });
 });
 
-// Le bouton flottant est CENSÉ chevaucher un peu les bords des cartes (il vit
-// sur la coupure entre deux d'entre elles) : ce qui compte, c'est qu'il ne
-// touche jamais le NOM d'un joueur. Sur les cartes tournées (joueurs de côté),
-// `.pplayer` est une bande verticale collée au bord INTÉRIEUR de la carte —
-// donc au plus près de la coupure entre deux cartes — ce qui en fait, mesuré
-// en vrai (voir enquête utilisateur), la zone réellement recouverte par le
-// bouton avant la correction de `positionDiceFab()` ; `.score-wrap`, plus
-// éloigné des bords, ne suffit pas à révéler le bug.
-test.describe('Écran de jeu — bouton dé flottant, jamais sur le nom d\'un joueur', () => {
+// Le bouton reste fixe au centre du plateau (top:50%;left:50%, voir css/app.css) :
+// ce test vérifie que le NOM d'aucun joueur ne se retrouve sous ce point fixe,
+// quel que soit le nombre de joueurs (donc quelle que soit la disposition de
+// grille — rangées paires/impaires, cartes empilées ou côte à côte).
+test.describe('Écran de jeu — bouton dé flottant (fixe, centre du plateau), jamais sur le nom d\'un joueur', () => {
   for (const n of [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) {
     test(`${n} joueurs : le bouton ne recouvre aucun nom`, async ({ page }) => {
       const server = await startStaticServer();
@@ -141,7 +138,7 @@ test.describe('Écran de jeu — bouton dé flottant, jamais sur le nom d\'un jo
         await page.goto(server.url);
         await acceptPrivacy(page);
         await startGameWithPlayers(page, n);
-        await page.waitForTimeout(250); // positionDiceFab() s'exécute après la mise en page (tryFit)
+        await page.waitForTimeout(250); // laisse fitTexts()/le layout se stabiliser
 
         // Box uniforme {x,y,w,h} : `boundingBox()` de Playwright renvoie
         // `width`/`height`, `getBoundingClientRect()` du navigateur aussi —
