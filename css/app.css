@@ -1203,7 +1203,7 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
 /* Sélecteurs faces / nombre */
 /* En-tête repliable : hamburger compact */
 .dice-config-toggle{display:inline-flex;align-items:center;justify-content:center;
-  width:42px;height:38px;margin:0 0 10px 0;border-radius:10px;
+  min-width:42px;height:38px;padding:0 10px;margin:0 0 10px 0;border-radius:10px;
   border:1.5px solid var(--border);background:var(--surface);color:var(--accent);
   cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background 0.12s;}
 .dice-config-toggle:active{background:var(--surface2);}
