@@ -483,6 +483,36 @@ jamais réutilisée même si une décision est amendée.)
   `npm run typecheck`/`lint`/`test` (87/87)/`build`/`playwright test`
   (12/12) tous revérifiés verts. Voir `docs/audit/DECISIONS-D.md` §10 pour
   le détail complet.
+- **D27** — Élément G (round 3, post-clôture, voir §8) : les 65 attributs
+  `onclick="..."` d'`index.html` (P1 #4 du constat initial, dette non
+  bloquante laissée par D/F) remplacés par un câblage `addEventListener`
+  explicite dans `src/main.ts` (aucun mécanisme générique par `data-action`
+  — chaque élément câblé nommément, même principe que `deleteProfile` de
+  l'élément B). 4 `id` ajoutés à des éléments qui n'en avaient pas
+  (`row-single-winner`, `bar-rotate-btn`, `bar-recap-btn`, `bar-theme-btn`),
+  aucun autre changement de structure/contenu/style. `Object.assign(window,
+  handlers)` conservé (dette documentée, §12 de `DECISIONS-G.md`) : un test
+  e2e existant hors périmètre (`e2e/pdf-export-offline.spec.ts`, élément E)
+  en dépend encore ; mesuré sans incidence sur la CSP resserrée (une
+  affectation de propriété par un script externe déjà autorisé n'est pas un
+  attribut d'évènement inline). `grep -c 'onclick=' index.html` → `0`.
+  `npm run typecheck`/`lint`/`test` (87/87)/`build` tous verts.
+  14 nouveaux tests e2e (`e2e/onclick-wiring.spec.ts`) couvrant chaque
+  écran/parcours, 3 mutations testées (cassées puis restaurées, échec
+  confirmé avant restauration, catégories distinctes : appel simple,
+  transmission d'évènement réel, argument littéral d'un appel composé).
+  Zéro régression visuelle (captures identiques octet pour octet, RNG figée
+  pour le lanceur de dés) ; les 9 tests d'accessibilité de l'élément D
+  (rôles ARIA, focus visible, piège de focus/Échap) revérifiés verts sans
+  modification. Une fois tout ceci vert : `'unsafe-inline'` retiré de
+  `script-src` dans `vercel.json` (`style-src` conservé, hors périmètre) et
+  vérifié par un nouveau test e2e committé (`e2e/csp-script-src.spec.ts`,
+  en-têtes lus dynamiquement depuis `vercel.json`, écouteur
+  `securitypolicyviolation` sur un parcours complet incluant l'export PDF
+  et le lanceur de dés) : 0 violation CSP, 0 erreur JS ; mutation testée
+  (`'unsafe-inline'` réintroduit → le test échoue, restauré). Voir
+  `docs/audit/DECISIONS-G.md` pour le détail complet (inventaire exhaustif
+  des 65 cas, dette restante).
 
 ## 8. Élément G (round 3, post-clôture) — retrait des `onclick` inline
 

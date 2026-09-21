@@ -1396,9 +1396,9 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
 
 <div id="setup-page" class="page active">
   <div class="logo">
-    <button class="logo-gear" id="theme-gear-btn" onclick="showThemeFromSetup()" aria-label="Thème">🎨</button>
+    <button class="logo-gear" id="theme-gear-btn" aria-label="Thème">🎨</button>
     <div class="logo-lang" id="lang-picker">
-      <button class="lang-flag-btn" id="lang-flag-btn" onclick="toggleLangDropdown()" aria-label="Changer de langue">🇬🇧</button>
+      <button class="lang-flag-btn" id="lang-flag-btn" aria-label="Changer de langue">🇬🇧</button>
       <div class="lang-dropdown hidden" id="lang-dropdown"></div>
     </div>
     <div class="logo-mark">
@@ -1415,8 +1415,8 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
   <div class="restore-banner hidden" id="restore-banner">
     <div class="restore-banner-text" id="restore-banner-text">🎮 Partie en cours<br>sauvegardée</div>
     <div class="restore-banner-btns">
-      <button class="restore-btn yes" id="restore-btn-yes" onclick="restoreGame()">Reprendre</button>
-      <button class="restore-btn no" id="restore-btn-no" onclick="discardSave()">Effacer</button>
+      <button class="restore-btn yes" id="restore-btn-yes">Reprendre</button>
+      <button class="restore-btn no" id="restore-btn-no">Effacer</button>
     </div>
   </div>
   <div class="setup-divider">
@@ -1448,31 +1448,31 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
   <div class="setup-section">
     <span class="setup-label" id="label-endgame">Conditions de fin de jeu</span>
     <div class="objectif-row">
-      <div class="objectif-chip" id="obj-win"  onclick="clearPresetSelection();selectObjectif('win')">Victoire</div>
-      <div class="objectif-chip" id="obj-elim" onclick="clearPresetSelection();selectObjectif('elim')">Défaite</div>
-      <div class="objectif-chip on" id="obj-none" onclick="clearPresetSelection();selectObjectif('none')">No limit</div>
+      <div class="objectif-chip" id="obj-win">Victoire</div>
+      <div class="objectif-chip" id="obj-elim">Défaite</div>
+      <div class="objectif-chip on" id="obj-none">No limit</div>
     </div>
     <div id="objectif-input">
       <div class="objectif-presets" id="objectif-presets">
-        <div class="points-chip" data-oval="0"   onclick="clearPresetSelection();selectObjectifPreset(0)">0</div>
-        <div class="points-chip" data-oval="10"  onclick="clearPresetSelection();selectObjectifPreset(10)">10</div>
-        <div class="points-chip" data-oval="20"  onclick="clearPresetSelection();selectObjectifPreset(20)">20</div>
-        <div class="points-chip" data-oval="50"  onclick="clearPresetSelection();selectObjectifPreset(50)">50</div>
-        <div class="points-chip" data-oval="100" onclick="clearPresetSelection();selectObjectifPreset(100)">100</div>
-        <div class="points-chip" data-oval="150" onclick="clearPresetSelection();selectObjectifPreset(150)">150</div>
+        <div class="points-chip" data-oval="0">0</div>
+        <div class="points-chip" data-oval="10">10</div>
+        <div class="points-chip" data-oval="20">20</div>
+        <div class="points-chip" data-oval="50">50</div>
+        <div class="points-chip" data-oval="100">100</div>
+        <div class="points-chip" data-oval="150">150</div>
       </div>
       <input class="points-input" id="objectif-custom" type="number" inputmode="numeric" placeholder="Autre valeur…">
     </div>
     <!-- Options victoire (visibles seulement si mode=win) -->
     <div id="win-options">
-      <div class="win-option-row" onclick="toggleSingleWinner()">
+      <div class="win-option-row" id="row-single-winner">
         <div class="win-option-toggle" id="toggle-single-winner"></div>
         <div class="win-option-texts">
           <div class="win-option-label" id="label-single-winner">Fin dès la première victoire</div>
           <div class="win-option-sub" id="label-single-winner-sub">Les autres joueurs sont automatiquement perdants</div>
         </div>
       </div>
-      <div class="win-option-row" id="row-last-loser" onclick="toggleLastLoser()">
+      <div class="win-option-row" id="row-last-loser">
         <div class="win-option-toggle" id="toggle-last-loser"></div>
         <div class="win-option-texts">
           <div class="win-option-label" id="label-last-loser">Dernier joueur perdant</div>
@@ -1481,11 +1481,11 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
       </div>
     </div>
   </div>
-  <button class="go-btn" id="go-btn" disabled onclick="showNamesScreen()">Suivant →</button>
+  <button class="go-btn" id="go-btn" disabled>Suivant →</button>
   <div class="setup-btn-row">
-    <button class="names-back names-back-flex" id="btn-savedefault" onclick="saveAsDefault(event)"><span class="btn-emoji">💾</span><span class="btn-label">Enregistrer ces<br>réglages</span></button>
-    <button class="names-back names-back-flex" id="btn-restoredefault" onclick="restoreSavedDefaults(event)"><span class="btn-emoji">↺</span><span class="btn-label">Restaurer les<br>réglages</span></button>
-    <button class="names-back names-back-flex" id="btn-cleardefault" onclick="clearSavedDefaults(event)"><span class="btn-emoji">🗑</span><span class="btn-label">Rien à<br>effacer</span></button>
+    <button class="names-back names-back-flex" id="btn-savedefault"><span class="btn-emoji">💾</span><span class="btn-label">Enregistrer ces<br>réglages</span></button>
+    <button class="names-back names-back-flex" id="btn-restoredefault"><span class="btn-emoji">↺</span><span class="btn-label">Restaurer les<br>réglages</span></button>
+    <button class="names-back names-back-flex" id="btn-cleardefault"><span class="btn-emoji">🗑</span><span class="btn-label">Rien à<br>effacer</span></button>
   </div>
 </div>
 
@@ -1493,7 +1493,7 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
   <div id="theme-mat-screen"></div>
   <div class="page-top-spacer"></div>
   <div class="settings-header">
-    <button class="back-btn" id="theme-back-btn" onclick="backFromTheme()" aria-label="Retour">←</button>
+    <button class="back-btn" id="theme-back-btn" aria-label="Retour">←</button>
     <div class="settings-title" id="settings-title-txt">🎨 Thème</div>
   </div>
   <div class="setup-section">
@@ -1502,17 +1502,17 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
     <div class="themes-grid" id="themes-grid"></div>
   </div>
   <div class="save-confirm" id="save-confirm"></div>
-  <button class="save-btn btn-privacy-link" id="btn-privacy-txt" onclick="showPrivacy()">🔒 Politique de confidentialité</button>
+  <button class="save-btn btn-privacy-link" id="btn-privacy-txt">🔒 Politique de confidentialité</button>
 </div>
 
 <div class="page" id="privacy-modal">
   <div class="page-top-spacer"></div>
   <div class="settings-header">
-    <button class="back-btn" id="privacy-back-btn" onclick="closePrivacy()" aria-label="Retour">←</button>
+    <button class="back-btn" id="privacy-back-btn" aria-label="Retour">←</button>
     <div class="settings-title" id="privacy-title-txt">🔒 Confidentialité</div>
   </div>
   <div class="logo-lang" id="lang-picker-privacy">
-    <button class="lang-flag-btn" id="lang-flag-btn-privacy" onclick="toggleLangDropdownPrivacy()" aria-label="Changer de langue">🇬🇧</button>
+    <button class="lang-flag-btn" id="lang-flag-btn-privacy" aria-label="Changer de langue">🇬🇧</button>
     <div class="lang-dropdown hidden" id="lang-dropdown-privacy"></div>
   </div>
   <div class="setup-section">
@@ -1527,9 +1527,9 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
       <p class="st-privacy-p"><strong class="privacy-strong" id="privacy-s4t">Vos droits</strong><br>
       <span id="privacy-s4">Vous pouvez supprimer toutes les données stockées à tout moment en effaçant les données du site dans les paramètres de votre navigateur.</span></p>
       <div id="privacy-s5-section"><p class="st-privacy-p st-privacy-p-last"><strong class="privacy-strong" id="privacy-s5t">Effacer mes données</strong><br>
-      <button class="btn-clear-all" id="btn-cleardata" onclick="clearAllData()">🗑 Supprimer toutes les données</button></p></div>
+      <button class="btn-clear-all" id="btn-cleardata">🗑 Supprimer toutes les données</button></p></div>
       <p class="st-privacy-date" id="privacy-date">Dernière mise à jour : avril 2026</p>
-      <button class="go-btn hidden" id="btn-privacy-accept" onclick="acceptPrivacy()"></button>
+      <button class="go-btn hidden" id="btn-privacy-accept"></button>
     </div>
   </div>
 </div>
@@ -1539,15 +1539,15 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
   <div class="names-title" id="names-title">Joueurs</div>
   <div class="names-sub" id="names-sub">Optionnel — laisser vide pour jouer sans nom</div>
   <div class="names-actions">
-    <button class="names-action-btn" id="btn-shuffle" onclick="shufflePlayers()">🔀 Mélanger</button>
-    <button class="names-action-btn" id="btn-memorize" onclick="saveProfiles()">💾 Mémoriser</button>
-    <button class="names-action-btn" id="btn-clearfields" onclick="clearNames()">↺ Vider les cases</button>
-    <button class="names-action-btn" id="btn-clearnames" onclick="clearAll()">✕ Tout effacer</button>
+    <button class="names-action-btn" id="btn-shuffle">🔀 Mélanger</button>
+    <button class="names-action-btn" id="btn-memorize">💾 Mémoriser</button>
+    <button class="names-action-btn" id="btn-clearfields">↺ Vider les cases</button>
+    <button class="names-action-btn" id="btn-clearnames">✕ Tout effacer</button>
   </div>
   <div class="profiles-list hidden" id="profiles-list"></div>
   <div id="names-list"></div>
-  <button class="names-go-btn" id="names-go-btn" onclick="startGame()">Lancer ▶</button>
-  <button class="names-back" id="btn-back-names" onclick="showSetup()">← Retour</button>
+  <button class="names-go-btn" id="names-go-btn">Lancer ▶</button>
+  <button class="names-back" id="btn-back-names">← Retour</button>
 </div>
 
 <div id="game-screen">
@@ -1561,33 +1561,33 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
     <button class="bar-btn" id="undo-btn" disabled>
       <span class="btn-icon" aria-hidden="true">↩</span><span class="btn-label" id="bar-undo-label">Annuler</span>
     </button>
-    <button class="bar-btn accent-btn" onclick="rotatePlayers()">
+    <button class="bar-btn accent-btn" id="bar-rotate-btn">
       <span class="btn-icon" aria-hidden="true">🔄</span><span class="btn-label" id="bar-rotate-label">Rotation</span>
     </button>
-    <button class="bar-btn" onclick="showRecap()">
+    <button class="bar-btn" id="bar-recap-btn">
       <span class="btn-icon" aria-hidden="true">📋</span><span class="btn-label" id="bar-recap-label">Récap</span>
     </button>
-    <button class="bar-btn" onclick="showThemeFromGame()">
+    <button class="bar-btn" id="bar-theme-btn">
       <span class="btn-icon" aria-hidden="true">🎨</span><span class="btn-label" id="bar-theme-label">Thème</span>
     </button>
-    <button class="bar-btn danger" onclick="document.getElementById('reset-modal').classList.remove('hidden')">
+    <button class="bar-btn danger" id="bar-reset-btn">
       <span class="btn-icon" aria-hidden="true">✕</span><span class="btn-label" id="bar-reset-label">Reset</span>
     </button>
   </div>
 </div>
 
 <!-- Bouton dé flottant (centre du plateau) -->
-<div id="dice-fab" class="hidden" onclick="openDice()">🎲</div>
+<div id="dice-fab" class="hidden">🎲</div>
 
 <!-- Overlay lanceur de dés -->
-<div id="dice-overlay" class="hidden" onclick="if(event.target===this)closeDice()" role="dialog" aria-modal="true" aria-labelledby="dice-title" tabindex="-1">
+<div id="dice-overlay" class="hidden" role="dialog" aria-modal="true" aria-labelledby="dice-title" tabindex="-1">
   <div class="dice-sheet">
     <div class="dice-handle"></div>
     <div class="dice-sheet-top" id="dice-sheet-top">
     <div class="dice-title" id="dice-title">🎲 Lanceur de dés</div>
 
     <!-- En-tête repliable : hamburger seul -->
-    <button class="dice-config-toggle collapsed" id="dice-config-toggle" onclick="diceToggleConfig()" aria-expanded="false" aria-label="Choisir le type de dé">
+    <button class="dice-config-toggle collapsed" id="dice-config-toggle" aria-expanded="false" aria-label="Choisir le type de dé">
       <span class="dice-type-badge" id="dice-type-badge">d6</span>
     </button>
 
@@ -1597,17 +1597,17 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
         <div class="dice-config-group">
           <div class="dice-config-label" id="dice-faces-label">Type</div>
           <div class="dice-select-row">
-            <button class="dice-step" id="dice-faces-minus" onclick="diceFacesStep(-1)" aria-label="Type de dé précédent">−</button>
+            <button class="dice-step" id="dice-faces-minus" aria-label="Type de dé précédent">−</button>
             <span class="dice-value" id="dice-faces-val">d6</span>
-            <button class="dice-step" id="dice-faces-plus" onclick="diceFacesStep(1)" aria-label="Type de dé suivant">+</button>
+            <button class="dice-step" id="dice-faces-plus" aria-label="Type de dé suivant">+</button>
           </div>
         </div>
         <div class="dice-config-group">
           <div class="dice-config-label" id="dice-count-label">Dés</div>
           <div class="dice-select-row">
-            <button class="dice-step" id="dice-count-minus" onclick="diceCountStep(-1)" aria-label="Moins de dés">−</button>
+            <button class="dice-step" id="dice-count-minus" aria-label="Moins de dés">−</button>
             <span class="dice-value" id="dice-count-val">1</span>
-            <button class="dice-step" id="dice-count-plus" onclick="diceCountStep(1)" aria-label="Plus de dés">+</button>
+            <button class="dice-step" id="dice-count-plus" aria-label="Plus de dés">+</button>
           </div>
         </div>
       </div>
@@ -1618,13 +1618,13 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
     <div class="dice-result" id="dice-result"></div>
 
     <!-- Bouton lancer -->
-    <button class="dice-roll-btn" id="dice-roll-btn" onclick="rollDice()">🎲 Lancer</button>
+    <button class="dice-roll-btn" id="dice-roll-btn">🎲 Lancer</button>
 
     <!-- Actions après lancer -->
     <div id="dice-post" style="display:none;">
       <div class="dice-actions">
-        <button class="dice-act add" onclick="dicePickPlayer('add')" id="dice-add-btn">+ Ajouter</button>
-        <button class="dice-act sub" onclick="dicePickPlayer('sub')" id="dice-sub-btn">− Retirer</button>
+        <button class="dice-act add" id="dice-add-btn">+ Ajouter</button>
+        <button class="dice-act sub" id="dice-sub-btn">− Retirer</button>
       </div>
     </div>
 
@@ -1632,10 +1632,10 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
     <div id="dice-player-pick" style="display:none;">
       <div class="dice-prompt" id="dice-pick-prompt">Choisir un joueur</div>
       <div class="dice-players" id="dice-players-list"></div>
-      <button class="dice-close" onclick="diceCancelPick()" id="dice-pick-back">← Retour</button>
+      <button class="dice-close" id="dice-pick-back">← Retour</button>
     </div>
 
-    <button class="dice-close" onclick="closeDice()" id="dice-close-btn">Fermer</button>
+    <button class="dice-close" id="dice-close-btn">Fermer</button>
     </div><!-- /dice-sheet-top -->
 
     <!-- Historique -->
@@ -1654,13 +1654,13 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
       <div class="modal-player" id="score-modal-player"></div>
       <div class="modal-score-display pos" id="score-modal-display">+0</div>
       <div class="modal-sign-row">
-        <button class="sign-btn minus" id="sign-minus" onclick="setSign(-1)">－ Perte</button>
-        <button class="sign-btn plus active" id="sign-plus" onclick="setSign(1)">＋ Gain</button>
+        <button class="sign-btn minus" id="sign-minus">－ Perte</button>
+        <button class="sign-btn plus active" id="sign-plus">＋ Gain</button>
       </div>
       <div class="modal-keypad" id="modal-keypad"></div>
       <div class="modal-confirm-row">
-        <button class="modal-btn primary" id="score-modal-confirm-btn" onclick="confirmScoreModal()" aria-label="Valider">✅</button>
-        <button class="modal-btn secondary" id="score-modal-cancel-btn" onclick="closeScoreModal()" aria-label="Annuler">❌</button>
+        <button class="modal-btn primary" id="score-modal-confirm-btn" aria-label="Valider">✅</button>
+        <button class="modal-btn secondary" id="score-modal-cancel-btn" aria-label="Annuler">❌</button>
       </div>
     </div>
   </div>
@@ -1672,9 +1672,9 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
     <div class="winner-name" id="winner-name">—</div>
     <div class="winner-sub" id="winner-sub">—</div>
     <div class="winner-btns">
-      <button class="modal-btn primary" id="btn-seerecap" onclick="showRecap()">Voir le récap</button>
-      <button class="modal-btn secondary" id="btn-newgame" onclick="startNewGameSameSetup()">Nouvelle partie</button>
-      <button class="modal-btn secondary" id="btn-returnmenu" onclick="confirmReset()">Retour au menu</button>
+      <button class="modal-btn primary" id="btn-seerecap">Voir le récap</button>
+      <button class="modal-btn secondary" id="btn-newgame">Nouvelle partie</button>
+      <button class="modal-btn secondary" id="btn-returnmenu">Retour au menu</button>
     </div>
   </div>
 </div>
@@ -1683,9 +1683,9 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
   <div class="simple-modal-box">
     <div class="winner-sub reset-sub" id="reset-sub-txt"></div>
     <div class="simple-modal-btns">
-      <button class="modal-btn primary" id="btn-newgame-reset" onclick="startNewGameSameSetup()"><span id="reset-btn-newgame">Nouvelle partie</span></button>
-      <button class="modal-btn secondary" id="btn-menu-reset" onclick="confirmReset()"><span id="reset-btn-menu">Retour au menu</span></button>
-      <button class="modal-btn secondary" id="btn-back-reset" onclick="document.getElementById('reset-modal').classList.add('hidden')"><span id="reset-btn-back">Retour au jeu</span></button>
+      <button class="modal-btn primary" id="btn-newgame-reset"><span id="reset-btn-newgame">Nouvelle partie</span></button>
+      <button class="modal-btn secondary" id="btn-menu-reset"><span id="reset-btn-menu">Retour au menu</span></button>
+      <button class="modal-btn secondary" id="btn-back-reset"><span id="reset-btn-back">Retour au jeu</span></button>
     </div>
   </div>
 </div>
@@ -1696,8 +1696,8 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
     <div class="winner-name" id="elim-confirm-name">—</div>
     <div class="winner-sub" id="elim-confirm-sub">Score à 0 — confirmer l'élimination ?</div>
     <div class="simple-modal-btns">
-      <button class="modal-btn primary" id="btn-elim-confirm-txt" onclick="confirmElim()">Confirmer</button>
-      <button class="modal-btn secondary" id="btn-cancel-elim" onclick="cancelElim()">Annuler</button>
+      <button class="modal-btn primary" id="btn-elim-confirm-txt">Confirmer</button>
+      <button class="modal-btn secondary" id="btn-cancel-elim">Annuler</button>
     </div>
   </div>
 </div>
@@ -1708,8 +1708,8 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
     <div class="winner-name" id="endgame-modal-title">Fin de partie</div>
     <div class="winner-sub" id="endgame-modal-sub">Confirmer la fin de la partie ?</div>
     <div class="simple-modal-btns">
-      <button class="modal-btn primary" id="endgame-modal-confirm-btn" onclick="confirmEndgame()">Confirmer</button>
-      <button class="modal-btn secondary" id="endgame-btn-cancel" onclick="cancelEndgame()">Annuler</button>
+      <button class="modal-btn primary" id="endgame-modal-confirm-btn">Confirmer</button>
+      <button class="modal-btn secondary" id="endgame-btn-cancel">Annuler</button>
     </div>
   </div>
 </div>
@@ -1728,13 +1728,13 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
       <label class="pdf-check-row"><input type="checkbox" id="pdf-chk-history" checked><span class="pdf-check-label" id="pdf-lbl-history">Historique des actions</span></label>
       <label class="pdf-check-row"><input type="checkbox" id="pdf-chk-info"><span class="pdf-check-label" id="pdf-lbl-info">Infos partie (preset, date)</span></label>
     </div>
-    <button class="btn-pdf" id="btn-pdf-dl" onclick="exportRecapPDF()">📄 Télécharger PDF</button>
+    <button class="btn-pdf" id="btn-pdf-dl">📄 Télécharger PDF</button>
   </div>
   <div id="recap-body"></div>
 </div>
 
 <!-- Overlay animation finisher -->
-<div id="fin-anim-overlay" onclick="stopFinAnim()" role="alert" aria-live="assertive">
+<div id="fin-anim-overlay" role="alert" aria-live="assertive">
   <canvas id="fin-anim-canvas"></canvas>
   <div id="fin-anim-texts">
     <div id="fin-anim-name"></div>
@@ -1743,7 +1743,7 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
   </div>
 </div>
 <!-- Overlay animation victoire -->
-<div id="win-anim-overlay" onclick="stopWinAnim()" role="alert" aria-live="assertive">
+<div id="win-anim-overlay" role="alert" aria-live="assertive">
   <canvas id="win-anim-canvas"></canvas>
   <div id="win-anim-texts">
     <canvas id="win-anim-trophy-canvas" width="160" height="160" aria-hidden="true"></canvas>
@@ -1753,7 +1753,7 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
   </div>
 </div>
 <!-- Overlay animation élimination -->
-<div id="elim-anim-overlay" onclick="stopElimAnim()" role="alert" aria-live="assertive">
+<div id="elim-anim-overlay" role="alert" aria-live="assertive">
   <canvas id="elim-anim-noise"></canvas>
   <div id="elim-anim-skull" aria-hidden="true">☠️</div>
   <div id="elim-anim-texts">
