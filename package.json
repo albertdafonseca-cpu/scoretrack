@@ -2,6 +2,7 @@
   "name": "scoretrack",
   "version": "74.0.0",
   "private": true,
+  "license": "UNLICENSED",
   "description": "Compteur de scores universel + lanceur de dés 3D",
   "type": "module",
   "scripts": {
