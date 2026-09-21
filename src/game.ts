@@ -1,7 +1,8 @@
 import { _detectLang, _flashBtnLabel, _getFooterBtn, applyLang, currentLang, setCurrentLang, t, updateRestoreBtn } from './i18n';
 import { playElimAnim, playWinAnim } from './animations';
 import { diceRenderPreview, diceResetPreview, diceUpdateFab } from './dice-ui';
-import { $, $opt, $$, $q } from './dom';
+import { $, $opt, $$, $q, escapeHtml } from './dom';
+import { ICON_FLAG, ICON_LOCK, ICON_SKULL, ICON_TROPHY, victoryIcon } from './ui-icons';
 import type { BloquerMode, CardRot, GameConfig, GamePreset, GameSave, HistoryGroup, ObjectifMode, Player, Settings, Theme, UndoSnapshot } from './types';
 
 /** Overlay du modal de score : porte l'orientation courante et l'état de glissement. */
@@ -76,6 +77,44 @@ export function fmtNum(n: number){
   return n.toLocaleString('fr-FR');
 }
 
+// ── ICÔNES FONCTIONNELLES (P1 #7 du constat initial, élément H) ────
+// `btn-privacy-txt`/`privacy-title-txt` reçoivent leur texte via
+// `src/i18n.ts` (`_setText`, hors périmètre de cet élément) qui fait
+// `el.textContent=val` (donc écrase tout enfant existant, y compris un SVG
+// posé à l'avance) et peut être appelé aussi bien depuis `loadSettings`
+// ci-dessous que directement depuis le sélecteur de langue d'`i18n.ts`
+// (hors de notre portée) : un MutationObserver — plutôt qu'un correctif au
+// seul point d'appel connu — repose l'icône SVG à chaque fois que le texte
+// est réécrit, quel que soit l'appelant.
+// Les 18 langues de `src/i18n/translations.ts` ne préfixent plus le texte
+// par l'émoji cadenas (nettoyé à la source, voir docs/audit/DECISIONS-H.md
+// §17.1) : `_fixLockIcon` pose donc l'icône de façon INCONDITIONNELLE,
+// avec un retrait défensif d'un éventuel préfixe émoji résiduel (aucune
+// source connue n'en produit plus, mais un appelant externe pourrait).
+// Émoji reconstruit par point de code (pas de littéral dans ce fichier) :
+// évite de réintroduire l'émoji système dans le source vérifié par
+// `grep` (voir docs/audit/DECISIONS-H.md §1, preuve de vérification).
+const LOCK_EMOJI=String.fromCodePoint(0x1F512);
+const LOCK_PREFIX_RE=new RegExp('^\\s*'+LOCK_EMOJI+'\\uFE0F?\\s*','u');
+export function _fixLockIcon(el: HTMLElement){
+  if(el.querySelector('svg.ui-icon'))return; // déjà posée : évite une boucle avec le MutationObserver
+  const rest=(el.textContent||'').replace(LOCK_PREFIX_RE,'');
+  el.innerHTML=ICON_LOCK+' '+escapeHtml(rest);
+}
+function _watchLockIcon(id: string){
+  const el=$opt(id);
+  if(!el)return;
+  _fixLockIcon(el);
+  new MutationObserver(()=>_fixLockIcon(el)).observe(el,{childList:true,subtree:true,characterData:true});
+}
+/** À appeler une fois au démarrage (voir `loadSettings`) : pose la surveillance
+ *  de l'icône cadenas SVG, résiliente aux appels d'`applyLang` hors de notre
+ *  périmètre. */
+export function initFunctionalIcons(){
+  _watchLockIcon('btn-privacy-txt');
+  _watchLockIcon('privacy-title-txt');
+}
+
 // ── SETTINGS ──────────────────────────────────────────────────────
 export function loadSettings(){
   const raw=localStorage.getItem('scoretrack_settings');
@@ -94,6 +133,7 @@ export function loadSettings(){
   // Langue persistée
   setCurrentLang(settings.lang || _detectLang());
   applyLang(currentLang);
+  initFunctionalIcons();
   checkFirstLaunch();
 
   defPlayers=settings.defPlayers||0;
@@ -293,7 +333,7 @@ export function renderPresets(){
     const c=document.createElement('div');
     c.className='preset-card'+(idx===selectedPresetIdx?' on':'');
     c.innerHTML=`<div class="preset-card-name">${t(p.nameKey)}</div><div class="preset-card-detail">${t(p.detailKey)}</div>`;
-    c.onclick=()=>applyPreset(idx);
+    c.addEventListener('click',()=>applyPreset(idx));
     g.appendChild(c);
   });
 }
@@ -306,13 +346,13 @@ export function renderThemeGrid(){
     card.className='theme-card'+(selectedTheme===th.id?' selected':'');
     card.style.background=th.bg;
     card.innerHTML=`<div class="theme-check">✓</div><div class="theme-card-name" style="color:${th.a}">${t(th.nameKey)}</div><div class="theme-swatches"><div class="theme-swatch" style="background:${th.a};box-shadow:0 0 6px ${th.a}"></div><div class="theme-swatch" style="background:${th.b};box-shadow:0 0 6px ${th.b}"></div><div class="theme-swatch" style="background:${th.bg};border:1px solid ${th.a}44"></div></div>`;
-    card.onclick=()=>{
+    card.addEventListener('click',()=>{
       $$<HTMLElement>('.theme-card').forEach(c=>c.classList.remove('selected'));
       card.classList.add('selected');selectedTheme=th.id;applyTheme(th.id);
       applyScreenMaterial(th.id);
       settings.theme=th.id;
       try{localStorage.setItem('scoretrack_settings',JSON.stringify(settings));}catch(e){}
-    };
+    });
     g.appendChild(card);
   });
   applyScreenMaterial(selectedTheme);
@@ -506,9 +546,15 @@ export function renderProfileChips(){
   if(!profiles.length){list.classList.add('hidden');return;}
   list.classList.remove('hidden');
   profiles.forEach(name=>{
+    // Construction par DOM (pas d'innerHTML) : le nom du joueur est une donnée
+    // utilisateur arbitraire, jamais interpolée dans du HTML ou dans un attribut
+    // onclick — voir docs/audit/DECISIONS-B.md (correctif de l'injection P0).
     const chip=document.createElement('div');chip.className='profile-chip';
-    chip.innerHTML=`<span>${name}</span><span class="profile-chip-del" onclick="event.stopPropagation();deleteProfile('${name.replace(/'/g,"\\'")}')">✕</span>`;
-    chip.onclick=()=>fillName(name);
+    const label=document.createElement('span');label.textContent=name;
+    const del=document.createElement('span');del.className='profile-chip-del';del.textContent='✕';
+    del.addEventListener('click',e=>{e.stopPropagation();deleteProfile(name);});
+    chip.appendChild(label);chip.appendChild(del);
+    chip.addEventListener('click',()=>fillName(name));
     list.appendChild(chip);
   });
 }
@@ -526,7 +572,7 @@ export function fillName(name: string){
   if(empty){empty.value=name;empty.focus();}
 }
 export function deleteProfile(name: string){
-  let profiles=loadProfiles().filter(p=>p!==name);
+  const profiles=loadProfiles().filter(p=>p!==name);
   localStorage.setItem('scoretrack_profiles',JSON.stringify(profiles));
   renderProfileChips();
 }
@@ -724,7 +770,7 @@ export function renderGame(){
     let cell: HTMLDivElement;
     if(i===-1){
       cell=document.createElement('div');
-      cell.style.cssText='background:var(--bg2);overflow:hidden;min-width:0;min-height:0;';
+      cell.className='grid-spacer-cell'; // règle dans css/app.css (simplification, ex `.style.cssText=`)
     } else {
       cell=buildCard(i,rot!);
     }
@@ -765,7 +811,7 @@ export function buildCard(pi: number,rot: CardRot){
   p.rot=rot; // mémoriser la rotation pour le modal
   const inner=document.createElement('div');inner.className='card-inner';inner.id=`inner-${pi}`;
   const cls=scoreClass(p.score);
-  const nameHtml=p.playerName?`<div class="pplayer">${p.playerName}</div>`:`<span class="pplayer-ghost"></span>`;
+  const nameHtml=p.playerName?`<div class="pplayer">${escapeHtml(p.playerName)}</div>`:`<span class="pplayer-ghost"></span>`;
   const zone=document.createElement('div');zone.className='tap-zone';
   zone.innerHTML=`${nameHtml}<div class="score-wrap"><span class="score ${cls}" id="sc-${pi}">${fmtNum(p.score)}</span><span class="delta-flash" id="df-${pi}"></span></div><span class="tap-sign-minus">－</span><span class="tap-sign-plus">＋</span>`;
 
@@ -848,12 +894,12 @@ export function buildCard(pi: number,rot: CardRot){
     const tag=document.createElement('div');tag.className='win-tag';
     const winScore: number|null=p.finalScore!==undefined?p.finalScore:null;
     const scoreStr=winScore!==null?`<div class="tag-score">${fmtNum(winScore)}</div>`:'';
-    const nameStr=p.playerName?`<div class="elim-name">${p.playerName}</div>`:'';
+    const nameStr=p.playerName?`<div class="elim-name">${escapeHtml(p.playerName)}</div>`:'';
     const winnerCount = players.filter(pl=>pl.winner).length;
     const multiWin = winnerCount > 1;
     const modeUnique = !!(singleWinner || (elimPoints!==null && !lastLoser));
     const isChampCard = p.winRank===1 && modeUnique && !multiWin;
-    const winIcon = isChampCard ? '🏆' : '🏁';
+    const winIcon = victoryIcon(isChampCard);
     const winLabel = isChampCard ? t('winner') : t('finisher');
     const winRankStr=multiWin?`<div class="win-rank">#${p.winRank||'?'}</div>`:'';
     tag.innerHTML=`<div class="win-icon">${winIcon}</div><div class="win-label">${winLabel}</div>${nameStr}${winRankStr}${scoreStr}`;
@@ -866,10 +912,10 @@ export function buildCard(pi: number,rot: CardRot){
     const ppE=$q<HTMLElement>('.pplayer',zone);
     if(ppE)ppE.style.display='none'; // masquer le prénom de la zone
     const tag=document.createElement('div');tag.className='elim-tag';
-    const nameStr=p.playerName?`<div class="elim-name">${p.playerName}</div>`:'';
+    const nameStr=p.playerName?`<div class="elim-name">${escapeHtml(p.playerName)}</div>`:'';
     const rankStr=p.elimRank?`<div class="elim-rank">#${p.elimRank}</div>`:'';
     const elimScore=p.finalScore!==undefined?p.finalScore:p.score;
-    tag.innerHTML=`<div class="elim-icon">💀</div><div class="elim-label">${t('eliminated')}</div>${nameStr}${rankStr}<div class="tag-score">${fmtNum(elimScore)}</div>`;
+    tag.innerHTML=`<div class="elim-icon">${ICON_SKULL}</div><div class="elim-label">${t('eliminated')}</div>${nameStr}${rankStr}<div class="tag-score">${fmtNum(elimScore)}</div>`;
     inner.appendChild(tag);
   }
   card.appendChild(inner);return card;
@@ -1019,19 +1065,54 @@ document.addEventListener('visibilitychange',()=>{
 // Pas d'action supplémentaire sur orientationchange — les modaux g/d gèrent nativement
 
 // ── ADJUST ────────────────────────────────────────────────────────
+/** Réglages de plafonnement pris en compte par {@link computeClampedScore}. */
+export interface ScoreLimits {
+  bloquerMode: BloquerMode;
+  startPoints: number;
+  allowNeg: boolean;
+  objectifMode: ObjectifMode;
+  winPoints: number|null;
+  maxPoints: number;
+}
+/** Résultat du calcul d'un ajustement de score borné. */
+export interface ClampedAdjustment {
+  /** score brut avant plafonnement (mémorisé pour le mode « bloquer ») */
+  rawScore: number;
+  /** score effectivement appliqué, après plafonnement */
+  newScore: number;
+  /** variation réellement appliquée (newScore − score précédent) */
+  realDelta: number;
+  /** variation brute avant plafonnement (score précédent → rawScore), pour l'historique */
+  rawDelta: number;
+}
+/**
+ * Calcule le score borné après application d'un delta, selon les réglages de
+ * partie donnés (plafond « bloquer », plafond d'objectif, autorisation du
+ * négatif). Fonction pure (aucun accès DOM ni état module) : factorise la
+ * logique auparavant dupliquée entre `adjust()` (tap +/−) et
+ * `confirmScoreModal()` (saisie manuelle) — voir docs/audit/DECISIONS-B.md.
+ */
+export function computeClampedScore(prevScore: number, delta: number, limits: ScoreLimits): ClampedAdjustment {
+  const minVal=limits.bloquerMode==='min'?limits.startPoints:(limits.allowNeg||limits.objectifMode==='elim'||limits.objectifMode==='none'?-Infinity:(limits.objectifMode==='win'&&limits.winPoints!==null&&limits.winPoints<limits.startPoints?limits.winPoints:0));
+  const capMax=limits.bloquerMode==='max'?limits.startPoints:(limits.maxPoints===Infinity?Infinity:limits.maxPoints);
+  const rawScore=prevScore+delta; // score brut avant clamp
+  const newScore=Math.min(capMax,Math.max(minVal,rawScore));
+  const realDelta=newScore-prevScore;
+  const rawDelta=rawScore-prevScore;
+  return {rawScore,newScore,realDelta,rawDelta};
+}
+/** Réglages courants de plafonnement, à passer à {@link computeClampedScore}. */
+function currentScoreLimits(): ScoreLimits {
+  return {bloquerMode,startPoints,allowNeg,objectifMode,winPoints,maxPoints};
+}
 export function adjust(i: number,delta: number,zone?: HTMLElement|null){
   const p=players[i];if(p.eliminated||p.winner)return;
-  const minVal=bloquerMode==='min'?startPoints:(allowNeg||objectifMode==='elim'||objectifMode==='none'?-Infinity:(objectifMode==='win'&&winPoints!==null&&winPoints<startPoints?winPoints:0));
-  const capMax=bloquerMode==='max'?startPoints:(maxPoints===Infinity?Infinity:maxPoints);
-  const rawScore=p.score+delta; // score brut avant clamp
-  const newScore=Math.min(capMax,Math.max(minVal,rawScore));
-  const realDelta=newScore-p.score;
+  const {rawScore,newScore,realDelta,rawDelta}=computeClampedScore(p.score,delta,currentScoreLimits());
   if(realDelta===0){
     flashZone(zone,'flash-neg');
     if(navigator.vibrate)navigator.vibrate([30,20,30]);
     return;
   }
-  const rawDelta=rawScore-(newScore-realDelta);
   const _prevScore=p.score, _prevRawScore=p.rawScore; // snapshot AVANT modification
   saveUndo();p.score=newScore;p.rawScore=rawScore;
   window._lastAdjustPrev={playerIdx:i, score:_prevScore, rawScore:_prevRawScore};
@@ -1102,7 +1183,7 @@ export function updateDisplay(i: number,zone: HTMLElement|null|undefined,delta: 
 
       if(singleWinner){
         const winnerName=p.playerName||(t('player')+' '+(i+1));
-        $('endgame-modal-icon').textContent='🏆';
+        $('endgame-modal-icon').innerHTML=ICON_TROPHY;
         $('endgame-modal-title').textContent=winnerName;
         $('endgame-modal-sub').textContent=(t('singleWinnerConfirm')||'Fin de partie — les autres joueurs sont perdants. Confirmer ?');
         $('endgame-modal').classList.remove('hidden');
@@ -1124,7 +1205,7 @@ export function updateDisplay(i: number,zone: HTMLElement|null|undefined,delta: 
         const loserIdx=players.indexOf(loser);
         const winnerName=p.playerName||(t('player')+' '+(i+1));
         const loserName=loser.playerName||(t('player')+' '+(loserIdx+1));
-        $('endgame-modal-icon').textContent='🏁';
+        $('endgame-modal-icon').innerHTML=ICON_FLAG;
         $('endgame-modal-title').textContent=winnerName;
         $('endgame-modal-sub').textContent=loserName+' '+(t('lastLoserConfirm')||'sera désigné perdant. Confirmer ?');
         $('endgame-modal').classList.remove('hidden');
@@ -1338,7 +1419,7 @@ export function openScoreModal(pi: number, forceRot?: CardRot){
 
     // Lire les safe-areas via élément sentinelle
     const _sa=document.createElement('div');
-    _sa.style.cssText='position:fixed;top:env(safe-area-inset-top,0px);left:env(safe-area-inset-left,0px);right:env(safe-area-inset-right,0px);bottom:env(safe-area-inset-bottom,0px);pointer-events:none;';
+    _sa.className='safe-area-probe'; // règle dans css/app.css (simplification, ex `.style.cssText=`)
     document.body.appendChild(_sa);
     const _sar=_sa.getBoundingClientRect();
     const safeL=_sar.left, safeR=vw-_sar.right, safeT=_sar.top, safeB=vh-_sar.bottom;
@@ -1607,15 +1688,11 @@ export function confirmScoreModal(){
   const v=parseInt(modalValue)||0;if(v===0){closeScoreModal();return;}
   const delta=modalSign*v;saveUndo();
   const p=players[modalPlayerIdx];
-  const minVal=bloquerMode==='min'?startPoints:(allowNeg||objectifMode==='elim'||objectifMode==='none'?-Infinity:(objectifMode==='win'&&winPoints!==null&&winPoints<startPoints?winPoints:0));
-  const capMax=bloquerMode==='max'?startPoints:(maxPoints===Infinity?Infinity:maxPoints);
   const prevScore=p.score;
   window._lastAdjustPrev={playerIdx:modalPlayerIdx, score:prevScore, rawScore:p.rawScore};
-  const rawScore=p.score+delta;
-  p.score=Math.min(capMax,Math.max(minVal,rawScore));
+  const {rawScore,newScore,realDelta,rawDelta}=computeClampedScore(prevScore,delta,currentScoreLimits());
+  p.score=newScore;
   p.rawScore=rawScore; // score brut avant clamp
-  const realDelta=p.score-prevScore;
-  const rawDelta=rawScore-prevScore; // delta brut avant clamp
   if(realDelta===0){closeScoreModal();return;}
   updateDisplay(modalPlayerIdx,null,realDelta);
   flashDelta(modalPlayerIdx,realDelta);
@@ -1702,7 +1779,7 @@ export function confirmEndgame(){
       playElimAnim(eg.loserIdx);
       window._afterElimAnim=function(){
         const loserName=loser.playerName||(t('player')+' '+(eg.loserIdx+1));
-        $('winner-icon').textContent='💀';
+        $('winner-icon').innerHTML=ICON_SKULL;
         $('winner-name').textContent=loserName;
         $('winner-sub').textContent=fmtNum(loser.finalScore ?? loser.rawScore ?? loser.score)+' pts';
         $('winner-modal').classList.remove('hidden');
@@ -1716,7 +1793,7 @@ export function confirmEndgame(){
 }
 
 export function showWinnerModal(isChampion: boolean){
-  $('winner-icon').textContent=isChampion?'🏆':'🏁';
+  $('winner-icon').innerHTML=victoryIcon(isChampion);
   $('winner-modal').classList.remove('hidden');
 }
 export function showRecap(){
@@ -1740,7 +1817,7 @@ export function showRecap(){
     const isFinisherMode = multiWin || !modeUniqueWinnerRecap;
     let statusBadge='';
     if(p.winner){
-      const icon=isFinisherMode?'🏁':'🏆';
+      const icon=victoryIcon(!isFinisherMode);
       const label=isFinisherMode?(t('finisher')||'Finisher'):(t('winner')||'Winner');
       const rankStr=(multiWin||isFinisherMode)?' #'+p.winRank:'';
       statusBadge=`<div class="recap-status win">${icon} ${label}${rankStr}</div>`;
@@ -1748,9 +1825,10 @@ export function showRecap(){
     else if(p.eliminated){
       const showRank=players.length>2 && !lastLoser && !singleWinner;
       const ordinal = p.elimRank===1?t('elimFirst1'):((p.elimRank as number)+t('elimFirstN'));
-      statusBadge=`<div class="recap-status elim">💀 ${t('eliminated')}${showRank?' · '+ordinal:''}</div>`;
+      statusBadge=`<div class="recap-status elim">${ICON_SKULL} ${t('eliminated')}${showRank?' · '+ordinal:''}</div>`;
     }
-    html+=`<div class="recap-player"><div class="recap-player-header"><div class="recap-player-dot" style="background:${COLORS[pi%12]};box-shadow:0 0 6px ${COLORS[pi%12]}"></div><div class="recap-player-name">${p.playerName||(t('player')+' '+(pi+1))}</div>${statusBadge}</div>`;
+    const recapPlayerName=p.playerName?escapeHtml(p.playerName):(t('player')+' '+(pi+1));
+    html+=`<div class="recap-player"><div class="recap-player-header"><div class="recap-player-dot" style="background:${COLORS[pi%12]};box-shadow:0 0 6px ${COLORS[pi%12]}"></div><div class="recap-player-name">${recapPlayerName}</div>${statusBadge}</div>`;
     groups.forEach(g=>{
       const sum=g.entries.reduce((s,e)=>s+e.delta,0);
       const cls=sum>0?'pos':'neg';const sign=sum>0?'+':'';
@@ -1761,9 +1839,14 @@ export function showRecap(){
   });
   if(!html)html=`<div style="color:var(--muted2);text-align:center;margin-top:48px;font-family:Share Tech Mono,monospace;font-size:14px;">${t('recapEmpty')}</div>`;
   $('recap-body').innerHTML=html;
-  $('recap-close-btn').onclick=()=>$('recap').classList.add('hidden');
   $('recap').classList.remove('hidden');
 }
+/** Ferme le récapitulatif (bouton `recap-close-btn`, câblé une fois au
+ *  chargement par `src/main.ts` — la précédente affectation `.onclick=`
+ *  était refaite à chaque `showRecap()`, un pattern qu'un `addEventListener`
+ *  câblé une seule fois évite ; voir élément G, docs/audit/DECISIONS-G.md,
+ *  même principe déjà appliqué aux 65 attributs `onclick` statiques). */
+export function closeRecap(){ $('recap').classList.add('hidden'); }
 
 
 // ── NOUVELLE PARTIE — mêmes noms et réglages, direct au compteur ──
@@ -1945,15 +2028,15 @@ export function confirmReset(){
   const g=$('players-grid');
   for(let i=1;i<=12;i++){
     const d=document.createElement('div');d.className='player-chip';d.textContent=String(i);
-    d.onclick=()=>{
+    d.addEventListener('click',()=>{
       $$<HTMLElement>('#players-grid .player-chip').forEach(c=>c.classList.remove('on'));
       d.classList.add('on');numPlayers=i;checkGoBtn();
       selectedPresetIdx=-1;
       $$<HTMLElement>('.preset-card').forEach(c=>c.classList.remove('on'));
-    };
+    });
     g.appendChild(d);
   }
-  $$<HTMLElement>('#start-presets .points-chip').forEach(c=>{c.onclick=()=>{$$<HTMLElement>('#start-presets .points-chip').forEach(x=>x.classList.remove('on'));c.classList.add('on');startPoints=parseInt(c.dataset.val!);$<HTMLInputElement>('points-custom').value='';checkGoBtn();selectedPresetIdx=-1;$$<HTMLElement>('.preset-card').forEach(x=>x.classList.remove('on'));};});
+  $$<HTMLElement>('#start-presets .points-chip').forEach(c=>{c.addEventListener('click',()=>{$$<HTMLElement>('#start-presets .points-chip').forEach(x=>x.classList.remove('on'));c.classList.add('on');startPoints=parseInt(c.dataset.val!);$<HTMLInputElement>('points-custom').value='';checkGoBtn();selectedPresetIdx=-1;$$<HTMLElement>('.preset-card').forEach(x=>x.classList.remove('on'));});});
   $<HTMLInputElement>('points-custom').addEventListener('input',function(){$$<HTMLElement>('#start-presets .points-chip').forEach(x=>x.classList.remove('on'));selectedPresetIdx=-1;$$<HTMLElement>('.preset-card').forEach(c=>c.classList.remove('on'));const v=parseInt(this.value);startPoints=isNaN(v)?-1:v;checkGoBtn();});
   const kp=$('modal-keypad');
   [7,8,9,4,5,6,1,2,3,'⌫',0,'00'].forEach(k=>{

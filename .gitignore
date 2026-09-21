@@ -1,2 +1,15 @@
 node_modules/
 dist/
+
+# Vitest (npm run test --coverage)
+coverage/
+
+# Playwright (npm run test:e2e)
+test-results/
+playwright-report/
+
+# Vercel CLI (vercel dev / vercel link) — config locale à la machine
+.vercel/
+
+# Éditeurs / OS
+.DS_Store

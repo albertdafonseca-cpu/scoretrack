@@ -91,6 +91,14 @@ export interface BodyGeoUserData {
 export interface NumTexUserData {
   /** encombrement du glyphe en fraction du côté de la plaque */
   box?: { w: number; h: number };
+  /**
+   * true si la texture vient du cache partagé (_numTex) : plusieurs dés/plaques la
+   * réutilisent, elle ne doit donc jamais être disposée à la destruction d'un seul
+   * dé (sinon les dés encore vivants perdent leurs chiffres). Les textures NON
+   * partagées (ex. points du d6/d3/pièce, régénérées à chaque construction) restent
+   * candidates à la libération.
+   */
+  shared?: boolean;
 }
 
 /** Rotation euler (x, y) amenant une face du cube à pips face caméra. */

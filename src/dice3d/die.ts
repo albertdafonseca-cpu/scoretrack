@@ -381,16 +381,22 @@ export function _hexHS(hex: number): { h: number; s: number } {
 }
 // fond calculé de la carte joueur color-n POUR LE THÈME ACTIF (couleur unie, sans texture)
 export function _cardBgHex(n: number): number | null {
+  var probe: HTMLDivElement | null=null;
   try{
-    var probe=document.createElement('div');
+    probe=document.createElement('div');
     probe.className='pcard color-'+n;
     probe.style.cssText='position:absolute;visibility:hidden;pointer-events:none;width:1px;height:1px;';
     document.body.appendChild(probe);
     var c=getComputedStyle(probe).backgroundColor;
-    document.body.removeChild(probe);
     var m=c&&c.match(/rgba?\((\d+)[,\s]+(\d+)[,\s]+(\d+)/);
     if(m) return (parseInt(m[1],10)<<16)|(parseInt(m[2],10)<<8)|parseInt(m[3],10);
   }catch(e){}
+  finally{
+    // retirer la sonde même si getComputedStyle/le regex a levé une exception :
+    // sinon un échec en cours de route laisse un <div> orphelin dans le <body>
+    // (appelé jusqu'à 10x par dé construit -> fuite DOM visible en aperçu répété).
+    if(probe && probe.parentNode) probe.parentNode.removeChild(probe);
+  }
   return null;
 }
 export function _diceBodyColor(): number {
@@ -554,7 +560,14 @@ export function _chamferSolid(geo: THREE.BufferGeometry, t: number): THREE.Buffe
 export var _numTexCache: Record<string, THREE.CanvasTexture>={};
 export function _numTex(value: string | number, colorHex: number, dense?: boolean): THREE.CanvasTexture {
   var key=value+'_'+colorHex+(dense?'_d':'');
-  if(!_numTexCache[key]) _numTexCache[key]=dieNumTexture(value,colorHex,dense);
+  if(!_numTexCache[key]){
+    var t=dieNumTexture(value,colorHex,dense);
+    // partagée entre TOUTES les plaques qui réutilisent cette valeur/couleur (cache
+    // ci-dessus) : disposeDieGroup ne doit jamais la libérer, seule une plaque non
+    // mise en cache (ex. textures de points _dieFaceTexture) peut l'être sans risque.
+    (t.userData as NumTexUserData).shared=true;
+    _numTexCache[key]=t;
+  }
   return _numTexCache[key];
 }
 // d4 "vrai" : les chiffres sont écrits près des SOMMETS (3 par face) ; la valeur lue

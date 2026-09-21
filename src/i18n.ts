@@ -11,7 +11,7 @@ export type TKey = TranslationKey | (string & {});
 
 /** Bouton portant l'état d'un libellé « flash » (`_flashBtnLabel`). */
 interface FlashBtn extends HTMLElement {
-  _flashTimer?: number | null;
+  _flashTimer?: ReturnType<typeof setTimeout> | null;
   _flashOrig?: string | null;
 }
 
@@ -125,7 +125,26 @@ export function applyLang(code: LangCode){
   _setText('privacy-date',        t('privacyDate'));
   _setText('btn-privacy-txt',     t('btnPrivacy'));
   _setText('btn-privacy-accept',   t('btnGotIt'));
+  // Accessibilité : libellés accessibles des boutons ne portant qu'une icône
+  // ou un symbole (aucun texte visible pour les lecteurs d'écran), traduits
+  // avec le reste de l'interface.
+  _setAriaLabel('theme-gear-btn',      t('btnTheme'));
+  _setAriaLabel('lang-flag-btn',       t('ariaLangPicker'));
+  _setAriaLabel('lang-flag-btn-privacy', t('ariaLangPicker'));
+  _setAriaLabel('theme-back-btn',      t('ariaBack'));
+  _setAriaLabel('privacy-back-btn',    t('ariaBack'));
+  _setAriaLabel('dice-faces-minus',    t('ariaDiceFacesPrev'));
+  _setAriaLabel('dice-faces-plus',     t('ariaDiceFacesNext'));
+  _setAriaLabel('dice-count-minus',    t('ariaDiceCountMinus'));
+  _setAriaLabel('dice-count-plus',     t('ariaDiceCountPlus'));
+  _setAriaLabel('score-modal-confirm-btn', t('btnConfirm'));
+  _setAriaLabel('score-modal-cancel-btn',  t('btnCancel'));
+  _setAriaLabel('recap-close-btn',     t('ariaClose'));
   renderThemeGrid();
+}
+export function _setAriaLabel(id: string, val: string){
+  const el=$opt(id); if(!el) return;
+  el.setAttribute('aria-label', val);
 }
 export function _setText(id: string, val: string, isHtml=false){
   const el=$opt(id); if(!el) return;
