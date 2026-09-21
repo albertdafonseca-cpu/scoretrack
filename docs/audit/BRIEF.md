@@ -604,6 +604,47 @@ jamais réutilisée même si une décision est amendée.)
   rapport, sous exécution parallèle, écarté après nouvelles exécutions
   toutes vertes). Voir `docs/audit/DECISIONS-H.md` §10 pour le détail
   complet et les preuves de mutation testing.
+- **D31** — Élément H, round 3 : réponse à `docs/audit/H-critique-round2.md`
+  (verdict round 2 : AAA non, 1 P1 de fond + 2 émojis supplémentaires très
+  visibles). Défaut de fond : `e2e/icon-shape-metrics.spec.ts` (8 métriques
+  globales du round 2) contournable par une géométrie de cadenas (corps
+  circulaire + 2 trous ronds + museau + anse réduite) mesurée à 0,220,
+  juste au-dessus du seuil 0,20, tout en étant visuellement quasi
+  indiscernable du crâne. Une première piste (grille fine 12×12 de
+  couverture d'encre, suggérée par le coordinateur) a été mesurée puis
+  écartée : sur la géométrie exacte du critique, elle donnait un verdict
+  encore plus optimiste (contournement mesuré comme MOINS proche du crâne
+  que deux icônes d'origine légitimes ne le sont entre elles). Correctif
+  retenu : average hash 16×16 (empreinte perceptuelle grossière, l'une des
+  méthodes alternatives suggérées par le critique) + distance de Hamming,
+  seuil 48 — sépare nettement la géométrie de contournement (41) du minimum
+  d'origine (58). Avant de committer, tentative personnelle de
+  contournement de ce nouveau test (6 géométries indépendantes construites
+  et mesurées, dont un balayage systématique de la taille de l'anse) :
+  aucune ne passe le seuil tout en restant une attaque plausible — le seul
+  cas qui passe cesse d'être un contournement en perdant le corps
+  circulaire qui le rendait dangereux (documenté en détail, y compris
+  l'échec de la première piste, dans `docs/audit/DECISIONS-H.md` §11-§12,
+  avec la limite honnête que ceci n'est pas une preuve formelle
+  d'impossibilité). Périmètre étendu par le coordinateur à deux zones
+  précises de `src/animations.ts` (voir §9) : `spawnFragments`/
+  `animateFragments` (émoji tête de mort dessiné ~28 fois par élimination
+  sur `<canvas>`, remplacé par un petit crâne vectoriel `drawFragSkull`) et
+  l'animation finisher (`_finEmojiOk`/la branche `fillText` de l'émoji
+  voiture de course retirées, le rendu vectoriel F1 déjà présent et soigné
+  étant désormais toujours utilisé) ; `git diff --stat src/animations.ts`
+  confirme que les 6 blocs modifiés tombent tous dans ces deux zones,
+  aucune autre partie du fichier touchée. Piège de mesure signalé par le
+  critique (`waitForTimeout` sous-estime le temps réel écoulé côté page)
+  corrigé dans les nouveaux tests par une attente programmée entièrement
+  côté navigateur. `npm run typecheck`/`lint` (0 erreur, 5 avertissements
+  de moins qu'avant grâce au retrait de code mort)/`test` (122/122)/`build`
+  tous verts ; `npx playwright test --workers=1` 40/40 verts sur 3
+  exécutions consécutives (sous parallélisation par défaut, 2 échecs isolés
+  et non reproductibles sur des tests différents à chaque fois, sans
+  rapport avec ce round — même contention d'infrastructure que documentée
+  au round 2, levée par la mesure en série). Voir
+  `docs/audit/DECISIONS-H.md` §11-§13 pour le détail complet.
 
 ## 8. Élément G (round 3, post-clôture) — retrait des `onclick` inline
 

@@ -652,3 +652,243 @@ round 1 pour les captures d'écran des icônes SVG (§3).
   téléchargement navigateur) supprimés et neutralisés dans le test lui-même
   (`doc.save` remplacé par un no-op dans `spyOnJsPdfDrawing`) avant le
   commit final.
+
+---
+
+## 11. Round 3 — réponse à `docs/audit/H-critique-round2.md` (verdict : AAA non, 1 P1 de fond + 2 émojis supplémentaires)
+
+Le critique round 2 a confirmé les 4 correctifs du round 2 (§10) avec ses
+propres preuves reproduites, mais a trouvé un défaut de fond sur le nouveau
+test de distance géométrique, plus deux émojis très visibles jamais
+inventoriés (un troisième signalé, non visible/code mort, laissé en note).
+Périmètre étendu par le coordinateur (`docs/audit/BRIEF.md` §9, extension
+round 3) à deux zones précises de `src/animations.ts`.
+
+### 11.1 Le défaut de fond : `e2e/icon-shape-metrics.spec.ts` contournable
+
+Le critique a démontré qu'une géométrie de cadenas (corps circulaire + 2
+trous ronds façon orbites + museau + anse réduite à un arceau décoratif)
+obtenait une distance de 0,220 sur les 8 métriques globales du round 2 —
+juste au-dessus du seuil de 0,20, donc invisible pour ce test — tout en
+étant, à l'écran réel, quasiment indiscernable du crâne. Cause racine :
+des moments statistiques globaux (couverture d'encre, aspect, centre de
+masse, quadrants) peuvent coïncider entre deux silhouettes structurellement
+différentes.
+
+**Démarche de correction, avec preuve à chaque étape** (voir §12 pour le
+détail complet des mesures et tentatives) :
+
+1. **Première approche essayée : grille fine de couverture d'encre**
+   (12×12 cellules, rendu supersamplé 48×48), approche explicitement
+   suggérée par le coordinateur. **Mesurée et rejetée** : la distance
+   euclidienne entre grilles pour la géométrie exacte du critique
+   (`skull↔lock(critique)`) est de **4,118**, alors que la distance
+   minimale entre les 4 icônes d'ORIGINE légitimes est de **4,099** — la
+   géométrie de contournement mesure donc comme MOINS proche du crâne que
+   deux icônes d'origine authentiques ne le sont l'une de l'autre. Une
+   variante avec recentrage sur le centre de masse (invariance à la
+   translation) donne le même verdict (4,113 contre un minimum d'origine de
+   3,457). **Conclusion mesurée, pas supposée** : une carte de densité de
+   pixels, même fine, n'est pas le bon espace de mesure pour ce type
+   d'attaque — la géométrie du critique déplace la MASSE d'encre de façon
+   à préserver une distance de grille normale tout en changeant la lecture
+   perceptuelle globale.
+2. **Deuxième approche, retenue : average hash (empreinte perceptuelle
+   grossière)**, l'une des méthodes alternatives suggérées par le critique
+   lui-même (« SSIM/pHash »). Rendu composé sur fond blanc à 16×16,
+   converti en niveaux de gris, chaque cellule vaut « encre » si elle est
+   plus sombre que la luminance moyenne de l'image, puis distance de
+   Hamming entre empreintes. **Mesurée : `skull↔lock(critique) = 41` bits
+   sur 256, contre un minimum de 58 entre les 4 icônes d'origine** — écart
+   net et net progrès par rapport à la grille fine (qui donnait le
+   verdict inverse). Seuil fixé à 48 (marge de 10 sous le minimum d'origine,
+   marge de 4 au-dessus de la plus haute valeur de contournement trouvée
+   dans mes propres tentatives, voir §12).
+3. Pourquoi pas une résolution 8×8 (plus simple) : mesurée et rejetée aussi
+   — à 8×8, `skull↔lock(critique) = 8` contre un minimum d'origine de 13,
+   un écart plus faible et moins de marge de manœuvre ; à 16×16 l'écart
+   (41 contre 58) est net plus large et plus robuste aux variantes que j'ai
+   testées (§12).
+
+Le test original du round 2 (8 métriques globales) est **conservé tel
+quel** (toujours vert, signal bon marché complémentaire) ; le nouveau test
+average hash s'ajoute comme second test dans le même fichier
+(`e2e/icon-shape-metrics.spec.ts`), pas un remplacement.
+
+**Mutation testing** : la géométrie EXACTE du critique
+(`H-critique-round2.md` §6.3) appliquée réellement dans `src/ui-icons.ts`,
+build réel, suite rejouée : le nouveau test average hash échoue bien
+(`Received: 41`, `Expected: >= 48`), le test des 8 métriques globales
+(round 2) reste vert (confirmé, cohérent avec le constat du critique).
+Restauré, `git diff --stat src/ui-icons.ts` vide confirmé, 122/122 et
+40/40 re-verts.
+
+### 11.2 `#elim-anim-skull`/`spawnFragments` : particules vectorielles
+
+Nouvelle fonction `drawFragSkull(ctx, sz)` dans `src/animations.ts`
+(uniquement dans `spawnFragments`/`animateFragments`, la zone autorisée) :
+tête ronde (cercle blanc) + mâchoire (rectangle blanc) + deux orbites
+(cercles sombres pleins, pas un trou transparent façon `evenodd` — un
+fragment minuscule qui vole en tous sens ne peut pas garantir un fond
+prévisible derrière lui, contrairement aux icônes d'interface fixes) + nez
+(triangle sombre). Remplace l'unique `fillText` de l'émoji tête de mort
+(`☠️`), dessiné ~28 fois par élimination. Le `textAlign`/
+`textBaseline` devenus sans objet (plus de texte dessiné) ont été retirés —
+seule modification hors des deux lignes de dessin proprement dites, mais
+strictement dans le même mécanisme, pas un ajout de portée.
+
+Vérifié réellement (`e2e/anim-vectors.spec.ts`, nouveau) : une élimination
+réellement jouée, `getImageData` sur `#elim-anim-noise` échantillonné à 5
+instants réels (2100 à 3400 ms, mesurés par un `setTimeout` posé CÔTÉ
+NAVIGATEUR — voir §11.4 sur le piège de mesure signalé par le critique
+round 2) : de l'encre réellement présente sur au moins 3 des 5 instants
+(fenêtre de vie des fragments), puis canvas réellement vidé une fois leur
+durée de vie (3000 ms) écoulée. Aucune erreur JS. Capture d'écran prise
+pendant l'explosion (`test-results/h-r3-frag-skulls.png`) : les fragments
+se lisent clairement comme de petits crânes vectoriels nets (tête ronde,
+deux yeux sombres, léger nez), pas des glyphes emoji rasterisés.
+
+### 11.3 Animation finisher : chemin vectoriel F1 forcé en permanence
+
+`_finEmojiOk` (détection de support emoji couleur sur canvas) et la
+branche `if(_finEmojiOk){ fillText(...) }` retirées : le rendu vectoriel
+existant (« F1 vectorielle », déjà présent et détaillé — carrosserie en
+dégradé, cockpit, casque, visière, ailerons, 4 roues) est désormais
+toujours utilisé. Le champ `e` (emoji du bolide) retiré de
+`FinRacer`/`FinMoto` et de `_FIN_RACERS` : il ne servait plus qu'à
+alimenter la branche supprimée, aucun autre consommateur (vérifié par
+recherche exhaustive de `.e`/`r.e` dans le fichier avant suppression).
+
+Vérifié réellement (`e2e/anim-vectors.spec.ts`) : `playFinAnim(0)`
+déclenché réellement, `fin-anim-canvas` échantillonné à 5 instants réels
+(150 à 1400 ms, même technique de mesure de temps réel côté navigateur) —
+à CHAQUE instant, un nombre substantiel de pixels s'écarte du fond uni
+`rgba(0,0,0,0.94)` (voiture, traînée, piste, étincelles, confettis,
+drapeau), preuve que le rendu tourne en continu et pas seulement à la
+première trame. Aucune erreur JS. Capture d'écran à t=1500ms
+(`test-results/h-r3-fin-f1-vector.png`) : la voiture F1 vectorielle
+(carrosserie cyan dégradée, cockpit, casque du pilote, roues) est nette et
+correctement rendue, comme le confirme indépendamment le critique round 2
+(§8, capture propre).
+
+### 11.4 Piège de mesure signalé par le critique — corrigé dans les nouveaux tests
+
+Le critique round 2 (§2) a noté que `page.waitForTimeout(ms)` sous-estime
+le temps réel écoulé côté page (coût des allers-retours Playwright/CDP).
+`e2e/anim-vectors.spec.ts` utilise `waitRealMs()`, qui programme l'attente
+ENTIÈREMENT dans le navigateur (`page.evaluate(() => new
+Promise(r=>setTimeout(r, ms)))`) plutôt que côté Node — la promesse ne
+résout qu'après le délai réel écoulé côté page, quel que soit le coût de
+l'aller-retour Playwright autour de cet appel.
+
+### 11.5 Tests ajoutés
+
+- `tests/animations-icons.test.ts` (4 tests, inspection de source pure,
+  sans DOM) : absence de l'émoji tête de mort/voiture de course dans
+  `src/animations.ts`, présence de `drawFragSkull`/de son appel, absence de
+  `_finEmojiOk`. Mutation-testé (2 mutations : `drawFragSkull(fragCtx,sz)`
+  remplacé par un `fillText` reconstruit par point de code — détecté ;
+  `_finEmojiOk` réintroduit dans la déclaration de variable — détecté).
+  Restauré, `git diff --stat` vide confirmé à chaque fois.
+- `e2e/anim-vectors.spec.ts` (2 tests, build réel + Chromium, timing réel
+  mesuré côté navigateur) : voir §11.2/§11.3.
+- `e2e/icon-shape-metrics.spec.ts` : 1 test ajouté (average hash), 1 test
+  existant conservé (8 métriques globales, round 2) — détail §11.1/§12.
+
+### 11.6 Vérifications finales round 3
+
+- `npm run typecheck` : vert (3 programmes).
+- `npm run lint` : 0 erreur, 560 avertissements (**5 de moins qu'au round
+  2** : suppression de code mort — `_finEmojiOk`, la détection emoji, le
+  champ `e` — qui portait plusieurs `var` déclenchant `no-var`).
+- `npm run test` (Vitest) : 122/122 verts (118 du round 2 + 4 nouveaux,
+  `tests/animations-icons.test.ts`).
+- `npm run build` : vert, poids `dist/app.js` inchangé (aucune dépendance
+  ajoutée).
+- `npx playwright test` (40 = 37 du round 2 + 1 nouveau test dans
+  `e2e/icon-shape-metrics.spec.ts` + 2 nouveaux dans
+  `e2e/anim-vectors.spec.ts`) : sous parallélisation par défaut
+  (2 workers), 2 des 3 exécutions consécutives ont chacune montré un échec
+  isolé et non reproductible d'un test différent à chaque fois
+  (`e2e/functional-icons.spec.ts` une fois, `e2e/onclick-wiring.spec.ts`
+  une autre fois — aucun rapport avec les changements de ce round, chaque
+  test rejoué seul repasse au vert immédiatement) — même symptôme de
+  contention d'infrastructure sous parallélisation que documenté au round 2
+  (§10.5), pas une régression. **`npx playwright test --workers=1`** :
+  **40/40 verts sur 3 exécutions consécutives**, sans aucune instabilité —
+  c'est la mesure retenue comme valide (méthodologie du brief §3.5 : traiter
+  un résultat non déterministe comme un défaut, pas comme une réussite ;
+  ici le défaut est isolé à l'infrastructure de test parallèle, pas au
+  code, la preuve en série lève l'ambiguïté).
+- `git diff --stat src/animations.ts` : les 6 blocs modifiés (`git diff
+  src/animations.ts | grep '^@@'`) tombent tous exactement dans les deux
+  zones autorisées (`spawnFragments`/`animateFragments`, lignes ~59-130 ;
+  `_FIN_RACERS`/`_finFrame`/`playFinAnim`, lignes ~263-585) — aucune autre
+  partie du fichier touchée (timing, autres animations, structure
+  générale).
+- `git status --short` : seuls les fichiers du périmètre déclaré (étendu
+  temporairement à `src/animations.ts`) sont modifiés/ajoutés.
+
+## 12. Ma propre tentative de contournement du test average hash (avant de le considérer fiable)
+
+Conformément à la consigne du coordinateur (« essaie TOI-MÊME de
+construire une géométrie de contournement... c'est la seule façon de
+savoir si tu as vraiment corrigé le problème de fond ou juste déplacé le
+seuil »), avant de committer le correctif §11.1, j'ai construit et mesuré
+plusieurs géométries alternatives, avec la même méthode exacte que le test
+final (average hash 16×16, distance de Hamming), dans un script de mesure
+séparé (non committé, jetable), toutes contre `ICON_SKULL` réel :
+
+| Géométrie | vs crâne | vs cadenas d'origine | Verdict |
+|---|---|---|---|
+| Cadenas d'origine (référence) | — | — | — |
+| Géométrie exacte du critique (corps circulaire r=5,3 + 2 petits trous + anse réduite r=1,1) | **41** | 57 | Détecté (< 48) |
+| A — corps « gélule » (rayon d'arrondi 5,4) + trous à la taille des orbites du crâne + anse réduite | **44** | 40 | Détecté (< 48) |
+| B — corps circulaire + anse un peu plus grande + trous taille crâne | **36** | 52 | Détecté (< 48) |
+| C — corps ovale (aspect proche du crâne, pas un cercle parfait) + trous + anse | **31** | 57 | Détecté (< 48) |
+| D — corps circulaire + **anse à sa taille ORIGINALE** (rayon 3,8, pas réduite) + trous/nez positionnés comme le crâne | **40** | 52 | **Détecté (< 48) malgré une anse de taille authentique** |
+| E — corps « gélule » (pas un cercle) + anse à sa taille originale + trous/nez positionnés comme le crâne | **60** | 24 | **Non détecté (≥ 48) — mais se lit aussi comme un vrai cadenas plausible, pas un contournement** |
+| Balayage du rayon de l'anse (1,0 à 3,8) sur le corps « gélule » de A | 44→44→41→42→44→**52**→**50** | — | Le seuil n'est dépassé qu'à partir d'un rayon d'anse ≥ 3,5 (proche de l'original 3,8) |
+
+**Constat honnête** : je n'ai pas trouvé de géométrie qui (a) reste
+mesurée comme visuellement confondante avec le crâne ET (b) passe le test
+average hash à 48. Les seules géométries qui passent (E, et le palier haut
+du balayage d'anse) ont en commun un corps **non circulaire** (gélule/
+rectangle arrondi, la famille de forme du cadenas d'origine) avec une anse
+de taille réaliste — c'est-à-dire qu'elles cessent d'être des
+contournements pour redevenir des cadenas plausibles. Le facteur
+discriminant réel, révélé par la comparaison D (corps circulaire, anse
+pleine taille, détecté) contre E (corps gélule, anse pleine taille, non
+détecté), est la **forme du corps** (circulaire vs rectangulaire/gélule),
+pas seulement la taille de l'anse comme je le pensais après ma première
+série de tentatives (A/B/C).
+
+**Ce que je NE prétends PAS** : ceci n'est pas une preuve formelle
+d'impossibilité — un espace de recherche plus systématique (formes non
+convexes, positions d'orbites asymétriques, textures de damier
+détournées...) pourrait en théorie trouver une autre géométrie de
+contournement, exactement comme la grille fine (§11.1) s'est révélée
+insuffisante après une seule mesure honnête. Ce qui est vérifié
+réellement : 6 géométries construites indépendamment (le critique + A/B/
+C/D + le balayage de rayon), couvrant la famille d'attaque « corps rond +
+2 trous + anse minimisée » qui a motivé ce correctif, sont toutes
+détectées par le seuil retenu (48), et la seule qui y échappe cesse d'être
+une attaque plausible en perdant précisément la propriété qui la rendait
+dangereuse (le corps rond). Documenté ici, y compris l'échec partiel de la
+première approche (grille fine), pour qu'un futur tour n'ait pas à
+redécouvrir ce chemin.
+
+## 13. Dette restante mise à jour (après round 3)
+
+1. **`src/i18n/translations.ts`** — inchangé depuis le round 1 (§4/§9.2).
+2. **`src/recap-pdf.ts`** — inchangé depuis le round 1/2 (§6/§9.3).
+3. **`win-anim-trophy-canvas` : `fillText('🏁',...)` mort** (ligne ~822,
+   confirmé sans impact visuel réel par le critique round 2 §8 — l'overlay
+   parent reste `display:none` pour tout appel où ce code s'exécute) :
+   **volontairement non traité**, hors mandat strict du round 3 (les deux
+   seules zones autorisées sont §11.2/§11.3). Nettoyage de code recommandé
+   pour un futur tour ayant mandat sur `animations.ts`.
+4. **La méthode de test elle-même (§11.1/§12)** : l'average hash 16×16 est
+   une amélioration réelle et mesurée par rapport à la grille fine et aux
+   métriques globales, mais reste, comme documenté en §12, sans garantie
+   formelle d'exhaustivité contre toute géométrie de contournement future.

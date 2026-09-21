@@ -77,13 +77,36 @@ type RGB = [number, number, number];
       frags.push({cx,cy,angle,speed,rotDir,sz,startT:performance.now()});
     }
   }
+  /** Petit crâne vectoriel dessiné à l'origine courante du contexte (déjà
+   *  translaté/pivoté par l'appelant) — remplace l'ancien `fillText(...)`
+   *  de l'émoji tête de mort (rendu non maîtrisé selon la plateforme,
+   *  P1 #7). Simplifié à dessein
+   *  pour un fragment minuscule qui tourne et s'estompe en 3 s (silhouette
+   *  cohérente avec `ICON_SKULL` de `src/ui-icons.ts` — tête ronde, orbites,
+   *  nez — sans reprendre son détail de mâchoire dentée, superflu à cette
+   *  taille et cette vitesse) : voir docs/audit/DECISIONS-H.md §11 (round 3,
+   *  H-critique-round2.md). Encre blanche + orbites/nez sombres pleins
+   *  (pas de trou transparent façon `evenodd`) : reste lisible quel que
+   *  soit ce qu'il y a derrière un fragment qui vole en tous sens, sans
+   *  dépendre d'un fond particulier. */
+  function drawFragSkull(ctx:CanvasRenderingContext2D, sz:number): void {
+    const r=sz*0.5;
+    ctx.fillStyle='#ffffff';
+    ctx.beginPath(); ctx.arc(0,-r*0.08,r,0,Math.PI*2); ctx.fill();
+    ctx.fillRect(-r*0.82,-r*0.08,r*1.64,r*0.72);
+    ctx.fillStyle='#1a1a1a';
+    ctx.beginPath(); ctx.arc(-r*0.4,-r*0.12,r*0.26,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(r*0.4,-r*0.12,r*0.26,0,Math.PI*2); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-r*0.13,r*0.16); ctx.lineTo(r*0.13,r*0.16); ctx.lineTo(0,r*0.48);
+    ctx.closePath(); ctx.fill();
+  }
   function animateFragments(): void {
     if(!fragCtx) return;
     const now=performance.now();
     // fragCanvas est toujours posé en même temps que fragCtx (spawnFragments)
     fragCtx.clearRect(0,0,fragCanvas!.width,fragCanvas!.height);
     let alive=false;
-    fragCtx.textAlign='center'; fragCtx.textBaseline='middle';
     // (fragCtx! : le rétrécissement de la garde ci-dessus ne se propage pas dans la fermeture)
     frags.forEach(f=>{
       const t=Math.min((now-f.startT)/3000,1);
@@ -97,8 +120,7 @@ type RGB = [number, number, number];
       fragCtx!.globalAlpha=alpha;
       fragCtx!.translate(f.cx+dx, f.cy+dy);
       fragCtx!.rotate(f.rotDir*t*Math.PI/180);
-      fragCtx!.font=sz+'px serif';
-      fragCtx!.fillText('\u2620\uFE0F',0,0);
+      drawFragSkull(fragCtx!, sz);
       fragCtx!.restore();
     });
     fragCtx.globalAlpha=1;
@@ -263,18 +285,23 @@ export function stopElimAnim(): void {
 (function(){
 var _FIN_GLOWS=['rgba(0,255,224,0.7)','rgba(255,100,0,0.7)','rgba(180,100,255,0.7)',
                 'rgba(255,220,0,0.7)','rgba(255,80,120,0.7)'];
-/** Bolide de la course : emoji, halo (rgba) et vitesse. */
-interface FinRacer { e:string; g:string; s:number }
+/** Bolide de la course : halo (rgba) et vitesse. Round 3 (H-critique-round2.md,
+ *  P1 nouveau) : le champ `e` (emoji du bolide, jamais utilisé qu'en filet de
+ *  secours si le rendu vectoriel ci-dessous était indisponible) est retiré —
+ *  le rendu vectoriel (`_finDrawFlag`-like, voir plus bas) est désormais
+ *  toujours utilisé, voir l'ancien indicateur de détection de secours
+ *  (retiré) plus bas. */
+interface FinRacer { g:string; s:number }
 /** Bolide en piste : position et décalage vertical en plus. */
 interface FinMoto extends FinRacer { x:number; oY:number; /** posé à chaque trame (_finFrame) */ y?:number }
 var _FIN_RACERS: FinRacer[]=[
-  {e:'🏎️',g:_FIN_GLOWS[0],s:6.75},
-  {e:'🏎️',g:_FIN_GLOWS[1],s:6.0},
-  {e:'🏎️',g:_FIN_GLOWS[2],s:7.35},
-  {e:'🏎️',g:_FIN_GLOWS[3],s:6.375},
-  {e:'🏎️',g:_FIN_GLOWS[4],s:5.625},
-  {e:'🏎️',g:_FIN_GLOWS[0],s:6.9},
-  {e:'🏎️',g:_FIN_GLOWS[3],s:6.6},
+  {g:_FIN_GLOWS[0],s:6.75},
+  {g:_FIN_GLOWS[1],s:6.0},
+  {g:_FIN_GLOWS[2],s:7.35},
+  {g:_FIN_GLOWS[3],s:6.375},
+  {g:_FIN_GLOWS[4],s:5.625},
+  {g:_FIN_GLOWS[0],s:6.9},
+  {g:_FIN_GLOWS[3],s:6.6},
 ];
 var _FIN_CONF_COLORS=['#ff4466','#ffd700','#00ffe0','#ff8800','#cc66ff','#ffffff','#66ff88'];
 
@@ -372,7 +399,7 @@ function _finFadeFrame(now:number): void {
 
 // Overlay, canvas et contexte : posés dans playFinAnim avant la première trame
 // (null! : pas de garde à l'exécution, comme en JS).
-var _finRAF: RafId=null, _finOverlay: HTMLElement=null!, _finCanvas: HTMLCanvasElement=null!, _finCtx: CanvasRenderingContext2D=null!, _finEmojiOk=false;
+var _finRAF: RafId=null, _finOverlay: HTMLElement=null!, _finCanvas: HTMLCanvasElement=null!, _finCtx: CanvasRenderingContext2D=null!;
 var _finStartT=0, _finRot=0, _finFlagWave=0, _finMotos: FinMoto[]=[];
 var _finShown0=false, _finShown1=false, _finShown2=false, _finFadeDone=false;
 var _FIN_T0=1600, _FIN_T1=1800, _FIN_T2=1950, _FIN_TFADE=4600, _FIN_TTOTAL=5200;
@@ -411,15 +438,13 @@ function _finFrame(now:number): void {
     _finCtx.save(); _finCtx.fillStyle=grad;
     _finCtx.fillRect(tX-tLen, m.y-tH/2, tLen, tH);
     _finCtx.restore();
-    // Voiture : emoji si supporté, vectoriel sinon
+    // Voiture : F1 vectorielle (round 3, H-critique-round2.md, P1 nouveau —
+    // le filet de secours emoji est retiré, ce chemin vectoriel déjà présent
+    // et soigné est désormais toujours utilisé, l'ancien indicateur de
+    // détection de secours étant supprimé).
     _finCtx.save();
     _finCtx.translate(m.x,m.y); _finCtx.scale(-1,1);
-    if(_finEmojiOk){
-      _finCtx.font=motoSz+'px serif';
-      _finCtx.textAlign='center'; _finCtx.textBaseline='middle';
-      _finCtx.fillText('\uD83C\uDFCE\uFE0F',0,0);
-    } else {
-      // F1 vectorielle
+    {
       var cw=motoSz*1.1, ch=motoSz*0.32;
       var r=rgb[0],g=rgb[1],b=rgb[2];
       var col='rgba('+r+','+g+','+b+',';
@@ -560,18 +585,8 @@ playFinAnim = function(playerIdx:number): void {
   var gaps=[0,1.8,3.8,6.0,8.5,11.5,15.0];
   var offsets=[-0.07,0.07,-0.05,0.07,-0.07,0.05,-0.55];
   _finMotos=_FIN_RACERS.map(function(r,i): FinMoto {
-    return {e:r.e,g:r.g,s:r.s,x:-motoSz*(0.5+gaps[i]),oY:motoSz*offsets[i]};
+    return {g:r.g,s:r.s,x:-motoSz*(0.5+gaps[i]),oY:motoSz*offsets[i]};
   });
-  // Détection support emoji sur canvas
-  (function(){
-    var tc=document.createElement('canvas'); tc.width=20; tc.height=20;
-    var tx=tc.getContext('2d')!; tx.font='16px serif';
-    tx.fillText('\uD83C\uDFCE\uFE0F',0,16);
-    var d=tx.getImageData(0,0,20,20).data;
-    var hasColor=false;
-    for(var pi=0;pi<d.length;pi+=4){if(d[pi]>20||d[pi+1]>20||d[pi+2]>20){hasColor=true;break;}}
-    _finEmojiOk=hasColor;
-  })();
   _finRAF=requestAnimationFrame(_finFrame);
 };
 })();
