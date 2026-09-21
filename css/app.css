@@ -29,6 +29,11 @@
 [data-theme="cyber-light"] .pcard.color-7 {background:#dbdbdb}
 [data-theme="cyber-light"] .pcard.color-8 {background:#eed9c7}
 [data-theme="cyber-light"] .pcard.color-9 {background:#c7dbee}
+/* color-10 manquait : la carte retombait sur le magenta SOMBRE par défaut
+   (#501228, pensé pour les thèmes sombres) dans ce thème clair — texte
+   quasi illisible dessus (contraste mesuré 1.28:1). Pastel aligné sur les
+   7 autres thèmes clairs (tous ~#eec7xx pour ce même magenta Tol #EE3377). */
+[data-theme="cyber-light"] .pcard.color-10{background:#eec7dd}
 [data-theme="dark"]{--bg:#0a0a0f;--bg2:#111118;--surface:#1a1a24;--surface2:#22222f;--border:rgba(255,255,255,0.1);--accent:#9965A9;--accent2:#9965A9;--green:#22d3a0;--red:#f4436c;--text:#f0f0ff;--muted:#444466;--muted2:#8888bb;--btn-font:'Inter',sans-serif;--score-font:'Inter',sans-serif;--radius:14px;
   --chip-bg:#1e1e2e;--chip-text:#8888bb;--chip-on:#88CCEE;--chip-on-text:#000000;
   --bg-grad:radial-gradient(ellipse at 50% 0%,#1a1a2e 0%,#0a0a0f 70%);
@@ -620,7 +625,7 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
   .score.bump-up,.score.bump-down{animation:none;}}
 /* === FIN AXE2 CSS === */
 /* Tailles initiales à 0 — tout est calculé par fitTexts */
-.tap-sign-minus,.tap-sign-plus{font-family:var(--btn-font);font-size:0;font-weight:900;line-height:1;pointer-events:none;opacity:0.65;position:absolute;bottom:2%;color:#fff;text-shadow:none;}
+.tap-sign-minus,.tap-sign-plus{font-family:var(--btn-font);font-size:0;font-weight:900;line-height:1;pointer-events:none;opacity:0.65;position:absolute;bottom:2%;color:var(--text);text-shadow:none;}
 .tap-sign-minus{left:3%;}
 .tap-sign-plus{right:3%;}
 [data-theme="mono-light"] .tap-sign-minus,[data-theme="mono-light"] .tap-sign-plus{color:#111;opacity:0.4;}
@@ -629,7 +634,18 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
    joueur du côté opposé (bord extérieur de sa carte) — l'ordre DOM (nom
    puis score, voir buildCard) reste inchangé pour ne pas perturber le
    lecteur d'écran, seul l'ordre visuel change. */
-.pplayer{order:2;font-family:var(--btn-font);font-size:0;font-weight:700;letter-spacing:0.04em;color:#fff;text-align:center;line-height:1.1;pointer-events:none;overflow:hidden;text-overflow:ellipsis;width:90%;max-width:90%;white-space:nowrap;text-shadow:0 1px 4px rgba(0,0,0,0.6);}
+.pplayer{order:2;font-family:var(--btn-font);font-size:0;font-weight:700;letter-spacing:0.04em;color:var(--text);text-align:center;line-height:1.1;pointer-events:none;overflow:hidden;text-overflow:ellipsis;width:90%;max-width:90%;white-space:nowrap;text-shadow:0 1px 4px rgba(0,0,0,0.6);}
+/* Thèmes clairs sans override dédié jusqu'ici (contraste nom/carte mesuré
+   ~1.2-1.6:1, quasi illisible — cf. audit contraste WCAG) : `light` et
+   `mono-light` avaient déjà leur propre correctif (`color:#111`), les 8
+   autres thèmes `-light` héritaient silencieusement du blanc pensé pour
+   les thèmes sombres. `var(--text)` ci-dessus les corrige tous ; l'ombre
+   portée sombre (pensée pour du texte blanc) ne sert plus à rien sur du
+   texte déjà foncé, retirée ici comme sur les deux thèmes déjà corrigés. */
+[data-theme="cyber-light"] .pplayer,[data-theme="dark-light"] .pplayer,
+[data-theme="neon-pink-light"] .pplayer,[data-theme="arcade-light"] .pplayer,
+[data-theme="nature-light"] .pplayer,[data-theme="sunset-light"] .pplayer,
+[data-theme="ocean-light"] .pplayer,[data-theme="gold-light"] .pplayer{text-shadow:none;}
 .pplayer-ghost{order:2;display:block;height:0;}
 .score-wrap{order:1;position:relative;pointer-events:none;display:flex;align-items:center;justify-content:center;flex:1;min-height:0;min-width:0;width:100%;overflow:visible;}
 .score{font-family:var(--score-font);font-size:0;line-height:1;color:var(--accent);text-align:center;white-space:nowrap;text-shadow:0 2px 6px rgba(0,0,0,0.6);}
