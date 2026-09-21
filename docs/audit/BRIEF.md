@@ -543,3 +543,27 @@ retirés), `docs/audit/DECISIONS-G.md`, `docs/audit/G-critique-round*.md`.
 Ne touche à aucun autre fichier (`game.ts`, `dice-ui.ts`, `animations.ts`,
 `i18n*`, `sw*.ts`, `recap-pdf.ts`, `dice3d/*`, `build.mjs`, `.gitignore`,
 `README.md`, `package.json`, tests existants sauf ajout de nouveaux tests).
+
+## 9. Élément H (round 4, post-clôture) — émojis système remplacés par des icônes SVG
+
+Sur demande explicite de l'utilisateur, suite du traitement de la dette
+documentée : les émojis système utilisés comme icônes fonctionnelles
+(🏆 victoire, 🏁 fin de manche, 💀 élimination, 🔒 confidentialité — P1 #7
+du constat initial) ont un rendu non maîtrisé selon la plateforme/l'OS et
+sont incohérents avec le reste de la charte visuelle du projet (le moteur
+de dés notamment). Contrairement aux éléments A-G, ce chantier touche du
+code réparti dans plusieurs fichiers pour une seule et même décision
+visuelle cohérente (le style des 4 icônes) : il est donc confié à UN SEUL
+agent constructeur plutôt que découpé en plusieurs (éviter une incohérence
+de style entre 3 agents qui dessineraient chacun leur propre icône).
+
+Contrainte D-PREF-1/D-CLAUDE-2 (rappel, non négociable) : les icônes
+doivent rester distinguables sans la couleur (forme claire, pas seulement
+une pastille colorée) et être adaptées aux daltoniens tout en restant
+jolies — cohérentes avec l'esthétique sombre/nette déjà en place (voir le
+moteur de dés, non modifiable, comme référence de style à égaler, pas à
+copier littéralement).
+
+Périmètre : `index.html`, `src/game.ts`, `src/recap-pdf.ts`, `src/icons.ts`
+(ou un nouveau fichier `src/ui-icons.ts` si plus propre), nouveaux tests,
+`docs/audit/DECISIONS-H.md`, `docs/audit/H-critique-round*.md`.
