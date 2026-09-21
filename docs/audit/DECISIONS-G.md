@@ -104,12 +104,14 @@ câblage explicite et lisible, pas un dispatcher générique par `data-action`.
 
 ## 2. `id` ajoutés à des éléments qui n'en avaient pas
 
-4 éléments portaient un `onclick` mais aucun `id` unique permettant de les
-cibler proprement en JS : la ligne "Fin dès la première victoire" de
-`#win-options` (id ajouté : `row-single-winner`, symétrique de
-`row-last-loser` qui existait déjà) et les 3 boutons `.bar-btn` sans id de
-la barre d'actions de l'écran de jeu (`bar-rotate-btn`, `bar-recap-btn`,
-`bar-theme-btn` — le 4e, "Reset", a reçu `bar-reset-btn`). Les 6 chips
+5 éléments portaient un `onclick` mais aucun `id` unique permettant de les
+cibler proprement en JS (décompte corrigé — round 1 du critique en avait
+trouvé 5 pour un texte qui n'en annonçait que 4) : la ligne "Fin dès la
+première victoire" de `#win-options` (id ajouté : `row-single-winner`,
+symétrique de `row-last-loser` qui existait déjà) et les 4 boutons
+`.bar-btn` sans id de la barre d'actions de l'écran de jeu
+(`bar-rotate-btn`, `bar-recap-btn`, `bar-theme-btn`, `bar-reset-btn`). Les 6
+chips
 `data-oval` de `#objectif-presets` n'ont PAS reçu d'id individuel : elles
 sont déjà distinguables sans ambiguïté par leur attribut `data-oval`
 existant, câblées en groupe (cas 7) — ajouter 6 id supplémentaires n'aurait
@@ -153,7 +155,8 @@ statiques d'`index.html`.
 ## 4. `onclick` construits dynamiquement en JavaScript (hors périmètre)
 
 Vérifié par `grep -rn '\.onclick\s*=' src/*.ts` (property assignment, pas un
-attribut HTML) : 8 occurrences restantes, TOUTES hors de mon périmètre
+attribut HTML) : 9 occurrences restantes (6+2+1 — décompte total corrigé,
+l'addition d'origine était fausse), TOUTES hors de mon périmètre
 d'édition (`src/game.ts` ×6, `src/dice-ui.ts` ×2, `src/sw.ts` ×1) —
 `applyPreset`/carte de préréglage, chip de nom mémorisé, ligne "récap"
 fermée, chip de joueur/points de départ à l'écran de démarrage, bouton

@@ -144,3 +144,84 @@ test('CSP resserrée (script-src sans unsafe-inline) : parcours complet sans auc
     await server.close();
   }
 });
+
+// P2-3 relevé par le critique de l'élément G (docs/audit/G-critique-round1.md) :
+// aucun test committé n'exerçait le geste de fermeture par glissement tactile
+// du lanceur de dés (seuils 120px / 0,3px·ms, CLAUDE.md) sous la CSP
+// resserrée — vérifié manuellement par le critique (0 violation), mais sans
+// protection contre une régression future. Playwright n'a pas d'API haut
+// niveau pour un glissement tactile multi-étapes (seulement des taps) : les
+// vrais évènements `touchstart`/`touchmove`/`touchend` de src/dice-ui.ts
+// (`initDiceDrag`) sont donc synthétisés via le protocole CDP
+// (`Input.dispatchTouchEvent`), comme l'a fait le critique pour sa propre
+// vérification.
+async function dispatchTouch(
+  cdp: import('@playwright/test').CDPSession,
+  type: 'touchStart' | 'touchMove' | 'touchEnd',
+  x: number,
+  y: number,
+): Promise<void> {
+  await cdp.send('Input.dispatchTouchEvent', {
+    type,
+    touchPoints: type === 'touchEnd' ? [] : [{ x, y }],
+  });
+}
+
+test('CSP resserrée : fermeture du lanceur de dés par glissement tactile, sans violation', async ({ page }) => {
+  const server = await startStaticServer();
+  try {
+    const violations: string[] = [];
+    const pageErrors: string[] = [];
+    page.on('pageerror', err => pageErrors.push(String(err)));
+    await page.addInitScript(() => {
+      document.addEventListener('securitypolicyviolation', (e) => {
+        (window as unknown as { __cspViolations: string[] }).__cspViolations ??= [];
+        (window as unknown as { __cspViolations: string[] }).__cspViolations.push(
+          `${e.violatedDirective} :: ${e.blockedURI}`,
+        );
+      });
+    });
+
+    await page.goto(server.url);
+    await page.locator('#btn-privacy-accept').click();
+    await page.locator('.preset-card').first().click();
+    await page.locator('#go-btn').click();
+    await page.locator('#names-go-btn').click();
+    await expect(page.locator('.pcard .score').first()).toBeVisible();
+
+    await page.locator('#dice-fab').click();
+    await expect(page.locator('#dice-overlay')).not.toHaveClass(/\bhidden\b/);
+
+    const cdp = await page.context().newCDPSession(page);
+    const top = page.locator('#dice-sheet-top');
+    const box = await top.boundingBox();
+    if (!box) throw new Error('dice-sheet-top introuvable');
+    const x = box.x + box.width / 2;
+    const y0 = box.y + 8; // proche du haut, hors des boutons de configuration
+
+    // 1. Glissement court et lent (< 120px, vitesse < 0,3 px/ms) : ne doit PAS fermer.
+    await dispatchTouch(cdp, 'touchStart', x, y0);
+    await dispatchTouch(cdp, 'touchMove', x, y0 + 30);
+    await page.waitForTimeout(150);
+    await dispatchTouch(cdp, 'touchMove', x, y0 + 60);
+    await page.waitForTimeout(150);
+    await dispatchTouch(cdp, 'touchEnd', x, y0 + 60);
+    await page.waitForTimeout(350); // laisse la transition de rebond se terminer
+    await expect(page.locator('#dice-overlay')).not.toHaveClass(/\bhidden\b/);
+
+    // 2. Glissement long et rapide (> 120px, vitesse > 0,3 px/ms) : doit fermer.
+    await dispatchTouch(cdp, 'touchStart', x, y0);
+    await dispatchTouch(cdp, 'touchMove', x, y0 + 60);
+    await dispatchTouch(cdp, 'touchMove', x, y0 + 180); // +120px en une frame : vitesse élevée
+    await dispatchTouch(cdp, 'touchEnd', x, y0 + 180);
+    await expect(page.locator('#dice-overlay')).toHaveClass(/\bhidden\b/, { timeout: 1000 });
+
+    const collected = await page.evaluate(() => (window as unknown as { __cspViolations?: string[] }).__cspViolations || []);
+    violations.push(...collected);
+
+    expect(violations, `violations CSP relevées : ${JSON.stringify(violations, null, 2)}`).toEqual([]);
+    expect(pageErrors, `erreurs JS relevées : ${JSON.stringify(pageErrors, null, 2)}`).toEqual([]);
+  } finally {
+    await server.close();
+  }
+});

@@ -513,6 +513,16 @@ jamais réutilisée même si une décision est amendée.)
   (`'unsafe-inline'` réintroduit → le test échoue, restauré). Voir
   `docs/audit/DECISIONS-G.md` pour le détail complet (inventaire exhaustif
   des 65 cas, dette restante).
+- **D28** — Correction de décompte dans D27, relevée par le critique de
+  l'élément G (`G-critique-round1.md`, verdict AAA : oui, 3 P2 sans impact
+  fonctionnel) : il y a bien **5** `id` ajoutés, pas 4 (`bar-reset-btn`
+  manquait au décompte de D27, bien que déjà câblé et mentionné dans le
+  corps de `DECISIONS-G.md`) ; et **9** occurrences restantes de
+  `.onclick=` dynamique hors périmètre, pas 8 (l'addition 6+2+1 du texte
+  d'origine était fausse). Comportement réel non affecté dans les deux cas
+  (mesuré, pas supposé) — corrections purement documentaires, appliquées
+  dans `docs/audit/DECISIONS-G.md` §2/§4 ; D27 n'est pas réécrit, cette
+  entrée l'amende conformément à la règle du préambule de ce document.
 
 ## 8. Élément G (round 3, post-clôture) — retrait des `onclick` inline
 
