@@ -79,25 +79,26 @@ export function fmtNum(n: number){
 
 // ── ICÔNES FONCTIONNELLES (P1 #7 du constat initial, élément H) ────
 // `btn-privacy-txt`/`privacy-title-txt` reçoivent leur texte via
-// `src/i18n.ts` (`_setText`, hors périmètre de cet élément) qui préfixe
-// encore la chaîne traduite par l'émoji cadenas dans les 18 langues de
-// `src/i18n/translations.ts` (également hors périmètre — dette documentée,
-// voir docs/audit/DECISIONS-H.md §5). Comme `_setText` fait
-// `el.textContent=val` (donc écrase tout enfant existant, y compris un
-// SVG posé à l'avance) et peut être appelé aussi bien depuis `loadSettings`
+// `src/i18n.ts` (`_setText`, hors périmètre de cet élément) qui fait
+// `el.textContent=val` (donc écrase tout enfant existant, y compris un SVG
+// posé à l'avance) et peut être appelé aussi bien depuis `loadSettings`
 // ci-dessous que directement depuis le sélecteur de langue d'`i18n.ts`
-// (hors de notre portée), un MutationObserver — plutôt qu'un correctif au
-// seul point d'appel connu — remplace ce préfixe par l'icône SVG dès qu'il
-// réapparaît, quel que soit l'appelant.
+// (hors de notre portée) : un MutationObserver — plutôt qu'un correctif au
+// seul point d'appel connu — repose l'icône SVG à chaque fois que le texte
+// est réécrit, quel que soit l'appelant.
+// Les 18 langues de `src/i18n/translations.ts` ne préfixent plus le texte
+// par l'émoji cadenas (nettoyé à la source, voir docs/audit/DECISIONS-H.md
+// §17.1) : `_fixLockIcon` pose donc l'icône de façon INCONDITIONNELLE,
+// avec un retrait défensif d'un éventuel préfixe émoji résiduel (aucune
+// source connue n'en produit plus, mais un appelant externe pourrait).
 // Émoji reconstruit par point de code (pas de littéral dans ce fichier) :
 // évite de réintroduire l'émoji système dans le source vérifié par
 // `grep` (voir docs/audit/DECISIONS-H.md §1, preuve de vérification).
 const LOCK_EMOJI=String.fromCodePoint(0x1F512);
 const LOCK_PREFIX_RE=new RegExp('^\\s*'+LOCK_EMOJI+'\\uFE0F?\\s*','u');
 export function _fixLockIcon(el: HTMLElement){
-  const txt=el.textContent||'';
-  if(!LOCK_PREFIX_RE.test(txt))return;
-  const rest=txt.replace(LOCK_PREFIX_RE,'');
+  if(el.querySelector('svg.ui-icon'))return; // déjà posée : évite une boucle avec le MutationObserver
+  const rest=(el.textContent||'').replace(LOCK_PREFIX_RE,'');
   el.innerHTML=ICON_LOCK+' '+escapeHtml(rest);
 }
 function _watchLockIcon(id: string){

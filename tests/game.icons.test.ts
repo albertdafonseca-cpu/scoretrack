@@ -128,7 +128,20 @@ describe('src/game.ts — icônes fonctionnelles SVG (élément H, P1 #7)', () =
   });
 
   describe('confidentialité — icône cadenas auto-réparée (MutationObserver, hors périmètre i18n.ts)', () => {
-    it('un texte déjà préfixé par l\'émoji cadenas AVANT la surveillance est corrigé immédiatement', () => {
+    // Depuis le nettoyage de l'émoji à la source (docs/audit/DECISIONS-H.md
+    // §17.1, les 18 langues de translations.ts ne préfixent plus le texte),
+    // `_fixLockIcon` pose l'icône de façon INCONDITIONNELLE — elle ne dépend
+    // plus de la présence d'un émoji à détecter et retirer.
+    it('un texte simple (sans émoji, cas réel depuis le nettoyage des traductions) reçoit l\'icône dès la surveillance posée', () => {
+      const btn = document.getElementById('btn-privacy-txt')!;
+      btn.textContent = 'Politique de test';
+      game.initFunctionalIcons();
+      expect(btn.innerHTML).toContain('<svg class="ui-icon"');
+      expect(btn.innerHTML).toContain(normalize(ICON_LOCK));
+      expect(btn.textContent).toBe(' Politique de test');
+    });
+
+    it('un éventuel préfixe émoji résiduel (garde défensive, aucune source connue n\'en produit plus) est retiré au passage', () => {
       const btn = document.getElementById('btn-privacy-txt')!;
       btn.textContent = '\u{1F512} Politique de test';
       game.initFunctionalIcons();
@@ -137,28 +150,49 @@ describe('src/game.ts — icônes fonctionnelles SVG (élément H, P1 #7)', () =
       expect(btn.textContent).toBe(' Politique de test');
     });
 
-    it("un texte réinjecté APRÈS coup (simulant un futur appel d'i18n.ts hors périmètre) est corrigé par le MutationObserver", async () => {
+    it("un texte réinjecté APRÈS coup (simulant un futur appel d'i18n.ts hors périmètre) reçoit l'icône via le MutationObserver", async () => {
       const title = document.getElementById('privacy-title-txt')!;
-      title.textContent = 'Confidentialité (sans icône)';
+      title.textContent = 'Confidentialité';
       game.initFunctionalIcons();
-      // Pas de préfixe émoji cette fois : rien à corriger.
-      expect(title.innerHTML).toBe('Confidentialité (sans icône)');
+      expect(title.innerHTML).toContain('<svg class="ui-icon"');
 
       // `_setText('privacy-title-txt', t('privacyTitle'))` (src/i18n.ts, hors
-      // périmètre) fait `el.textContent = '🔒 Confidentialité'` à chaque
-      // changement de langue — on simule exactement cet effet de bord ici.
-      title.textContent = '\u{1F512} Confidentialité';
+      // périmètre) fait `el.textContent = 'Confidentialité'` à chaque
+      // changement de langue (écrase l'icône posée) — on simule exactement
+      // cet effet de bord ici.
+      title.textContent = 'Confidentialité';
       await flushMicrotasks();
       expect(title.innerHTML).toContain('<svg class="ui-icon"');
       expect(title.innerHTML).toContain(normalize(ICON_LOCK));
       expect(title.textContent).toBe(' Confidentialité');
     });
 
-    it('mutation testing : `_fixLockIcon` sans le préfixe cadenas ne modifie rien (pas de faux positif)', () => {
+    it('idempotence : deux appels successifs sur un élément déjà réparé n\'empilent pas les icônes', () => {
       const el = document.createElement('div');
-      el.textContent = 'Texte sans rapport';
+      el.textContent = 'Texte quelconque';
       game._fixLockIcon(el);
-      expect(el.innerHTML).toBe('Texte sans rapport');
+      game._fixLockIcon(el);
+      expect(el.querySelectorAll('svg').length).toBe(1);
+    });
+
+    it("mutation testing : la garde `el.querySelector('svg.ui-icon')` rend bien l'appel sans effet une fois l'icône posée", () => {
+      // Sans cette garde, le MutationObserver de production (qui observe
+      // childList/subtree/characterData) se re-déclencherait indéfiniment :
+      // `el.innerHTML=...` pose l'icône -> ce changement DOM notifie
+      // l'observateur -> il rappelle `_fixLockIcon` -> qui recompose et
+      // réaffecte `innerHTML` (nouvelle instance de nœuds, même contenu) ->
+      // nouvelle notification -> boucle. Preuve directe, sans reproduire la
+      // boucle elle-même (jamais souhaitable dans une suite de tests) : une
+      // fois l'icône posée, un second appel ne modifie plus RIEN, pas même
+      // les nœuds DOM eux-mêmes (comparaison par référence du nœud `<svg>`).
+      const el = document.createElement('div');
+      el.textContent = 'Texte quelconque';
+      game._fixLockIcon(el);
+      const svgBefore = el.querySelector('svg.ui-icon');
+      const htmlBefore = el.innerHTML;
+      game._fixLockIcon(el);
+      expect(el.querySelector('svg.ui-icon')).toBe(svgBefore); // même nœud, jamais recréé
+      expect(el.innerHTML).toBe(htmlBefore);
     });
   });
 });
