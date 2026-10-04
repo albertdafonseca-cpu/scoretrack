@@ -354,10 +354,10 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
 /* défaut / cyber — teintes Tol à ~40% luminosité sur fond bleu-vert */
 .pcard.color-1 {background:#1a3a55} /* bleu       Tol #4477AA */
 .pcard.color-2 {background:#5a2030} /* rose       Tol #EE6677 */
-.pcard.color-3 {background:#484410} /* jaune-vert Tol #CCBB44 */
+.pcard.color-3 {background:#423f0f} /* jaune-vert Tol #CCBB44 — assombri (2.84:1 -> 3.09:1 contre le score) */
 .pcard.color-4 {background:#441535} /* violet     Tol #AA3377 */
 .pcard.color-5 {background:#103820} /* vert       Tol #228833 */
-.pcard.color-6 {background:#104850} /* cyan       Tol #66CCEE */
+.pcard.color-6 {background:#0f444b} /* cyan       Tol #66CCEE — assombri (2.91:1 -> 3.09:1 contre le score) */
 .pcard.color-7 {background:#303030} /* gris       Tol #BBBBBB */
 .pcard.color-8 {background:#4a2a10} /* orange     Tol #EE7733 */
 .pcard.color-9 {background:#082848} /* bleu foncé Tol #0077BB */
@@ -399,16 +399,24 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
 [data-theme="arcade"] .pcard.color-9 {background:#060d1e}
 [data-theme="arcade"] .pcard.color-10{background:#38101c}
 
-/* nature — vert forêt */
-[data-theme="nature"] .pcard.color-1 {background:#89959b}
-[data-theme="nature"] .pcard.color-2 {background:#9d8b8b}
-[data-theme="nature"] .pcard.color-3 {background:#959587}
-[data-theme="nature"] .pcard.color-4 {background:#95878f}
-[data-theme="nature"] .pcard.color-5 {background:#849589}
-[data-theme="nature"] .pcard.color-6 {background:#849d93}
-[data-theme="nature"] .pcard.color-7 {background:#8b8f8b}
-[data-theme="nature"] .pcard.color-8 {background:#9c9087}
-[data-theme="nature"] .pcard.color-9 {background:#848f9b}
+/* nature — vert forêt. Couleurs 1-9 assombries (luminance ~0.35-0.45 à
+   l'origine, mesurée) : contraste du nom (--text) jusqu'à 2.75:1 et du score
+   (--accent) jusqu'à 1.01:1 — quasi invisible. Chaque teinte d'origine est
+   conservée (mise à l'échelle RGB uniforme, donc même rapport R:G:B), juste
+   ramenée à une luminance variant de 0.012 à 0.048 selon la carte (cf. audit
+   contraste e2e/theme-card-contrast.spec.ts) : assez sombre pour un contraste
+   réel contre le texte ET le score, assez varié d'une carte à l'autre pour
+   rester distinguables par la luminance seule (repère daltonien), comme les
+   autres thèmes sombres. */
+[data-theme="nature"] .pcard.color-1 {background:#1b1d1e}
+[data-theme="nature"] .pcard.color-2 {background:#262222}
+[data-theme="nature"] .pcard.color-3 {background:#282824}
+[data-theme="nature"] .pcard.color-4 {background:#302b2e}
+[data-theme="nature"] .pcard.color-5 {background:#2c322e}
+[data-theme="nature"] .pcard.color-6 {background:#2d3633}
+[data-theme="nature"] .pcard.color-7 {background:#363836}
+[data-theme="nature"] .pcard.color-8 {background:#3f3a36}
+[data-theme="nature"] .pcard.color-9 {background:#3a3e44}
 [data-theme="nature"] .pcard.color-10{background:#2c1020}
 
 /* sunset — rouge-bordeaux chaud */
@@ -423,16 +431,20 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
 [data-theme="sunset"] .pcard.color-9 {background:#4b4e69}
 [data-theme="sunset"] .pcard.color-10{background:#421020}
 
-/* ocean — bleu marine électrique */
-[data-theme="ocean"] .pcard.color-1 {background:#637088}
-[data-theme="ocean"] .pcard.color-2 {background:#7e6378}
-[data-theme="ocean"] .pcard.color-3 {background:#6f7564}
-[data-theme="ocean"] .pcard.color-4 {background:#6f617d}
-[data-theme="ocean"] .pcard.color-5 {background:#5e6e7d}
-[data-theme="ocean"] .pcard.color-6 {background:#5e7b88}
-[data-theme="ocean"] .pcard.color-7 {background:#66707d}
-[data-theme="ocean"] .pcard.color-8 {background:#756b5e}
-[data-theme="ocean"] .pcard.color-9 {background:#5d6b84}
+/* ocean — bleu marine électrique. Même correctif que nature ci-dessus (même
+   cause : cartes 1-9 à luminance ~0.35-0.45, score jusqu'à 1.03:1) — teintes
+   d'origine conservées, luminance ramenée à 0.008-0.027 (--accent d'ocean est
+   plus sombre que celui de nature, d'où un plafond plus bas pour garder
+   3:1 — cf. e2e/theme-card-contrast.spec.ts). */
+[data-theme="ocean"] .pcard.color-1 {background:#14161b}
+[data-theme="ocean"] .pcard.color-2 {background:#1f181d}
+[data-theme="ocean"] .pcard.color-3 {background:#1d1e1a}
+[data-theme="ocean"] .pcard.color-4 {background:#241f28}
+[data-theme="ocean"] .pcard.color-5 {background:#1f2529}
+[data-theme="ocean"] .pcard.color-6 {background:#1f282c}
+[data-theme="ocean"] .pcard.color-7 {background:#26292e}
+[data-theme="ocean"] .pcard.color-8 {background:#2f2b26}
+[data-theme="ocean"] .pcard.color-9 {background:#282e39}
 [data-theme="ocean"] .pcard.color-10{background:#300c2c}
 
 /* mono — niveaux de gris bien distincts */
@@ -1030,16 +1042,19 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
 [data-theme="arcade"] .delta-flash,
 [data-theme="arcade"] .tap-sign-minus,
 [data-theme="arcade"] .tap-sign-plus{text-shadow:none;}
-[data-theme="arcade-light"] .pcard.color-1 {background:#cdd2e9}
-[data-theme="arcade-light"] .pcard.color-2 {background:#ebcaca}
+/* Couleurs 1/2/4/9/10 légèrement éclaircies (2.75-2.82:1 -> >=3.06:1 contre
+   --accent #997700, partagé avec sunset-light/gold-light) — même méthode que
+   nature/ocean (mise à l'échelle RGB uniforme, teinte conservée). */
+[data-theme="arcade-light"] .pcard.color-1 {background:#d7dbee}
+[data-theme="arcade-light"] .pcard.color-2 {background:#f0d6d6}
 [data-theme="arcade-light"] .pcard.color-3 {background:#eeebc7}
-[data-theme="arcade-light"] .pcard.color-4 {background:#e3ccea}
+[data-theme="arcade-light"] .pcard.color-4 {background:#e8d6ee}
 [data-theme="arcade-light"] .pcard.color-5 {background:#cce9cc}
 [data-theme="arcade-light"] .pcard.color-6 {background:#c9eded}
 [data-theme="arcade-light"] .pcard.color-7 {background:#eee6c7}
 [data-theme="arcade-light"] .pcard.color-8 {background:#eedec7}
-[data-theme="arcade-light"] .pcard.color-9 {background:#c7d3ee}
-[data-theme="arcade-light"] .pcard.color-10{background:#eec7d3}
+[data-theme="arcade-light"] .pcard.color-9 {background:#d3dcf2}
+[data-theme="arcade-light"] .pcard.color-10{background:#f2d4dd}
 [data-theme="arcade-light"]{
   --card-texture:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect y='0' width='4' height='2' fill='%23ffdc00' opacity='0.07'/%3E%3C/svg%3E");
   --card-texture-size:4px 4px;--card-texture-opacity:1;}
@@ -1089,16 +1104,18 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
   font-size:24px;line-height:1.2;letter-spacing:0.04em;}
 [data-theme="sunset-light"] .settings-title,
 [data-theme="mono-light"] .settings-title{text-transform:none;}
-[data-theme="sunset-light"] .pcard.color-1 {background:#d9d6e0}
-[data-theme="sunset-light"] .pcard.color-2 {background:#e3d2d7}
+/* Couleurs 1/2/4/9/10 légèrement éclaircies (2.90-2.96:1 -> >=3.06:1 contre
+   --accent #997700, partagé avec arcade-light/gold-light) — même méthode. */
+[data-theme="sunset-light"] .pcard.color-1 {background:#dddbe3}
+[data-theme="sunset-light"] .pcard.color-2 {background:#e7d8dd}
 [data-theme="sunset-light"] .pcard.color-3 {background:#e3ded3}
-[data-theme="sunset-light"] .pcard.color-4 {background:#e1d4de}
+[data-theme="sunset-light"] .pcard.color-4 {background:#e4d9e2}
 [data-theme="sunset-light"] .pcard.color-5 {background:#d8deda}
 [data-theme="sunset-light"] .pcard.color-6 {background:#d6dde0}
-[data-theme="sunset-light"] .pcard.color-7 {background:#e0d6d6}
+[data-theme="sunset-light"] .pcard.color-7 {background:#e3dada}
 [data-theme="sunset-light"] .pcard.color-8 {background:#e4d8d2}
-[data-theme="sunset-light"] .pcard.color-9 {background:#d5d6e1}
-[data-theme="sunset-light"] .pcard.color-10{background:#eec7d4}
+[data-theme="sunset-light"] .pcard.color-9 {background:#dadbe5}
+[data-theme="sunset-light"] .pcard.color-10{background:#f2d4de}
 [data-theme="sunset-light"]{
   --card-texture:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cpath d='M0 40L40 0' stroke='%23ff6040' stroke-width='0.6' opacity='0.12'/%3E%3Cpath d='M-10 30L30 -10' stroke='%23ffaa00' stroke-width='0.4' opacity='0.08'/%3E%3C/svg%3E");
   --card-texture-size:40px 40px;--card-texture-opacity:1;}
@@ -1135,16 +1152,18 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
   --chip-bg:#1e1800;--chip-text:#887000;--chip-on:#CCBB44;--chip-on-text:#000000;
   --bg-grad:radial-gradient(ellipse at 50% 0%,#f4f1e0 0%,#fbf9f3 70%);
   --modal-bg:rgba(8,6,0,0.94);--modal-glow:0 -8px 40px rgba(220,180,0,0.16);}
-[data-theme="gold-light"] .pcard.color-1 {background:#cfd9e7}
-[data-theme="gold-light"] .pcard.color-2 {background:#e9cdcd}
+/* Couleurs 1/2/4/9/10 légèrement éclaircies (2.78-2.95:1 -> >=3.06:1 contre
+   --accent #997700, partagé avec arcade-light/sunset-light) — même méthode. */
+[data-theme="gold-light"] .pcard.color-1 {background:#d4dde9}
+[data-theme="gold-light"] .pcard.color-2 {background:#edd7d7}
 [data-theme="gold-light"] .pcard.color-3 {background:#eee8c7}
-[data-theme="gold-light"] .pcard.color-4 {background:#ebcadd}
+[data-theme="gold-light"] .pcard.color-4 {background:#efd5e4}
 [data-theme="gold-light"] .pcard.color-5 {background:#cfe7cf}
 [data-theme="gold-light"] .pcard.color-6 {background:#cde9e3}
 [data-theme="gold-light"] .pcard.color-7 {background:#eee8c7}
 [data-theme="gold-light"] .pcard.color-8 {background:#eedbc7}
-[data-theme="gold-light"] .pcard.color-9 {background:#c7d2ee}
-[data-theme="gold-light"] .pcard.color-10{background:#eeccc7}
+[data-theme="gold-light"] .pcard.color-9 {background:#d3dcf2}
+[data-theme="gold-light"] .pcard.color-10{background:#f1d6d2}
 [data-theme="gold-light"]{
   --card-texture:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cline x1='12' y1='0' x2='12' y2='24' stroke='%23ffee44' stroke-width='0.5' opacity='0.14'/%3E%3Cline x1='0' y1='12' x2='24' y2='12' stroke='%23ddb800' stroke-width='0.5' opacity='0.10'/%3E%3C/svg%3E");
   --card-texture-size:24px 24px;--card-texture-opacity:1;}
