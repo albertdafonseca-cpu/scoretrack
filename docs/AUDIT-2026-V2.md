@@ -1,4 +1,4 @@
-# Audit qualité AAA — ScoreTrack, base réelle `main` (v2, 20 septembre 2026)
+# Audit qualité AAA — ScoreTrack, base réelle `main` (v2, 20 septembre 2026 ; mis à jour le 5 octobre 2026)
 
 Rapport final de l'audit qualité mené sur le code réellement déployé du
 projet (TypeScript, moteur de dés 3D Three.js, i18n 18 langues, export PDF,
@@ -49,10 +49,12 @@ elle est documentée ici plutôt que tue.
 | G | Retrait des `onclick` inline, CSP `script-src` (round 3, post-clôture) | 1 | AAA — `G-critique-round1.md` |
 | H | Émojis système → icônes SVG (round 4, post-clôture) | 5 + 1 correctif | AAA — `H-critique-round5.md` + correctif D34 |
 
-État vérifié sur le dernier commit de la branche `claude/audit-qualite-aaa-lmthte` :
+État vérifié à la clôture initiale (6 éléments + G + H) :
 `npm run typecheck` (3 configurations), `npm run lint` (0 erreur),
 `npm run test` (122 tests unitaires), `npm run build`, et
-`npx playwright test` (42 tests e2e) — tous verts.
+`npx playwright test` (42 tests e2e) — tous verts. Après les travaux
+post-audit ci-dessous (PR #7 à #11), revérifié : 127 tests unitaires,
+57 tests e2e, toujours tous verts.
 
 ## Élément H (round 4, post-clôture, ajouté sur demande explicite)
 
@@ -179,6 +181,58 @@ typecheck/lint/tests unitaires/build/e2e) — détail complet dans
   après avoir mesuré (pas supposé) qu'un retrait complet casserait les
   innombrables mutations `.style.xxx=` légitimes du projet.
 
+## Travaux post-audit (PR #7 à #11, sur signalement utilisateur)
+
+Après la clôture formelle ci-dessus, l'utilisateur a continué à utiliser
+l'application et signalé des défauts supplémentaires par capture d'écran,
+traités hors du formalisme élément/critique — comme les six points de dette
+fermés plus haut, chacun revérifié typecheck/lint/tests unitaires/build/e2e
+avant fusion, avec surveillance de la CI jusqu'au merge :
+
+- **PR #7** — Politique de confidentialité : numéro de version affiché dans
+  les 18 langues, lu depuis `<meta name="app-version">` (même source que
+  l'invalidation de cache du service worker) pour rester exact à chaque
+  build sans entretien manuel séparé.
+- **PR #8** — Deux bugs visuels du lanceur de dés : le badge de type de dé
+  (`d100`/`d120`) débordait de sa capsule (largeur figée à 42px, pensée pour
+  un libellé court type « d6 » ; corrigée en `min-width`). Le bouton
+  flottant « dé », fixe au centre du plateau, recouvrait le nom d'un joueur
+  sur certaines configurations de la grille de cartes ; une première
+  correction l'a rendu dynamique pour éviter les noms mesurés en temps réel.
+- **PR #9** — Le positionnement dynamique du bouton (PR #8) a été jugé trop
+  fragile par l'utilisateur après qu'un deuxième cas de recouvrement a été
+  trouvé. Remplacé par un bouton de nouveau fixe au centre (comportement
+  d'origine) et un réordonnancement visuel des cartes (`order` CSS, DOM
+  inchangé pour ne pas perturber le lecteur d'écran) qui éloigne le nom du
+  joueur du centre du plateau, quelle que soit la disposition de grille.
+  Corrige au passage un score à deux chiffres mal centré sur les cartes
+  tournées à 90° (le calcul de taille de `fitCard` remplissait tout
+  l'espace disponible sans marge ; ramené à 80%/72% largeur/hauteur).
+- **PR #10 et #11** — Premier chantier mesurable de la refonte visuelle
+  demandée par l'utilisateur (« revois le design ») : un audit de contraste
+  WCAG réel (`getComputedStyle` sur le DOM rendu, pas une lecture théorique
+  du CSS) sur les 22 thèmes × 10 couleurs de carte, pour le nom du joueur,
+  le score et les signes +/-. Trouvailles : 8 thèmes clairs avaient une
+  couleur de texte figée à blanc, pensée pour les thèmes sombres (contraste
+  mesuré jusqu'à 1,2:1, quasi illisible) ; `cyber-light` n'avait pas
+  d'override pour une couleur de carte, retombant sur un défaut sombre dans
+  un thème clair (1,28:1) ; `nature` et `ocean` avaient une palette de
+  cartes délibérément grisée dont la luminance était trop proche à la fois
+  du texte et du score (jusqu'à 1,01:1, quasi invisible) et insuffisamment
+  distinguables entre elles pour un œil daltonien. **0 échec restant sur
+  les 220 combinaisons.** Couvert par `e2e/theme-card-contrast.spec.ts`
+  (généralisé en PR #11), validé par mutation testing des deux côtés
+  (constructeur et vérification indépendante).
+
+Ce chantier de refonte visuelle n'en est qu'à sa première phase (le
+contraste, maintenant terminé) : un point de départ mesurable plutôt
+qu'une prise de position esthétique, choisi précisément pour ne pas
+rouvrir de décision déjà verrouillée (rendu du moteur de dés) ni se fier
+au seul jugement visuel de l'exécutant. Les phases suivantes
+(typographie, espacement, densité des écrans, cohérence des composants
+au-delà des couleurs de carte) restent à cadrer avec l'utilisateur — pas
+de direction donnée à ce stade, donc pas engagées.
+
 ## Dette restante, documentée et assumée (non bloquante pour AAA, hors de portée de cet audit)
 
 - 4 langues (arabe, japonais, coréen, chinois) signalées par leur propre
@@ -210,3 +264,13 @@ Il ne reste que de la dette qui dépasse la portée de cet audit : la
 relecture de 4 traductions par un locuteur natif, une limite d'un outil
 tiers (`typescript-eslint`) hors du contrôle du projet, et la validation de
 la CSP sur un déploiement réel.
+
+Cinq points supplémentaires signalés par l'utilisateur après la clôture
+(PR #7 à #11) ont depuis été traités par le même processus (correctif ciblé,
+test de non-régression, mutation testing, CI verte avant fusion) : version
+affichée dans la politique de confidentialité, deux bugs de mise en page du
+lanceur de dés, le repositionnement du bouton dé et le centrage du score, et
+un audit de contraste WCAG complet amorçant la refonte visuelle demandée
+(0 échec sur 220 combinaisons thème × couleur de carte). Cette refonte reste
+ouverte au-delà du contraste — sans direction donnée pour ses phases
+suivantes, elle n'est pas engagée.
