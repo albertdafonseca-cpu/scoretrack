@@ -673,7 +673,13 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
 
 /* BAR */
 #bar{display:flex;flex-direction:column;align-items:stretch;flex-shrink:0;width:100%;background:var(--bg2);border-top:1px solid var(--border);}
-#bar-handle-zone{display:flex;align-items:center;justify-content:center;padding:5px 0 4px;cursor:pointer;touch-action:none;transition:padding 0.3s cubic-bezier(0.32,0.72,0,1);}
+/* padding porté de 5px/4px à 11px/10px : zone tactile fermée mesurée à
+   13px de haut (sur toute la largeur de l'écran) — sous le minimum WCAG
+   2.5.8 AA (24px) — alors que c'est le seul moyen d'atteindre Undo/Rotation/
+   Récap/Thème/Reset (la barre se referme seule après 3s d'inactivité).
+   L'indicateur visuel (#bar-handle, 36x4px) ne change pas : seule la marge
+   de respiration autour grandit. */
+#bar-handle-zone{display:flex;align-items:center;justify-content:center;padding:11px 0 10px;cursor:pointer;touch-action:none;transition:padding 0.3s cubic-bezier(0.32,0.72,0,1);}
 #bar-handle{width:36px;height:4px;border-radius:2px;background:var(--muted2);opacity:0.55;transition:background 0.2s, width 0.3s cubic-bezier(0.32,0.72,0,1), height 0.3s;}
 #bar.open #bar-handle-zone{padding:12px 0 10px;}
 #bar.open #bar-handle{width:56px;height:5px;background:var(--accent);}

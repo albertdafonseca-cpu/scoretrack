@@ -119,4 +119,51 @@ describe('dist/sw.js compilé — exécution réelle, aucune requête tierce à 
       expect(url).not.toMatch(/^https?:\/\//);
     }
   });
+
+  // Refonte visuelle phase 2 (audit des zones tactiles) : bug trouvé en
+  // vérifiant un correctif sans rapport — la bannière « mise à jour
+  // disponible » (src/sw.ts) s'affichait aussi au tout premier chargement,
+  // pas seulement lors d'une vraie mise à jour, interceptant les clics
+  // pendant quelques centaines de ms (cause de la fragilité observée sur
+  // e2e/accessibility-basics.spec.ts). Exécute le vrai handler `activate`
+  // compilé, comme le test d'installation ci-dessus, avec un espion sur
+  // `postMessage` pour prouver le comportement sur les deux scénarios.
+  async function runActivate(existingCacheKeys: string[]): Promise<{ posted: boolean }> {
+    const posted: unknown[] = [];
+    const listeners: Record<string, (e: unknown) => void> = {};
+    const deletedKeys: string[] = [];
+    const fakeCaches = {
+      open: async () => ({ put: async () => {}, match: async () => undefined }),
+      keys: async () => existingCacheKeys,
+      delete: async (k: string) => { deletedKeys.push(k); return true; },
+    };
+    const fakeClient = { postMessage: (msg: unknown) => posted.push(msg) };
+    const fakeSelf = {
+      addEventListener: (type: string, cb: (e: unknown) => void) => { listeners[type] = cb; },
+      skipWaiting: async () => {},
+      clients: { claim: async () => {}, matchAll: async () => [fakeClient] },
+    };
+    const sandbox = {
+      self: fakeSelf, caches: fakeCaches, fetch: async () => ({ ok: false }) as Response,
+      Response: class { constructor(public body?: unknown, public init?: unknown) {} },
+      Request: class { constructor(public url: string) {} },
+      URL: globalThis.URL, console,
+    };
+    const fn = new Function(...Object.keys(sandbox), readFileSync(outfile, 'utf8'));
+    fn(...Object.values(sandbox));
+    let activatePromise: Promise<unknown> = Promise.resolve();
+    listeners.activate({ waitUntil: (p: Promise<unknown>) => { activatePromise = p; } });
+    await activatePromise;
+    return { posted: posted.length > 0 };
+  }
+
+  it("ne prévient PAS d'une mise à jour à la toute première installation (aucun ancien cache)", async () => {
+    const { posted } = await runActivate(['st-v' + 'test']); // seul le cache qu'on vient de créer existe
+    expect(posted).toBe(false);
+  });
+
+  it("prévient bien d'une mise à jour quand un cache d'une AUTRE version existe", async () => {
+    const { posted } = await runActivate(['st-v' + 'test', 'st-vOLD']);
+    expect(posted).toBe(true);
+  });
 });

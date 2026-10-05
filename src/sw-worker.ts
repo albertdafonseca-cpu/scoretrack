@@ -76,14 +76,24 @@ sw.addEventListener('install', (e: ExtendableEvent) => {
 sw.addEventListener('activate', (e: ExtendableEvent) => {
   e.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(
-      keys
-        .filter(k => k !== CACHE_VERSION)
-        .map(k => caches.delete(k))
-    );
+    // Caches d'une AUTRE version que celle qu'on vient d'installer : leur
+    // présence est le signal d'une vraie mise à jour (un visiteur déjà venu,
+    // qui avait donc un ancien cache à remplacer). Leur absence (tableau
+    // vide) signifie que c'est la toute première installation sur cet
+    // appareil : il n'y a rien à « mettre à jour », donc rien à annoncer —
+    // avant ce correctif, la bannière « mise à jour disponible » s'affichait
+    // aussi au tout premier chargement (message trompeur pour l'utilisateur,
+    // et interfère avec l'UI en l'interceptant pendant quelques centaines de
+    // ms à chaque lancement, cf. e2e/accessibility-basics.spec.ts, trouvé en
+    // vérifiant la refonte visuelle phase 2 — pas un correctif de cette
+    // phase elle-même, mais un vrai bug trouvé au passage).
+    const staleKeys = keys.filter(k => k !== CACHE_VERSION);
+    await Promise.all(staleKeys.map(k => caches.delete(k)));
     await sw.clients.claim();
-    const clients = await sw.clients.matchAll({ type: 'window' });
-    clients.forEach(c => c.postMessage({ type: 'SW_UPDATED', version: CACHE_VERSION }));
+    if (staleKeys.length > 0) {
+      const clients = await sw.clients.matchAll({ type: 'window' });
+      clients.forEach(c => c.postMessage({ type: 'SW_UPDATED', version: CACHE_VERSION }));
+    }
   })());
 });
 
