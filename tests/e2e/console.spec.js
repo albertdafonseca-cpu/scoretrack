@@ -3,9 +3,13 @@ const { test, expect, startGame, openBar, applyDelta } = require('./helpers');
 test('aucune erreur console, aucune réponse HTTP >= 400, aucune requête tierce sur un parcours complet', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await startGame(page, { players: 3, names: ['A', 'B', 'C'] });
-  await page.locator('#card-1').focus();
-  await page.keyboard.press('ArrowUp');
-  await page.keyboard.press('ArrowDown');
+  // Les cartes peuvent être redessinées juste après le démarrage (focus perdu) : on réessaie
+  await expect(async () => {
+    await page.locator('#card-1').focus();
+    await page.keyboard.press('ArrowUp'); // bloqué au score de départ (aucun effet attendu)
+    await page.keyboard.press('ArrowDown');
+    await expect(page.locator('#undo-btn')).toBeEnabled({ timeout: 500 });
+  }).toPass({ timeout: 7000 });
   await openBar(page);
   await page.click('#undo-btn');
   await page.locator('.bar-btn.accent-btn').click();
