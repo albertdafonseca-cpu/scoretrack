@@ -3451,13 +3451,42 @@ const T = {
 // ── Libellés ajoutés (accessibilité, erreurs) — FR/EN/PT, repli EN puis clé ──
 Object.assign(T.fr,{
   pdfLoadError:'Impossible de charger le module PDF. Réessayez une fois connecté.',
+  confirmClearData:'Supprimer toutes les données de ScoreTrack Light (réglages, partie en cours, prénoms mémorisés) sur cet appareil ?',
 });
 Object.assign(T.en,{
   pdfLoadError:'Could not load the PDF module. Please try again when online.',
+  confirmClearData:'Delete all ScoreTrack Light data (settings, current game, saved names) on this device?',
 });
 Object.assign(T.pt,{
   pdfLoadError:'Não foi possível carregar o módulo PDF. Tente novamente quando estiver online.',
+  confirmClearData:'Apagar todos os dados do ScoreTrack Light (definições, jogo em curso, nomes memorizados) neste dispositivo?',
 });
+
+// ══════════════════════════════════════════════════════════════════
+//  STOCKAGE ISOLÉ PAR APP — clés st:<APP_ID>:<nom>, aucun accès direct ailleurs
+// ══════════════════════════════════════════════════════════════════
+const APP_ID='light';
+const K=n=>'st:'+APP_ID+':'+n;
+const store={get(k){try{return localStorage.getItem(K(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(K(k),v);return true}catch(e){return false}},del(k){try{localStorage.removeItem(K(k))}catch(e){}}};
+function readJSON(k,fallback){try{const r=store.get(k);if(r===null||r===undefined)return fallback;const v=JSON.parse(r);return (v===null||v===undefined)?fallback:v;}catch(e){return fallback;}}
+// Migration unique des anciennes clés partagées entre apps.
+// Les anciennes clés ne sont PAS supprimées : les apps sœurs doivent pouvoir migrer aussi.
+(function migrateLegacyStorage(){
+  try{
+    if(store.get('migrated'))return;
+    const legacy={save:'scoretrack_save',settings:'scoretrack_settings',profiles:'scoretrack_profiles',privacy:'st_privacy_accepted'};
+    Object.keys(legacy).forEach(k=>{
+      if(store.get(k)!==null)return;
+      let old=null;try{old=localStorage.getItem(legacy[k]);}catch(e){}
+      if(old!==null)store.set(k,old);
+    });
+    store.set('migrated','1');
+  }catch(e){}
+})();
+function saveSettings(){store.set('settings',JSON.stringify(settings));}
+// Efface uniquement les données de cette app (sauf le drapeau de migration,
+// pour ne pas ré-importer les anciennes données partagées)
+function clearAppStorage(){['save','settings','profiles','privacy'].forEach(k=>store.del(k));}
 
 // ── i18n state & helpers ──────────────────────────────────────────
 function _detectLang(){
@@ -3600,7 +3629,7 @@ function initLight(){
   setTimeout(()=>_lkAll(['btn-savedefault','btn-shuffle','btn-clearnames']),50);
   // Thème Cyber forcé
   applyTheme('cyber'); selectedTheme='cyber'; settings.theme='cyber';
-  try{localStorage.setItem('scoretrack_settings',JSON.stringify(settings));}catch(e){}
+  saveSettings();
   // Starting points : chips visibles et verrouillées (lk-disabled), saisie manuelle à 20
   const pc=document.getElementById('points-custom');
   if(pc&&!pc.value){pc.value='20'; startPoints=20;}
@@ -3679,7 +3708,7 @@ function renderLangDropdown(){
       if(!IS_PRO&&!['fr','en','pt'].includes(l.code)){_spop();return;}
       currentLang=l.code;
       settings.lang=l.code;
-      try{localStorage.setItem('scoretrack_settings',JSON.stringify(settings));}catch(err){}
+      saveSettings();
       applyLang(l.code);
       renderPresets();
     });
@@ -3724,7 +3753,7 @@ function renderLangDropdownPrivacy(){
         setTimeout(()=>{
           currentLang='fr';
           settings.lang='fr';
-          try{localStorage.setItem('scoretrack_settings',JSON.stringify(settings));}catch(err){}
+          saveSettings();
           applyLang('fr');
           renderPresets();
         },200);
@@ -3732,7 +3761,7 @@ function renderLangDropdownPrivacy(){
       }
       currentLang=l.code;
       settings.lang=l.code;
-      try{localStorage.setItem('scoretrack_settings',JSON.stringify(settings));}catch(err){}
+      saveSettings();
       applyLang(l.code);
     });
     dd.appendChild(opt);
@@ -3803,7 +3832,8 @@ let rankCounter=0;
 let players=[],seatOrder=[],undoStack=[],history=[],actionCounter=0,groupTimers={};
 const GROUP_DELAY=1500;
 let modalPlayerIdx=-1,modalValue='0',modalSign=1;
-let settings={theme:'cyber',defPlayers:0,defStart:20,defMax:0,defNeg:false,defObjectifMode:'win',defObjectifVal:0,defSaved:false};
+const SETTINGS_DEFAULT={theme:'cyber',defPlayers:0,defStart:20,defMax:0,defNeg:false,defObjectifMode:'win',defObjectifVal:0,defSaved:false};
+let settings={...SETTINGS_DEFAULT};
 let selectedTheme='cyber',defPlayers=0,defStart=-1,defMax=0,defNeg=false;
 let elimPending=-1; // index joueur en attente de confirmation d'élimination
 let winPending=-1;
@@ -3817,9 +3847,9 @@ function fmtNum(n){
 
 // ── SETTINGS ──────────────────────────────────────────────────────
 function loadSettings(){
-  const raw=localStorage.getItem('scoretrack_settings');
-  const firstRun=!raw;
-  try{const s=JSON.parse(raw||'{}');settings={...settings,...s};}catch(e){}
+  const raw=store.get('settings');
+  const firstRun=!raw; // dépend de la clé isolée de cette app
+  try{const s=JSON.parse(raw||'{}');if(s&&typeof s==='object'&&!Array.isArray(s))settings={...settings,...s};}catch(e){}
 
   if(firstRun){
     // Première ouverture : thème Dark + preset Loi du Milieu
@@ -3844,8 +3874,8 @@ function loadSettings(){
     settings.defSaved=true;
   }
 
-  if(localStorage.getItem('scoretrack_save')){
-    restoreGame(); return; // reprendre la partie en cours
+  if(store.get('save')&&restoreGame()){
+    return; // reprendre la partie en cours (sauvegarde valide)
   }
   applyDefaults(firstRun);
   updateRestoreBtn();
@@ -3954,13 +3984,13 @@ function clearSavedDefaults(e){
   if(!settings.defSaved)return;
   settings={...settings,defPlayers:0,defStart:0,defMax:0,defNeg:false,defObjectifMode:'none',defObjectifVal:null,defSingleWinner:false,defLastLoser:false,defSaved:false};
   defPlayers=0;defStart=0;defMax=0;defNeg=false;
-  try{localStorage.setItem('scoretrack_settings',JSON.stringify(settings));}catch(err){}
+  saveSettings();
   updateRestoreBtn();
   _flashBtnLabel(_getFooterBtn(e),t('cleared')||'✓ Effacé',1500);
 }
 function saveAsDefault(e){
   settings={...settings,defPlayers:numPlayers||0,defStart:startPoints>=0?startPoints:0,defMax:maxPoints===Infinity?0:maxPoints,defNeg:allowNeg,defObjectifMode:objectifMode||'none',defObjectifVal:getObjectifVal(),defSingleWinner:singleWinner||false,defLastLoser:lastLoser||false,defSaved:true};
-  try{localStorage.setItem('scoretrack_settings',JSON.stringify(settings));}catch(e2){}
+  saveSettings();
   defPlayers=settings.defPlayers;defStart=settings.defStart;defMax=settings.defMax;defNeg=settings.defNeg;
   // Flash confirmation
   updateRestoreBtn();
@@ -3972,7 +4002,7 @@ function saveAsDefault(e){
 // ── SAUVEGARDE DE PARTIE ──────────────────────────────────────────
 function saveGame(){
   try{
-    localStorage.setItem('scoretrack_save',JSON.stringify({
+    store.set('save',JSON.stringify({
       players,seatOrder,history,actionCounter,
       numPlayers,startPoints,maxPoints:maxPoints===Infinity?null:maxPoints,allowNeg,
       saveVersion:33,
@@ -3984,7 +4014,7 @@ function saveGame(){
 }
 function restoreGame(){
   try{
-    const s=JSON.parse(localStorage.getItem('scoretrack_save'));
+    const s=readJSON('save',null);
     if(!s)return;
     // Version 3.3 : vérifier la version du save
     if((s.saveVersion||0) < 33){
@@ -4006,7 +4036,7 @@ function restoreGame(){
   }catch(e){discardSave();}
 }
 function discardSave(){
-  localStorage.removeItem('scoretrack_save');
+  store.del('save');
   document.getElementById('restore-banner').classList.add('hidden');
 }
 
@@ -4023,14 +4053,14 @@ function backFromTheme(){
 }
 function showPrivacy(){_privacyOrigin=document.querySelector('.page.active')?.id||'settings-page';showPage('privacy-modal');}
 function acceptPrivacy(){
-  localStorage.setItem('st_privacy_accepted','1');
+  store.set('privacy','1');
   document.getElementById('btn-privacy-accept').classList.add('hidden');
   document.getElementById('privacy-back-btn').classList.remove('hidden');
   document.getElementById('privacy-s5-section').classList.remove('hidden');
   closePrivacy();
 }
 function checkFirstLaunch(){
-  if(!localStorage.getItem('st_privacy_accepted')){
+  if(!store.get('privacy')){
     _privacyOrigin='setup-page';
     document.getElementById('privacy-back-btn').classList.add('hidden');
     document.getElementById('btn-privacy-accept').classList.remove('hidden');
@@ -4041,7 +4071,11 @@ function checkFirstLaunch(){
 let _privacyOrigin='settings-page';
 function closePrivacy(){showPage(_privacyOrigin);}
 function clearAllData(){
-  localStorage.clear();
+  if(!confirm(t('confirmClearData')))return;
+  clearAppStorage();
+  // Réglages en mémoire remis aux valeurs par défaut (la page reste cohérente)
+  settings={...SETTINGS_DEFAULT,theme:'cyber',lang:currentLang};
+  lastGameConfig=null;
   closePrivacy();
   confirmReset();
 }
@@ -4085,7 +4119,7 @@ function renderThemeGrid(){
         document.querySelectorAll('.theme-card').forEach(c=>c.classList.remove('selected'));
         card.classList.add('selected');selectedTheme=th.id;applyTheme(th.id);
         settings.theme=th.id;
-        try{localStorage.setItem('scoretrack_settings',JSON.stringify(settings));}catch(e){}
+        saveSettings();
       };
     }
     g.appendChild(card);
@@ -4239,7 +4273,8 @@ function checkGoBtn(){
 
 // ── PROFILS JOUEURS ───────────────────────────────────────────────
 function loadProfiles(){
-  try{return JSON.parse(localStorage.getItem('scoretrack_profiles')||'[]');}catch(e){return[];}
+  const v=readJSON('profiles',[]);
+  return Array.isArray(v)?v.filter(n=>typeof n==='string'&&n.trim()):[];
 }
 function saveProfiles(){
   const inputs=document.querySelectorAll('.name-input');
@@ -4249,7 +4284,7 @@ function saveProfiles(){
   // Ajouter chaque nom unique
   names.forEach(n=>{if(!profiles.includes(n))profiles.push(n);});
   if(profiles.length>30)profiles=profiles.slice(-30);
-  localStorage.setItem('scoretrack_profiles',JSON.stringify(profiles));
+  store.set('profiles',JSON.stringify(profiles));
   renderProfileChips();
 }
 function renderProfileChips(){
@@ -4280,7 +4315,7 @@ function fillName(name){
 }
 function deleteProfile(name){
   let profiles=loadProfiles().filter(p=>p!==name);
-  localStorage.setItem('scoretrack_profiles',JSON.stringify(profiles));
+  store.set('profiles',JSON.stringify(profiles));
   renderProfileChips();
 }
 
@@ -4326,7 +4361,7 @@ function clearAll(){
   clearSavedNames();
 }
 function clearSavedNames(){
-  localStorage.removeItem('scoretrack_profiles');
+  store.del('profiles');
   document.getElementById('profiles-list').innerHTML='';
   document.getElementById('profiles-list').classList.add('hidden');
 }
@@ -4338,7 +4373,7 @@ function startGame(){_hpop();
   // Mémoriser les réglages de cette partie pour le reset + persistance
   lastGameConfig={numPlayers,startPoints,objectifMode,objectifVal:getObjectifVal(),bloquerMode,allowNeg,singleWinner,lastLoser};
   settings.lastGameConfig=lastGameConfig;
-  try{localStorage.setItem('scoretrack_settings',JSON.stringify(settings));}catch(e){}
+  saveSettings();
   const inputs=document.querySelectorAll('.name-input');
   players=Array.from({length:numPlayers},(_,i)=>({playerName:inputs[i]?.value.trim()||'',score:startPoints,eliminated:false}));
   seatOrder=players.map((_,i)=>i);undoStack=[];history=[];actionCounter=0;groupTimers={};elimPending=-1;rankCounter=0;
@@ -4888,7 +4923,7 @@ function updateDisplay(i,zone,delta){
           document.getElementById('winner-name').textContent='';
           document.getElementById('winner-sub').textContent='';
           showWinnerModal(false);
-          localStorage.removeItem('scoretrack_save');
+          store.del('save');
           window._afterFinAnim=null;
         };
       }
@@ -4941,7 +4976,7 @@ function elimDirect(i){
         document.getElementById('winner-name').textContent=t('winner');
         document.getElementById('winner-sub').textContent=(alive[0].playerName||'')+(alive[0].playerName?' · ':'')+fmtNum(alive[0].finalScore)+' pts';
         showWinnerModal(true);
-        localStorage.removeItem('scoretrack_save');
+        store.del('save');
         window._afterWinAnim=null;
       };
       if(window.playWinAnim) playWinAnim(players.indexOf(alive[0]));
@@ -5423,7 +5458,7 @@ function confirmEndgame(){
       document.getElementById('winner-name').textContent=t('winner');
       document.getElementById('winner-sub').textContent=(p.playerName||'')+(p.playerName?' · ':'')+fmtNum(p.finalScore||p.rawScore||p.score)+' pts';
       showWinnerModal(true);
-      localStorage.removeItem('scoretrack_save');
+      store.del('save');
       window._afterWinAnim=null;
     };
     if(window.playWinAnim) playWinAnim(eg.winnerIdx);
@@ -5446,7 +5481,7 @@ function confirmEndgame(){
         document.getElementById('winner-name').textContent=loserName;
         document.getElementById('winner-sub').textContent=fmtNum(loser.finalScore||loser.rawScore||loser.score)+' pts';
         document.getElementById('winner-modal').classList.remove('hidden');
-        localStorage.removeItem('scoretrack_save');
+        store.del('save');
         window._afterElimAnim=null;
       };
     };
@@ -6525,7 +6560,7 @@ function startNewGameSameSetup(){
   ['reset-modal','winner-modal','recap','score-modal','elim-modal','endgame-modal']
     .forEach(id => document.getElementById(id).classList.add('hidden'));
 
-  localStorage.removeItem('scoretrack_save');
+  store.del('save');
 
   // Restaurer les réglages de la partie précédente
   if(cfg){
@@ -6561,7 +6596,7 @@ function startNewGameSameSetup(){
 function confirmReset(){
   ['reset-modal','winner-modal','recap','score-modal','elim-modal','endgame-modal'].forEach(id=>document.getElementById(id).classList.add('hidden'));
   document.getElementById('game-screen').style.display='none';
-  localStorage.removeItem('scoretrack_save');
+  store.del('save');
   numPlayers=0;startPoints=0;maxPoints=Infinity;allowNeg=false;elimPending=-1;
   elimPoints=null;winPoints=null;objectifMode='none';
   bloquerMode='none';rankCounter=0;
