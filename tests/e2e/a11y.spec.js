@@ -153,9 +153,12 @@ test.describe('Accessibilité', () => {
     await page.locator('#card-0').focus();
     await page.keyboard.press('Shift+Tab');
     await page.keyboard.press('Tab');
-    const outline = await page.evaluate(() => { const s = getComputedStyle(document.activeElement); return { w: parseFloat(s.outlineWidth), st: s.outlineStyle }; });
-    expect(outline.st).not.toBe('none');
-    expect(outline.w).toBeGreaterThanOrEqual(2);
+    // L'anneau de focus s'anime (transition des boutons) : on attend sa valeur finale
+    await expect(async () => {
+      const outline = await page.evaluate(() => { const s = getComputedStyle(document.activeElement); return { w: parseFloat(s.outlineWidth), st: s.outlineStyle }; });
+      expect(outline.st).not.toBe('none');
+      expect(outline.w).toBeGreaterThanOrEqual(2);
+    }).toPass({ timeout: 2000 });
   });
 
   test('les cibles du sélecteur de thème et de retour font au moins 44px', async ({ page }) => {
