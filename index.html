@@ -683,7 +683,10 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
 .profiles-list{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;min-height:0;}
 .profile-chip{background:var(--chip-bg);border:1.5px solid var(--border);border-radius:20px;padding:5px 10px 5px 12px;font-family:var(--btn-font);font-size:11px;color:var(--chip-text);cursor:pointer;display:flex;align-items:center;gap:5px;transition:all 0.15s;}
 .profile-chip:active{opacity:0.7;}
-.profile-chip-del{font-size:13px;opacity:0.45;line-height:1;padding-left:2px;}
+.profile-chip-name{background:none;border:none;padding:0;margin:0;font:inherit;color:inherit;cursor:pointer;}
+.profile-chip-del{position:relative;background:none;border:none;margin:0;font-family:inherit;color:inherit;cursor:pointer;font-size:13px;line-height:1;padding:0 0 0 2px;}
+/* Zone cliquable élargie (≥44px) sans changer la mise en page */
+.profile-chip-del::before{content:'';position:absolute;top:50%;left:50%;width:44px;height:44px;transform:translate(-50%,-50%);}
 /* NAMES PAGE extras */
 .names-actions{display:flex;gap:8px;margin-bottom:14px;width:100%;max-width:420px;}
 .names-action-btn{flex:1;padding:10px 6px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--muted2);font-family:var(--btn-font);font-size:8px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;transition:all 0.15s;}
@@ -3450,14 +3453,17 @@ const T = {
 };
 // ── Libellés ajoutés (accessibilité, erreurs) — FR/EN/PT, repli EN puis clé ──
 Object.assign(T.fr,{
+  ariaDeleteProfile:'Supprimer le profil {n}',
   pdfLoadError:'Impossible de charger le module PDF. Réessayez une fois connecté.',
   confirmClearData:'Supprimer toutes les données de ScoreTrack Light (réglages, partie en cours, prénoms mémorisés) sur cet appareil ?',
 });
 Object.assign(T.en,{
+  ariaDeleteProfile:'Delete profile {n}',
   pdfLoadError:'Could not load the PDF module. Please try again when online.',
   confirmClearData:'Delete all ScoreTrack Light data (settings, current game, saved names) on this device?',
 });
 Object.assign(T.pt,{
+  ariaDeleteProfile:'Apagar o perfil {n}',
   pdfLoadError:'Não foi possível carregar o módulo PDF. Tente novamente quando estiver online.',
   confirmClearData:'Apagar todos os dados do ScoreTrack Light (definições, jogo em curso, nomes memorizados) neste dispositivo?',
 });
@@ -3838,6 +3844,9 @@ let selectedTheme='cyber',defPlayers=0,defStart=-1,defMax=0,defNeg=false;
 let elimPending=-1; // index joueur en attente de confirmation d'élimination
 let winPending=-1;
 let lastGameConfig=null; // réglages de la dernière partie lancée
+
+// ── ÉCHAPPEMENT HTML (prénoms, données stockées) ──────────────────
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 // ── FORMATAGE ─────────────────────────────────────────────────────
 function fmtNum(n){
@@ -4294,9 +4303,15 @@ function renderProfileChips(){
   if(!profiles.length){list.classList.add('hidden');return;}
   list.classList.remove('hidden');
   profiles.forEach(name=>{
+    // Aucun nom dans du HTML ni dans un onclick inline : textContent + addEventListener
     const chip=document.createElement('div');chip.className='profile-chip';
-    chip.innerHTML=`<span>${name}</span><span class="profile-chip-del" onclick="event.stopPropagation();deleteProfile('${name.replace(/'/g,"\\'")}')">✕</span>`;
-    chip.onclick=()=>fillName(name);
+    const nm=document.createElement('button');nm.type='button';nm.className='profile-chip-name';nm.textContent=name;
+    nm.addEventListener('click',e=>{e.stopPropagation();fillName(name);});
+    const del=document.createElement('button');del.type='button';del.className='profile-chip-del';del.textContent='✕';
+    del.setAttribute('aria-label',t('ariaDeleteProfile').replace('{n}',name));
+    del.addEventListener('click',e=>{e.stopPropagation();deleteProfile(name);});
+    chip.addEventListener('click',()=>fillName(name));
+    chip.appendChild(nm);chip.appendChild(del);
     list.appendChild(chip);
   });
 }
@@ -4551,7 +4566,7 @@ function buildCard(pi,rot){
   p.rot=rot; // mémoriser la rotation pour le modal
   const inner=document.createElement('div');inner.className='card-inner';inner.id=`inner-${pi}`;
   const cls=scoreClass(p.score);
-  const nameHtml=p.playerName?`<div class="pplayer">${p.playerName}</div>`:`<span class="pplayer-ghost"></span>`;
+  const nameHtml=p.playerName?`<div class="pplayer">${esc(p.playerName)}</div>`:`<span class="pplayer-ghost"></span>`;
   const zone=document.createElement('div');zone.className='tap-zone';
   zone.innerHTML=`${nameHtml}<div class="score-wrap"><span class="score ${cls}" id="sc-${pi}">${fmtNum(p.score)}</span><span class="delta-flash" id="df-${pi}"></span></div><span class="tap-sign-minus">－</span><span class="tap-sign-plus">＋</span>`;
 
@@ -4634,14 +4649,14 @@ function buildCard(pi,rot){
     const tag=document.createElement('div');tag.className='win-tag';
     const winScore=p.finalScore!==undefined?p.finalScore:null;
     const scoreStr=winScore!==null?`<div class="tag-score">${fmtNum(winScore)}</div>`:'';
-    const nameStr=p.playerName?`<div class="elim-name">${p.playerName}</div>`:'';
+    const nameStr=p.playerName?`<div class="elim-name">${esc(p.playerName)}</div>`:'';
     const winnerCount = players.filter(pl=>pl.winner).length;
     const multiWin = winnerCount > 1;
     const modeUnique = !!(singleWinner || (elimPoints!==null && !lastLoser));
     const isChampCard = p.winRank===1 && modeUnique && !multiWin;
     const winIcon = isChampCard ? '🏆' : '🏁';
     const winLabel = isChampCard ? t('winner') : t('finisher');
-    const winRankStr=multiWin?`<div class="win-rank">#${p.winRank||'?'}</div>`:'';
+    const winRankStr=multiWin?`<div class="win-rank">#${esc(p.winRank||'?')}</div>`:'';
     tag.innerHTML=`<div class="win-icon">${winIcon}</div><div class="win-label">${winLabel}</div>${nameStr}${winRankStr}${scoreStr}`;
     inner.appendChild(tag);
   } else if(p.eliminated){
@@ -4652,8 +4667,8 @@ function buildCard(pi,rot){
     const ppE=zone.querySelector('.pplayer');
     if(ppE)ppE.style.display='none'; // masquer le prénom de la zone
     const tag=document.createElement('div');tag.className='elim-tag';
-    const nameStr=p.playerName?`<div class="elim-name">${p.playerName}</div>`:'';
-    const rankStr=p.elimRank?`<div class="elim-rank">#${p.elimRank}</div>`:'';
+    const nameStr=p.playerName?`<div class="elim-name">${esc(p.playerName)}</div>`:'';
+    const rankStr=p.elimRank?`<div class="elim-rank">#${esc(p.elimRank)}</div>`:'';
     const elimScore=p.finalScore!==undefined?p.finalScore:p.score;
     tag.innerHTML=`<div class="elim-icon">💀</div><div class="elim-label">${t('eliminated')}</div>${nameStr}${rankStr}<div class="tag-score">${fmtNum(elimScore)}</div>`;
     inner.appendChild(tag);
@@ -5520,15 +5535,15 @@ function showRecap(){
     if(p.winner){
       const icon=isFinisherMode?'🏁':'🏆';
       const label=isFinisherMode?(t('finisher')||'Finisher'):(t('winner')||'Winner');
-      const rankStr=(multiWin||isFinisherMode)?' #'+p.winRank:'';
+      const rankStr=(multiWin||isFinisherMode)?' #'+esc(p.winRank):'';
       statusBadge=`<div class="recap-status win">${icon} ${label}${rankStr}</div>`;
     }
     else if(p.eliminated){
       const showRank=players.length>2 && !lastLoser && !singleWinner;
-      const ordinal = p.elimRank===1?t('elimFirst1'):(p.elimRank+t('elimFirstN'));
+      const ordinal = p.elimRank===1?t('elimFirst1'):(esc(p.elimRank)+t('elimFirstN'));
       statusBadge=`<div class="recap-status elim">💀 ${t('eliminated')}${showRank?' · '+ordinal:''}</div>`;
     }
-    html+=`<div class="recap-player"><div class="recap-player-header"><div class="recap-player-dot" style="background:${COLORS[pi%12]};box-shadow:0 0 6px ${COLORS[pi%12]}"></div><div class="recap-player-name">${p.playerName||(t('player')+' '+(pi+1))}</div>${statusBadge}</div>`;
+    html+=`<div class="recap-player"><div class="recap-player-header"><div class="recap-player-dot" style="background:${COLORS[pi%12]};box-shadow:0 0 6px ${COLORS[pi%12]}"></div><div class="recap-player-name">${esc(p.playerName||(t('player')+' '+(pi+1)))}</div>${statusBadge}</div>`;
     groups.forEach(g=>{
       const sum=g.entries.reduce((s,e)=>s+e.delta,0);
       const cls=sum>0?'pos':'neg';const sign=sum>0?'+':'';
