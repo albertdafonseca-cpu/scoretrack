@@ -75,6 +75,8 @@ async function startGame(page, { players = 3, points = 20, names = [], max = nul
   for (let i = 0; i < names.length; i++) await page.locator('.name-input').nth(i).fill(names[i]);
   await page.click('.names-go-btn');
   await expect(page.locator('.pcard')).toHaveCount(players);
+  // Les cartes restent masquées (visibility:hidden) le temps d'ajuster les textes : on attend qu'elles soient visibles
+  await expect(page.locator('.pcard').first()).toBeVisible();
 }
 
 const score = async (page, i) => +(await page.locator('#sc-' + i).textContent()).replace(/\s/g, '');
