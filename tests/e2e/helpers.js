@@ -111,10 +111,11 @@ async function tapCard(page, i, plus) {
 async function applyDelta(page, i, delta) {
   // L'ouverture peut être ignorée quelques instants après une action précédente (fin de groupe)
   await expect(async () => {
-    await page.locator('#card-' + i).focus();
+    await focusCard(page, i);
     await page.keyboard.press('Enter');
     await expect(page.locator('#score-modal')).toBeVisible({ timeout: 800 });
   }).toPass({ timeout: 10_000 });
+  await expect.poll(() => page.evaluate(() => document.getElementById('score-modal').contains(document.activeElement))).toBe(true);
   for (const d of String(Math.abs(delta))) await page.keyboard.press(d);
   await page.click(delta < 0 ? '#sign-minus' : '#sign-plus');
   await expect(page.locator('#score-modal')).toBeHidden();

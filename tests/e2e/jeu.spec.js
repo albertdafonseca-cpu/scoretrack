@@ -46,6 +46,8 @@ test.describe('Parcours de jeu', () => {
     await focusCard(page, 2);
     await page.keyboard.press('Enter');
     await expect(page.locator('#score-modal')).toBeVisible();
+    // le focus entre dans la modale juste après son ouverture : sinon Entrée la rouvrirait depuis la carte
+    await expect.poll(() => page.evaluate(() => document.getElementById('score-modal').contains(document.activeElement))).toBe(true);
     await page.keyboard.press('5');
     await expect(page.locator('#score-modal-display')).toHaveText(/^▲ \+5/);
     await page.keyboard.press('Enter');
