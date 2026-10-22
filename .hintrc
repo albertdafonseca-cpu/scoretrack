@@ -3,7 +3,6 @@
     "development"
   ],
   "hints": {
-    "manifest-exists": "off",
     "compat-api/html": [
       "default",
       {
@@ -11,7 +10,6 @@
           "meta[name=theme-color]"
         ]
       }
-    ],
-    "manifest-file-extension": "off"
+    ]
   }
 }
