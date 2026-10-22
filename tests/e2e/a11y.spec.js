@@ -144,9 +144,12 @@ test.describe('Accessibilité', () => {
   test('un focus clavier est visible (contour)', async ({ page }) => {
     await startGame(page, { players: 2 });
     await page.keyboard.press('Tab');
-    const outline = await page.evaluate(() => { const e = document.activeElement; const s = getComputedStyle(e); return { w: parseFloat(s.outlineWidth), st: s.outlineStyle }; });
-    expect(outline.st).not.toBe('none');
-    expect(outline.w).toBeGreaterThanOrEqual(2);
+    // L'anneau de focus s'anime (transition des boutons) : on attend sa valeur finale
+    await expect(async () => {
+      const outline = await page.evaluate(() => { const e = document.activeElement; const s = getComputedStyle(e); return { w: parseFloat(s.outlineWidth), st: s.outlineStyle }; });
+      expect(outline.st).not.toBe('none');
+      expect(outline.w).toBeGreaterThanOrEqual(2);
+    }).toPass({ timeout: 2000 });
   });
 
   test('les cibles de réglages et de retour font au moins 44px', async ({ page }) => {
