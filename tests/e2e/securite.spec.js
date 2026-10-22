@@ -1,4 +1,4 @@
-const { test, expect, XSS_NAME, seedStorage, startGame, setName, openBar, applyDelta } = require('./helpers');
+const { test, expect, XSS_NAME, seedStorage, startGame, setName, openBar, applyDelta, focusCard } = require('./helpers');
 
 test.describe('Sécurité', () => {
   test('un prénom <img onerror> n\'est jamais exécuté (profils, cartes, récap)', async ({ page }) => {
@@ -45,7 +45,7 @@ test.describe('Sécurité', () => {
 
   test('aucune requête vers un tiers pendant un parcours complet', async ({ page }) => {
     await startGame(page, { players: 2, names: ['A', 'B'] });
-    await page.locator('#card-0').focus();
+    await focusCard(page, 0);
     await page.keyboard.press('+');
     await page.evaluate(() => showRecap());
     await expect(page.locator('#recap')).toBeVisible();
