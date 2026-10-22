@@ -95,8 +95,6 @@ test.describe('Stockage isolé', () => {
   };
   for (const [name, over] of Object.entries(invalids)) {
     test(`sauvegarde invalide rejetée : ${name}`, async ({ page }) => {
-      // BUG APP : isValidSave ne vérifie pas l'unicité de seatOrder (la version Light le fait)
-      test.fixme(name === 'seatOrder dupliqué', 'seatOrder dupliqué [0,0] accepté à la restauration (scoretrack) : cartes #card-0 en double');
       await seedStorage(page, { 'st:main:save': validSave(over), 'st:main:migrated': '1' });
       await page.goto('/');
       await expect(page.locator('#setup-page')).toHaveClass(/active/);

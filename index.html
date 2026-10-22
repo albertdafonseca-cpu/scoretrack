@@ -870,7 +870,7 @@ function isValidSave(s){
   if(!s.players.every(p=>p&&typeof p==='object'&&typeof p.score==='number'&&isFinite(p.score)))return false;
   if(!Array.isArray(s.seatOrder)||!Array.isArray(s.history))return false;
   const n=s.players.length;
-  if(s.seatOrder.length!==n||!s.seatOrder.every(i=>Number.isInteger(i)&&i>=0&&i<n))return false;
+  if(s.seatOrder.length!==n||new Set(s.seatOrder).size!==n||!s.seatOrder.every(i=>Number.isInteger(i)&&i>=0&&i<n))return false;
   if(!s.history.every(h=>h&&Array.isArray(h.entries)))return false;
   if(typeof s.startPoints!=='number'||!isFinite(s.startPoints))return false;
   if(s.maxPoints!=null&&(typeof s.maxPoints!=='number'||!isFinite(s.maxPoints)))return false;
