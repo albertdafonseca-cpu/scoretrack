@@ -379,7 +379,9 @@ html{overflow-x:hidden;width:100%;height:100%;}body{height:100%;width:100%;min-h
 .modal-sign-row{display:flex;gap:8px;margin-bottom:16px;}
 .sign-btn{flex:1;padding:14px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--btn-font);font-size:11px;font-weight:700;cursor:pointer;transition:all 0.15s;text-align:center;letter-spacing:0.06em;text-transform:uppercase;background:var(--surface);color:var(--muted2);}
 .sign-btn.plus.active{background:var(--green);border-color:var(--green);color:#000;box-shadow:0 0 16px color-mix(in srgb,var(--green) 35%,transparent);}
-.sign-btn.minus.active{background:var(--red);border-color:var(--red);color:#fff;box-shadow:0 0 16px color-mix(in srgb,var(--red) 35%,transparent);}
+[data-theme="light"] .sign-btn.plus.active,[data-theme="mono-light"] .sign-btn.plus.active,[data-theme="ldm-day"] .sign-btn.plus.active{color:#fff;}
+[data-theme="light"] .sign-btn.minus.active,[data-theme="mono-light"] .sign-btn.minus.active,[data-theme="ldm-day"] .sign-btn.minus.active{color:#fff;}
+.sign-btn.minus.active{background:var(--red);border-color:var(--red);color:#000;box-shadow:0 0 16px color-mix(in srgb,var(--red) 35%,transparent);}
 .modal-confirm-row{display:flex;gap:8px;}
 .modal-btn{flex:1;padding:15px;border:none;border-radius:8px;font-family:var(--btn-font);font-size:11px;font-weight:700;cursor:pointer;transition:all 0.15s;letter-spacing:0.1em;text-transform:uppercase;}
 .modal-btn.primary{background:transparent;color:var(--accent);border:2px solid var(--accent);text-shadow:0 0 8px var(--accent);}
@@ -781,7 +783,7 @@ document.addEventListener('keydown',e=>{
 function makePressable(el,activeClass){
   el.setAttribute('role','button');el.tabIndex=0;
   if(activeClass){el.dataset.pressed=activeClass;el.setAttribute('aria-pressed',el.classList.contains(activeClass)?'true':'false');}
-  el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();el.click();}});
+  el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();if(!el.classList.contains('disabled'))el.click();}});
 }
 const _a11yObs=new MutationObserver(recs=>recs.forEach(r=>{
   const el=r.target;
@@ -992,8 +994,8 @@ function toggleNegative(){allowNeg=!allowNeg;document.getElementById('neg-toggle
 function updateMaxChips(){
   document.querySelectorAll('#max-presets .points-chip').forEach(c=>{
     const v=parseInt(c.dataset.val);
-    if(v<startPoints){c.classList.add('disabled');if(c.classList.contains('on')){c.classList.remove('on');maxPoints=Infinity;document.getElementById('max-custom').value='';}}
-    else c.classList.remove('disabled');
+    if(v<startPoints){c.classList.add('disabled');c.tabIndex=-1;if(c.classList.contains('on')){c.classList.remove('on');maxPoints=Infinity;document.getElementById('max-custom').value='';}}
+    else{c.classList.remove('disabled');c.tabIndex=0;}
   });
   const mc=document.getElementById('max-custom');const v=parseInt(mc.value);
   if(!isNaN(v)&&v>0&&v<startPoints){setFieldError(mc,'max-error',`Le maximum doit être au moins égal aux points de départ (${fmtNum(startPoints)}).`);maxPoints=Infinity;mc.value='';}else if(!mc.value)setFieldError(mc,'max-error','');
