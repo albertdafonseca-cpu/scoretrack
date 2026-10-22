@@ -548,7 +548,7 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
 .profile-chip-name{background:none;border:none;padding:0;margin:0;font:inherit;color:inherit;cursor:pointer;}
 .profile-chip-del{position:relative;background:none;border:none;margin:0;font-family:inherit;color:inherit;cursor:pointer;font-size:13px;line-height:1;padding:0 0 0 2px;}
 /* Zone cliquable élargie (≥44px) sans changer la mise en page */
-.profile-chip-del::before{content:'';position:absolute;top:50%;left:50%;width:44px;height:44px;transform:translate(-50%,-50%);}
+.profile-chip-del::before{content:'';position:absolute;top:-8px;bottom:-8px;left:-2px;right:-10px;}
 /* NAMES PAGE extras */
 .names-actions{display:flex;gap:8px;margin-bottom:14px;width:100%;max-width:420px;}
 .names-action-btn{flex:1;min-height:44px;padding:8px 4px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--muted2);font-family:var(--btn-font);font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;transition:all 0.15s;}
@@ -5596,6 +5596,7 @@ function loadScript(src){
   });
 }
 async function exportRecapPDF(){
+  if(!IS_PRO){_spop();return;}
   if(!window.jspdf){
     try{await loadScript('vendor/jspdf.umd.min.js');}catch(e){console.warn(e);}
     if(!window.jspdf){alert(t('pdfLoadError'));return;}
