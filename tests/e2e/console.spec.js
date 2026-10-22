@@ -1,4 +1,4 @@
-const { test, expect, startGame, tapCard0 } = require('./helpers');
+const { test, expect, startGame, tapCard0, focusCard } = require('./helpers');
 
 test('aucune erreur console, aucune réponse HTTP >= 400, aucune requête tierce sur un parcours complet', async ({ page }) => {
   await page.goto('/');
@@ -7,7 +7,7 @@ test('aucune erreur console, aucune réponse HTTP >= 400, aucune requête tierce
   await page.locator('.back-btn').click();
   await startGame(page, { players: 3, names: ['A', 'B', 'C'] });
   await tapCard0(page, true);
-  await page.locator('#card-1').focus();
+  await focusCard(page, 1);
   await page.keyboard.press('ArrowDown');
   await page.click('#undo-btn');
   await page.locator('.bar-btn.accent-btn').click();

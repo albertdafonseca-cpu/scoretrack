@@ -1,4 +1,4 @@
-const { test, expect, seedStorage, storage, json, startGame, score, tapCard0 } = require('./helpers');
+const { test, expect, seedStorage, storage, json, startGame, score, tapCard0, focusCard } = require('./helpers');
 
 test.describe('Parcours de jeu', () => {
   test('setup : « Suivant » n\'est actif qu\'avec un nombre de joueurs et des points', async ({ page }) => {
@@ -69,7 +69,7 @@ test.describe('Parcours de jeu', () => {
   test('récap : ouvert avec glyphes, fermé par Échap', async ({ page }) => {
     await startGame(page, { players: 3 });
     await tapCard0(page, false);
-    await page.locator('#card-1').focus();
+    await focusCard(page, 1);
     await page.keyboard.press('+');
     await page.locator('.bar-btn >> nth=2').click();
     await expect(page.locator('#recap')).toBeVisible();

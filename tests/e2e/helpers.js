@@ -118,4 +118,15 @@ function contrastByTheme(page) {
   });
 }
 
-module.exports = { test, expect, APP, XSS_NAME, seedStorage, storage, json, swReady, startGame, score, tapCard0, contrastByTheme };
+/** Donne le focus à une carte joueur : attend qu'elle soit visible (l'app masque les cartes
+ *  le temps d'ajuster les textes) et réessaie si un rendu a remplacé l'élément. */
+async function focusCard(page, i) {
+  const card = page.locator('#card-' + i);
+  await expect(card).toBeVisible();
+  await expect(async () => {
+    await card.focus();
+    await expect(card).toBeFocused({ timeout: 300 });
+  }).toPass({ timeout: 7000 });
+}
+
+module.exports = { focusCard, test, expect, APP, XSS_NAME, seedStorage, storage, json, swReady, startGame, score, tapCard0, contrastByTheme };

@@ -1,4 +1,4 @@
-const { test, expect, APP, seedStorage, storage, json, startGame } = require('./helpers');
+const { test, expect, APP, seedStorage, storage, json, startGame, focusCard } = require('./helpers');
 
 const validSave = (over = {}) => ({
   app: 'main', players: [{ playerName: 'Ana', score: 7, eliminated: false }, { playerName: 'Léo', score: 3, eliminated: false }],
@@ -8,7 +8,7 @@ const validSave = (over = {}) => ({
 test.describe('Stockage isolé', () => {
   test('une partie n\'écrit que des clés st:main:*', async ({ page }) => {
     await startGame(page, { players: 2, names: ['Ana', 'Léo'] });
-    await page.locator('#card-1').focus();
+    await focusCard(page, 1);
     await page.keyboard.press('+');
     const st = await storage(page);
     const keys = Object.keys(st);
@@ -74,7 +74,7 @@ test.describe('Stockage isolé', () => {
     const sister = { 'st:autre:save': '{"a":1}', 'st:autre:settings': '{"theme":"gold"}', 'st:autre:profiles': '["S"]', 'st:autre:privacy': '1', 'st:autre:migrated': '1' };
     await seedStorage(page, sister);
     await startGame(page, { players: 3, names: ['A', 'B', 'C'] });
-    await page.locator('#card-0').focus();
+    await focusCard(page, 0);
     await page.keyboard.press('+');
     await page.locator('.bar-btn.accent-btn').click();
     await page.locator('.bar-btn.danger').click();

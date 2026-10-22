@@ -1,4 +1,4 @@
-const { test, expect, startGame, score, contrastByTheme } = require('./helpers');
+const { test, expect, startGame, score, contrastByTheme, focusCard } = require('./helpers');
 
 test.describe('Accessibilité', () => {
   test('carte joueur : focusable, role=group, aria-label mis à jour au clavier', async ({ page }) => {
@@ -17,7 +17,7 @@ test.describe('Accessibilité', () => {
 
   test('Entrée ouvre la saisie (focus dans la modale), Échap la ferme et rend le focus', async ({ page }) => {
     await startGame(page, { players: 2 });
-    await page.locator('#card-1').focus();
+    await focusCard(page, 1);
     await page.keyboard.press('Enter');
     const modal = page.locator('#score-modal');
     await expect(modal).toBeVisible();
@@ -114,7 +114,7 @@ test.describe('Accessibilité', () => {
     const shapes = await page.locator('.pcard .pshape').allTextContents();
     expect(new Set(shapes).size).toBe(8);
     await expect(page.locator('.pcard .pshape').first()).toHaveAttribute('aria-hidden', 'true');
-    await page.locator('#card-1').focus();
+    await focusCard(page, 1);
     await page.keyboard.press('+');
     await expect(page.locator('#df-1')).toContainText('▲');
     await page.keyboard.press('-');
