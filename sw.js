@@ -48,6 +48,8 @@ self.addEventListener('activate',e=>{
     const keys=await caches.keys();
     const old=keys.filter(k=>k.startsWith(PREFIX)&&k!==CACHE);
     await Promise.all(old.map(k=>caches.delete(k)));
+    // Anciens caches de sw-st.js (noms non préfixés, propres à cette app)
+    await Promise.all(['st-v1','st-fonts-v1'].filter(k=>keys.includes(k)).map(k=>caches.delete(k)));
     await self.clients.claim();
     if(old.length){
       const cl=await self.clients.matchAll({type:'window'});
