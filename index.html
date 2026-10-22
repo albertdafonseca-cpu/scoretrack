@@ -413,6 +413,7 @@ function validSave(s) {
     && s.players.every(p => p && typeof p === 'object' && num(p.score) && (p.playerName == null || typeof p.playerName === 'string'))
     && Array.isArray(s.seatOrder) && s.seatOrder.length === s.players.length
     && s.seatOrder.every(i => Number.isInteger(i) && i >= 0 && i < s.players.length)
+    && new Set(s.seatOrder).size === s.players.length
     && Array.isArray(s.history)
     && s.history.every(h => h && typeof h === 'object' && Array.isArray(h.entries) && h.entries.every(e => e && num(e.delta)));
 }
