@@ -697,7 +697,10 @@ function cardLabel(pi) {
     set('#pdf-game-name', t('ariaPdfName'));
     document.querySelectorAll('.name-input').forEach((inp, i) => inp.setAttribute('aria-label', t('playerNameLabel') + ' ' + (i + 1)));
     document.querySelectorAll('.profile-chip-del').forEach(d => d.setAttribute('aria-label', t('deleteProfile') + ' ' + (d.dataset.name || '')));
-    document.querySelectorAll('.pcard[id^="card-"]').forEach(c => c.setAttribute('aria-label', cardLabel(+c.id.slice(5))));
+    document.querySelectorAll('.pcard[id^="card-"]').forEach(c => {
+      c.setAttribute('aria-label', cardLabel(+c.id.slice(5)));
+      if (c.hasAttribute('aria-description')) c.setAttribute('aria-description', t('cardHint'));
+    });
     validateInputs();
   }
   const _applyLang = applyLang;
