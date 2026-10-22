@@ -4010,8 +4010,11 @@ function saveAsDefault(e){
 
 // ── SAUVEGARDE DE PARTIE ──────────────────────────────────────────
 function saveGame(){
+  // Pas de sauvegarde pendant une confirmation de fin de partie en attente
+  if(window._pendingEndgame)return;
   try{
     store.set('save',JSON.stringify({
+      app:APP_ID,
       players,seatOrder,history,actionCounter,
       numPlayers,startPoints,maxPoints:maxPoints===Infinity?null:maxPoints,allowNeg,
       saveVersion:33,
@@ -4021,28 +4024,61 @@ function saveGame(){
     }));
   }catch(e){}
 }
+// Limites Light : 2 à 6 joueurs (chips 2-4 + preset Loi du Milieu), pas de mode
+// « sans limite » ni d'options de victoire Pro
+const MAX_PLAYERS=12, LIGHT_MIN_PLAYERS=2, LIGHT_MAX_PLAYERS=6;
+const _isNum=v=>typeof v==='number'&&isFinite(v);
+function isValidSave(s){
+  if(!s||typeof s!=='object'||Array.isArray(s))return false;
+  if(s.app!==undefined&&s.app!==APP_ID)return false;
+  if((s.saveVersion||0)<33)return false;
+  const P=s.players;
+  if(!Array.isArray(P)||P.length<1||P.length>MAX_PLAYERS)return false;
+  if(!P.every(p=>p&&typeof p==='object'&&_isNum(p.score)&&(p.playerName===undefined||typeof p.playerName==='string')
+    &&(p.rawScore===undefined||_isNum(p.rawScore))&&(p.finalScore===undefined||_isNum(p.finalScore))))return false;
+  if(!Array.isArray(s.seatOrder)||s.seatOrder.length!==P.length
+    ||!s.seatOrder.every(i=>Number.isInteger(i)&&i>=0&&i<P.length)
+    ||new Set(s.seatOrder).size!==P.length)return false;
+  if(!Array.isArray(s.history)||!s.history.every(h=>h&&typeof h==='object'&&Number.isInteger(h.playerIdx)
+    &&h.playerIdx>=0&&h.playerIdx<P.length&&Array.isArray(h.entries)&&h.entries.every(e=>e&&_isNum(e.delta))))return false;
+  if(!_isNum(s.startPoints))return false;
+  if(!IS_PRO){
+    if(P.length<LIGHT_MIN_PLAYERS||P.length>LIGHT_MAX_PLAYERS)return false;
+    if(!['win','elim'].includes(s.objectifMode))return false;
+    if(s.singleWinner||s.lastLoser)return false;
+  }
+  return true;
+}
+// Renvoie true si la partie a été reprise, false sinon (l'init normale continue)
 function restoreGame(){
+  const s=readJSON('save',null);
+  if(!s||!isValidSave(s)){
+    discardSave(); // sauvegarde absente, corrompue ou hors limites de cette app
+    return false;
+  }
   try{
-    const s=readJSON('save',null);
-    if(!s)return;
-    // Version 3.3 : vérifier la version du save
-    if((s.saveVersion||0) < 33){
-      discardSave(); return;
-    }
-    players=s.players;seatOrder=s.seatOrder;history=s.history;actionCounter=s.actionCounter;
-    numPlayers=s.numPlayers;startPoints=s.startPoints;
-    maxPoints=s.maxPoints===null?Infinity:s.maxPoints;
+    players=s.players;seatOrder=s.seatOrder;history=s.history;actionCounter=_isNum(s.actionCounter)?s.actionCounter:0;
+    numPlayers=s.players.length;startPoints=s.startPoints;
+    maxPoints=_isNum(s.maxPoints)?s.maxPoints:Infinity;
     allowNeg=s.allowNeg||false;
-    elimPoints=s.elimPoints??null;winPoints=s.winPoints??null;objectifMode=s.objectifMode||'none';
-    bloquerMode=s.bloquerMode||'none';rankCounter=s.rankCounter||0;
+    elimPoints=_isNum(s.elimPoints)?s.elimPoints:null;winPoints=_isNum(s.winPoints)?s.winPoints:null;objectifMode=s.objectifMode||'none';
+    bloquerMode=s.bloquerMode||'none';rankCounter=_isNum(s.rankCounter)?s.rankCounter:0;
     singleWinner=s.singleWinner||false; lastLoser=s.lastLoser||false;
-    if(s.lastGameConfig)lastGameConfig=s.lastGameConfig;
+    if(s.lastGameConfig&&typeof s.lastGameConfig==='object')lastGameConfig=s.lastGameConfig;
     undoStack=[];groupTimers={};
+    document.getElementById('undo-btn').disabled=true;
     document.getElementById('restore-banner').classList.add('hidden');
     document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
     document.getElementById('game-screen').style.display='flex';
     renderGame();
-  }catch(e){discardSave();}
+    return true;
+  }catch(e){
+    console.warn('Restauration impossible',e);
+    discardSave();
+    document.getElementById('game-screen').style.display='none';
+    showPage('setup-page');
+    return false;
+  }
 }
 function discardSave(){
   store.del('save');
@@ -4392,6 +4428,9 @@ function startGame(){_hpop();
   const inputs=document.querySelectorAll('.name-input');
   players=Array.from({length:numPlayers},(_,i)=>({playerName:inputs[i]?.value.trim()||'',score:startPoints,eliminated:false}));
   seatOrder=players.map((_,i)=>i);undoStack=[];history=[];actionCounter=0;groupTimers={};elimPending=-1;rankCounter=0;
+  window._pendingEndgame=null;
+  document.getElementById('undo-btn').disabled=true;
+  document.getElementById('restore-banner').classList.add('hidden');
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('game-screen').style.display='flex';
   
@@ -4902,7 +4941,7 @@ function updateDisplay(i,zone,delta){
             if(prev&&prev.playerIdx===i){ p.score=prev.score; p.rawScore=prev.rawScore; }
             history.length=0; _snapHistory.forEach(h=>history.push(h));
           }};
-        setTimeout(()=>{ renderGame(); saveGame(); },300);
+        setTimeout(()=>{ renderGame(); },300); // pas de sauvegarde avant confirmation
         return;
       }
 
@@ -4924,7 +4963,7 @@ function updateDisplay(i,zone,delta){
             if(prev&&prev.playerIdx===i){ p.score=prev.score; p.rawScore=prev.rawScore; }
             history.length=0; _snapHistory.forEach(h=>history.push(h));
           }};
-        setTimeout(()=>{ renderGame(); saveGame(); },300);
+        setTimeout(()=>{ renderGame(); },300); // pas de sauvegarde avant confirmation
         return;
       }
 
@@ -4932,7 +4971,6 @@ function updateDisplay(i,zone,delta){
       // Vérifier si tous les joueurs sont maintenant vainqueurs → fin de partie
       const allDone=players.every(pl=>pl.winner||pl.eliminated);
       if(allDone){
-        setTimeout(()=>{ renderGame(); saveGame(); },300);
         // Winner-modal à la fin de la dernière animation finisher
         window._afterFinAnim=function(){
           document.getElementById('winner-name').textContent='';
@@ -5394,18 +5432,20 @@ function updateModalDisplay(){
 }
 function confirmScoreModal(){
   const v=parseInt(modalValue)||0;if(v===0){closeScoreModal();return;}
-  const delta=modalSign*v;saveUndo();
+  const delta=modalSign*v;
   const p=players[modalPlayerIdx];
   const minVal=bloquerMode==='min'?startPoints:(allowNeg||objectifMode==='elim'||objectifMode==='none'?-Infinity:(objectifMode==='win'&&winPoints!==null&&winPoints<startPoints?winPoints:0));
   const capMax=bloquerMode==='max'?startPoints:(maxPoints===Infinity?Infinity:maxPoints);
   const prevScore=p.score;
-  window._lastAdjustPrev={playerIdx:modalPlayerIdx, score:prevScore, rawScore:p.rawScore};
   const rawScore=p.score+delta;
-  p.score=Math.min(capMax,Math.max(minVal,rawScore));
+  const newScore=Math.min(capMax,Math.max(minVal,rawScore));
+  if(newScore===prevScore){closeScoreModal();return;} // aucun changement réel : pas d'étape d'annulation
+  saveUndo();
+  window._lastAdjustPrev={playerIdx:modalPlayerIdx, score:prevScore, rawScore:p.rawScore};
+  p.score=newScore;
   p.rawScore=rawScore; // score brut avant clamp
   const realDelta=p.score-prevScore;
   const rawDelta=rawScore-prevScore; // delta brut avant clamp
-  if(realDelta===0){closeScoreModal();return;}
   updateDisplay(modalPlayerIdx,null,realDelta);
   flashDelta(modalPlayerIdx,realDelta);
   actionCounter++;
@@ -5418,25 +5458,34 @@ function confirmScoreModal(){
 // ── UNDO ──────────────────────────────────────────────────────────
 (function setupUndo(){
   const btn=document.getElementById('undo-btn');let iv=null,to=null;
-  const start=e=>{e.preventDefault();undoLast();to=setTimeout(()=>{iv=setInterval(undoLast,120);},500);};
   const stop=()=>{clearTimeout(to);clearInterval(iv);to=null;iv=null;};
+  const start=e=>{e.preventDefault();stop();undoLast();to=setTimeout(()=>{iv=setInterval(undoLast,120);},500);};
+  window._undoRepeatStop=stop;
   btn.addEventListener('touchstart',start,{passive:false});btn.addEventListener('touchend',stop);btn.addEventListener('touchcancel',stop);
   btn.addEventListener('mousedown',start);btn.addEventListener('mouseup',stop);btn.addEventListener('mouseleave',stop);
+  // Relâchement n'importe où : arrêter la répétition
+  ['pointerup','pointercancel','touchend'].forEach(ev=>document.addEventListener(ev,stop,{passive:true}));
+  // Clavier (Entrée/Espace) : une seule annulation, sans répétition
+  btn.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();if(!e.repeat)undoLast();}});
 })();
 
 function saveUndo(){
-  undoStack.push(JSON.stringify({players,history,seatOrder,actionCounter}));
+  undoStack.push(JSON.stringify({players,history,seatOrder,actionCounter,rankCounter}));
   if(undoStack.length>40)undoStack.shift();
   document.getElementById('undo-btn').disabled=false;
 }
 function undoLast(){
-  if(!undoStack.length)return;
+  if(!undoStack.length){if(window._undoRepeatStop)window._undoRepeatStop();return;}
   // Fermer le modal winner s'il est ouvert
   document.getElementById('winner-modal').classList.add('hidden');
   document.getElementById('elim-modal').classList.add('hidden');
   elimPending=-1;
+  // Annuler toute fin de partie / animation en attente
+  window._afterFinAnim=null;window._afterWinAnim=null;window._afterElimAnim=null;window._pendingEndgame=null;
+  document.getElementById('endgame-modal').classList.add('hidden');
   const s=JSON.parse(undoStack.pop());
   players=s.players;history=s.history;seatOrder=s.seatOrder;actionCounter=s.actionCounter;
+  if(typeof s.rankCounter==='number')rankCounter=s.rankCounter;
   document.getElementById('undo-btn').disabled=undoStack.length===0;
   _fitCache={};
   renderGame();saveGame();
@@ -5445,7 +5494,7 @@ function undoLast(){
 function rotatePlayers(){
   if(players.length<2)return;saveUndo();
   const last=seatOrder.pop();seatOrder.unshift(last);
-  renderGame();
+  renderGame();saveGame();
 }
 
 // ── RÉCAP ─────────────────────────────────────────────────────────
@@ -5997,7 +6046,7 @@ async function exportRecapPDF(){
           overlay.style.clipPath='';
           overlay.style.transition='';
           skull.style.cssText='';
-          frags.forEach(f=>f.el.remove()); frags=[];
+          frags=[];
           resetTexts();
           if(window._afterElimAnim) window._afterElimAnim();
         },650);
@@ -6611,6 +6660,8 @@ function startNewGameSameSetup(){
 function confirmReset(){
   ['reset-modal','winner-modal','recap','score-modal','elim-modal','endgame-modal'].forEach(id=>document.getElementById(id).classList.add('hidden'));
   document.getElementById('game-screen').style.display='none';
+  document.getElementById('restore-banner').classList.add('hidden');
+  window._pendingEndgame=null;
   store.del('save');
   numPlayers=0;startPoints=0;maxPoints=Infinity;allowNeg=false;elimPending=-1;
   elimPoints=null;winPoints=null;objectifMode='none';
