@@ -10,215 +10,55 @@
   if(screen.orientation?.lock)screen.orientation.lock('portrait').catch(()=>{});
   document.addEventListener('contextmenu',e=>e.preventDefault());
   // Zoom pinch autorisé — pas de preventDefault sur multi-touch
-  // Service Worker — fonctionnement hors ligne + mise à jour automatique
+  // Service Worker (fichier ./sw.js) — fonctionnement hors ligne + mise à jour automatique
   if('serviceWorker' in navigator){
-    const appVer=document.querySelector('meta[name="app-version"]')?.content||'0';
-    const swCode=`// ─────────────────────────────────────────────────────────────────
-//  ScoreTrack — Service Worker
-//  ⚠️  Incrémenter CACHE_VERSION à chaque déploiement
-//      → invalide le cache sur tous les appareils
-// ─────────────────────────────────────────────────────────────────
-const CACHE_VERSION = 'st-v'+appVer;
-const FONTS_CACHE   = 'st-fonts-v2';   // polices : mise à jour rare
-const CDN_CACHE     = 'st-cdn-v1';     // librairies CDN : jsPDF etc.
-
-const STATIC = [
-  './',
-  './index.html',
-  './manifest-st.json',
-  './favicon.png',
-];
-
-// URLs des fonts à précacher au premier chargement
-const FONT_CSS_URLS = [
-  'https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Share+Tech+Mono&family=Exo+2:wght@400;600&display=swap',
-];
-
-const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
-
-// CDN à précacher (jsPDF)
-const CDN_URLS = [
-  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
-];
-const CDN_HOSTS = ['cdnjs.cloudflare.com'];
-
-// ── Installation ──────────────────────────────────────────────────
-self.addEventListener('install', e => {
-  e.waitUntil((async () => {
-    // 1. Précache les fichiers statiques
-    const staticCache = await caches.open(CACHE_VERSION);
-    await staticCache.addAll(STATIC);
-
-    // 2. Précache les fonts (cache séparé, survit aux mises à jour de l'app)
-    const fontCache = await caches.open(FONTS_CACHE);
-    await Promise.all(
-      FONT_CSS_URLS.map(url =>
-        fetch(url, { mode: 'cors' })
-          .then(res => { if (res.ok) fontCache.put(url, res); })
-          .catch(() => {/* hors ligne à l'install — réessai au premier fetch */})
-      )
-    );
-
-    // 3. Précache les CDN (jsPDF) — cache séparé, longue durée
-    const cdnCache = await caches.open(CDN_CACHE);
-    await Promise.all(
-      CDN_URLS.map(url =>
-        fetch(url, { mode: 'cors' })
-          .then(res => { if (res.ok) cdnCache.put(url, res); })
-          .catch(() => {})
-      )
-    );
-
-    await self.skipWaiting();
-  })());
-});
-
-// ── Activation ────────────────────────────────────────────────────
-self.addEventListener('activate', e => {
-  e.waitUntil((async () => {
-    const keys = await caches.keys();
-    await Promise.all(
-      keys
-        .filter(k => k !== CACHE_VERSION && k !== FONTS_CACHE && k !== CDN_CACHE)
-        .map(k => caches.delete(k))
-    );
-    await self.clients.claim();
-    const clients = await self.clients.matchAll({ type: 'window' });
-    clients.forEach(c => c.postMessage({ type: 'SW_UPDATED', version: CACHE_VERSION }));
-  })());
-});
-
-// ── Fetch ─────────────────────────────────────────────────────────
-self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return;
-
-  const url = new URL(e.request.url);
-
-  // Polices Google : cache-first (ne changent pas)
-  if (FONT_HOSTS.includes(url.hostname)) {
-    e.respondWith(
-      caches.open(FONTS_CACHE).then(cache =>
-        cache.match(e.request).then(cached => {
-          if (cached) return cached;
-          return fetch(e.request, { mode: 'cors' }).then(res => {
-            if (res.ok) cache.put(e.request, res.clone());
-            return res;
-          }).catch(() => cached || new Response('', { status: 503 }));
-        })
-      )
-    );
-    return;
-  }
-
-  // CDN (jsPDF etc.) : cache-first
-  if (CDN_HOSTS.includes(url.hostname)) {
-    e.respondWith(
-      caches.open(CDN_CACHE).then(cache =>
-        cache.match(e.request).then(cached => {
-          if (cached) return cached;
-          return fetch(e.request, { mode: 'cors' }).then(res => {
-            if (res.ok) cache.put(e.request, res.clone());
-            return res;
-          }).catch(() => new Response('', { status: 503 }));
-        })
-      )
-    );
-    return;
-  }
-
-  // Tout le reste : network-first, fallback cache hors ligne
-  e.respondWith((async () => {
-    const cache = await caches.open(CACHE_VERSION);
-    try {
-      const res = await fetch(e.request);
-      if (res.ok) cache.put(e.request, res.clone());
-      return res;
-    } catch {
-      return (await cache.match(e.request))
-        || new Response('Hors ligne — rechargez une fois connecté.', {
-            status: 503,
-            headers: { 'Content-Type': 'text/plain; charset=utf-8' }
-           });
-    }
-  })());
-});
-`;
-    const swBlob=new Blob([swCode],{type:'application/javascript'});
-    const swUrl=URL.createObjectURL(swBlob);
-    navigator.serviceWorker.register(swUrl,{scope:'./'}).catch(()=>{});
+    navigator.serviceWorker.register('./sw.js',{scope:'./'}).catch(e=>console.warn('SW',e));
     // Reçoit la notification de mise à jour du SW
     navigator.serviceWorker.addEventListener('message', e => {
-      if (e.data?.type === 'SW_UPDATED') {
+      if (e.data?.type === 'SW_UPDATED' && !document.getElementById('update-banner')) {
         // Bannière discrète en bas — tap pour recharger
-        const b = document.createElement('div');
-        b.id = 'update-banner';
-        b.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#00ffe0;color:#020d12;font-family:Orbitron,monospace;font-size:11px;font-weight:700;letter-spacing:0.12em;padding:10px 20px;border-radius:30px;z-index:9999;cursor:pointer;box-shadow:0 4px 20px rgba(0,255,224,0.4);white-space:nowrap;';
-        b.textContent = t('updateBanner');
+        const b = document.createElement('button');
+        b.id = 'update-banner'; b.type = 'button';
+        b.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#00ffe0;color:#020d12;font-family:Orbitron,monospace;font-size:11px;font-weight:700;letter-spacing:0.12em;padding:10px 20px;min-height:44px;border:none;border-radius:30px;z-index:9999;cursor:pointer;box-shadow:0 4px 20px rgba(0,255,224,0.4);white-space:nowrap;';
+        b.textContent = (typeof t==='function') ? t('updateBanner') : 'Mise à jour disponible';
         b.onclick = () => location.reload();
         document.body.appendChild(b);
       }
     });
   }
 </script>
-<meta name="apple-mobile-web-app-title" content="ScoreTrack">
+<meta name="apple-mobile-web-app-title" content="ScoreTrack Light">
 <meta name="theme-color" id="meta-theme-color" content="#020d12">
-<meta name="app-version" content="61">
-<link rel="manifest" id="dyn-manifest">
-<link rel="apple-touch-icon" id="dyn-touch-icon" href="#">
+<meta name="app-version" content="62">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon-64.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="apple-touch-startup-image" id="dyn-splash">
-<link rel="icon" id="dyn-favicon" type="image/png">
 <script>
-(function(){
-  try{
-    // ── Génère l'icône PNG 192×192 via canvas ──────────────────────
-    function makeIcon(size){
-      const c=document.createElement('canvas');c.width=size;c.height=size;
-      const ctx=c.getContext('2d');const s=size/64;
-      // Fond arrondi clair
-      const r=14*s;ctx.beginPath();ctx.moveTo(r,0);ctx.lineTo(size-r,0);ctx.quadraticCurveTo(size,0,size,r);ctx.lineTo(size,size-r);ctx.quadraticCurveTo(size,size,size-r,size);ctx.lineTo(r,size);ctx.quadraticCurveTo(0,size,0,size-r);ctx.lineTo(0,r);ctx.quadraticCurveTo(0,0,r,0);ctx.closePath();
-      // Dégradé blanc → gris très clair
-      const grad=ctx.createLinearGradient(0,0,0,size);
-      grad.addColorStop(0,'#ffffff');grad.addColorStop(1,'#e8eaf0');
-      ctx.fillStyle=grad;ctx.fill();
-      // Ligne horizontale séparatrice
-      ctx.strokeStyle='#ccccdd';ctx.lineWidth=1.2*s;ctx.beginPath();ctx.moveTo(14*s,38*s);ctx.lineTo(50*s,38*s);ctx.stroke();
-      // Barre + (bleue — plus sombre pour contraste sur fond clair)
-      ctx.strokeStyle='#2299cc';ctx.lineWidth=2.5*s;ctx.lineCap='round';
-      ctx.beginPath();ctx.moveTo(32*s,11*s);ctx.lineTo(32*s,27*s);ctx.stroke();
-      ctx.beginPath();ctx.moveTo(24*s,19*s);ctx.lineTo(40*s,19*s);ctx.stroke();
-      // Barre − (rose — plus sombre pour contraste sur fond clair)
-      ctx.strokeStyle='#cc3344';ctx.beginPath();ctx.moveTo(24*s,51*s);ctx.lineTo(40*s,51*s);ctx.stroke();
-      return c.toDataURL('image/png');
-    }
-    const png64  = makeIcon(64);
-    const png192 = makeIcon(192);
-    const png512 = makeIcon(512);
-    (function(){const sc=document.createElement('canvas');sc.width=2732;sc.height=2732;const sctx=sc.getContext('2d');sctx.fillStyle='#020d12';sctx.fillRect(0,0,2732,2732);const img=new Image();img.onload=function(){sctx.drawImage(img,(2732-512)/2,(2732-512)/2,512,512);const sp=document.getElementById('dyn-splash');if(sp)sp.href=sc.toDataURL('image/png');};img.src=png512;})();
-    // Favicon onglet
-    document.getElementById('dyn-favicon').href=png64;
-    // Apple touch icon
-    document.getElementById('dyn-touch-icon').href=png192;
-    // Manifest entièrement inline via Blob — aucun fichier externe requis
-    const manifest={
-      name:'ScoreTrack',short_name:'ScoreTrack',
-      description:'Compteur de scores universel',
-      start_url:'./',display:'standalone',orientation:'portrait-primary',
-      background_color:'#020d12',theme_color:'#020d12',
-      icons:[
-        {src:png192,sizes:'192x192',type:'image/png'},
-        {src:png192,sizes:'192x192',type:'image/png',purpose:'maskable'},
-        {src:png512,sizes:'512x512',type:'image/png'},
-        {src:png512,sizes:'512x512',type:'image/png',purpose:'maskable'}
-      ]
-    };
-    const blob=new Blob([JSON.stringify(manifest)],{type:'application/manifest+json'});
-    document.getElementById('dyn-manifest').href=URL.createObjectURL(blob);
-  }catch(e){}
-})();
+// Splash iOS 2732×2732 — généré après le chargement, hors du chemin critique
+window.addEventListener('load',()=>{
+  const run=()=>{
+    try{
+      const img=new Image();
+      img.onload=()=>{
+        try{
+          const sc=document.createElement('canvas');sc.width=2732;sc.height=2732;
+          const sctx=sc.getContext('2d');sctx.fillStyle='#020d12';sctx.fillRect(0,0,2732,2732);
+          sctx.drawImage(img,(2732-512)/2,(2732-512)/2,512,512);
+          const sp=document.getElementById('dyn-splash');if(sp)sp.href=sc.toDataURL('image/png');
+        }catch(e){}
+      };
+      img.src='icons/icon-512.png';
+    }catch(e){}
+  };
+  if('requestIdleCallback' in window)requestIdleCallback(run,{timeout:3000});else setTimeout(run,1500);
+});
 </script>
+<link rel="stylesheet" href="fonts/fonts-core.css">
+<link rel="stylesheet" href="fonts/fonts-retro.css">
+<link rel="stylesheet" href="fonts/fonts-classic.css">
 <title>ScoreTrack Light</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&family=Inter:wght@400;600;700;800&family=Press+Start+2P&family=Cinzel:wght@400;600;700&family=Bebas+Neue&display=swap');
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;touch-action:manipulation;}
 
@@ -1038,7 +878,6 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
 }
 @keyframes winFadeOut{from{opacity:1}to{opacity:0}}
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" onerror="console.warn('jsPDF non chargé')"></script>
 </head>
 <body>
 
@@ -3609,6 +3448,16 @@ const T = {
     btnNoClear:'Ingenting å<br>slette'
   },
 };
+// ── Libellés ajoutés (accessibilité, erreurs) — FR/EN/PT, repli EN puis clé ──
+Object.assign(T.fr,{
+  pdfLoadError:'Impossible de charger le module PDF. Réessayez une fois connecté.',
+});
+Object.assign(T.en,{
+  pdfLoadError:'Could not load the PDF module. Please try again when online.',
+});
+Object.assign(T.pt,{
+  pdfLoadError:'Não foi possível carregar o módulo PDF. Tente novamente quando estiver online.',
+});
 
 // ── i18n state & helpers ──────────────────────────────────────────
 function _detectLang(){
@@ -5660,8 +5509,22 @@ function showRecap(){
 }
 
 // ── EXPORT PDF RÉCAPITULATIF ──────────────────────────────────────
-function exportRecapPDF(){
-  if(!window.jspdf){alert('jsPDF non chargé.');return;}
+// Chargement de script à la demande (auto-hébergé, aucune requête tierce)
+const _scriptPromises={};
+function loadScript(src){
+  if(_scriptPromises[src])return _scriptPromises[src];
+  return _scriptPromises[src]=new Promise((resolve,reject)=>{
+    const s=document.createElement('script');s.src=src;s.async=true;
+    s.onload=()=>resolve();
+    s.onerror=()=>{delete _scriptPromises[src];s.remove();reject(new Error('Chargement impossible : '+src));};
+    document.head.appendChild(s);
+  });
+}
+async function exportRecapPDF(){
+  if(!window.jspdf){
+    try{await loadScript('vendor/jspdf.umd.min.js');}catch(e){console.warn(e);}
+    if(!window.jspdf){alert(t('pdfLoadError'));return;}
+  }
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
 
