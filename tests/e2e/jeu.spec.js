@@ -1,5 +1,5 @@
 const fs = require('fs');
-const { test, expect, storage, json, startGame, score, applyDelta, tapCard, openBar, acceptPrivacyIfAsked } = require('./helpers');
+const { test, expect, storage, json, startGame, score, applyDelta, tapCard, openBar, acceptPrivacyIfAsked, focusCard } = require('./helpers');
 
 const saved = async (page) => json((await storage(page))['st:test:save']);
 
@@ -43,7 +43,7 @@ test.describe('Parcours de jeu', () => {
 
   test('saisie par la modale : affichage ▲/▼ et application', async ({ page }) => {
     await startGame(page, { players: 3 });
-    await page.locator('#card-2').focus();
+    await focusCard(page, 2);
     await page.keyboard.press('Enter');
     await expect(page.locator('#score-modal')).toBeVisible();
     await page.keyboard.press('5');
@@ -86,7 +86,7 @@ test.describe('Parcours de jeu', () => {
 
   test('rechargement : la partie en cours est reprise avec ses scores', async ({ page }) => {
     await startGame(page, { players: 3, names: ['A', 'B', 'C'] });
-    await page.locator('#card-1').focus();
+    await focusCard(page, 1);
     await page.keyboard.press('+');
     await expect.poll(async () => (await saved(page)).players[1].score).toBe(21);
     await page.reload();
@@ -179,9 +179,16 @@ test.describe('Parcours de jeu', () => {
 
     test('dernier survivant avec animation : l\'overlay s\'affiche et Échap le passe', async ({ page }) => {
       await startGame(page, { players: 2, names: ['A', 'B'] });
+      // Enregistre l'apparition d'un des deux overlays, même brève (l'ordre et la durée varient selon la machine)
+      await page.evaluate(() => {
+        window.__ovSeen = false;
+        const ids = ['elim-anim-overlay', 'win-anim-overlay'];
+        const check = () => { if (ids.some((id) => { const e = document.getElementById(id); return e && getComputedStyle(e).display !== 'none'; })) window.__ovSeen = true; };
+        new MutationObserver(check).observe(document.body, { attributes: true, subtree: true, attributeFilter: ['style', 'class'] });
+      });
       await applyDelta(page, 0, -20);
       await page.click('#btn-elim-confirm-txt');
-      await expect(page.locator('#elim-anim-overlay, #win-anim-overlay').first()).toBeVisible();
+      await expect.poll(() => page.evaluate(() => window.__ovSeen)).toBe(true);
       await expect(async () => {
         await page.keyboard.press('Escape');
         await expect(page.locator('#winner-modal')).toBeVisible({ timeout: 500 });
@@ -240,7 +247,7 @@ test.describe('Parcours de jeu', () => {
 
   test('appui long sur Annuler : vide la pile puis s\'arrête, même relâché hors du bouton', async ({ page }) => {
     await startGame(page, { players: 2, points: 50 });
-    await page.locator('#card-0').focus();
+    await focusCard(page, 0);
     for (let k = 0; k < 6; k++) { await page.keyboard.press('+'); }
     await expect.poll(() => page.evaluate(() => undoStack.length)).toBeGreaterThan(0);
     await openBar(page);

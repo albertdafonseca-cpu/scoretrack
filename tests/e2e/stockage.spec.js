@@ -1,4 +1,4 @@
-const { test, expect, APP, seedStorage, storage, json, startGame, acceptPrivacyIfAsked } = require('./helpers');
+const { test, expect, APP, seedStorage, storage, json, startGame, acceptPrivacyIfAsked, focusCard } = require('./helpers');
 
 const validSave = (over = {}) => ({
   app: 'test', saveVersion: 33,
@@ -11,7 +11,7 @@ const tooMany = () => Array.from({ length: 13 }, (_, i) => ({ playerName: 'P' + 
 test.describe('Stockage isolé', () => {
   test('une partie n\'écrit que des clés st:test:*', async ({ page }) => {
     await startGame(page, { players: 2, names: ['Ana', 'Léo'] });
-    await page.locator('#card-1').focus();
+    await focusCard(page, 1);
     await page.keyboard.press('+');
     await expect.poll(async () => Object.keys(await storage(page))).toEqual(expect.arrayContaining(['st:test:save']));
     const st = await storage(page);
@@ -104,7 +104,7 @@ test.describe('Stockage isolé', () => {
     const sister = { 'st:autre:save': '{"a":1}', 'st:autre:settings': '{"theme":"gold"}', 'st:autre:profiles': '["S"]', 'st:autre:privacy': '1', 'st:autre:migrated': '1' };
     await seedStorage(page, sister);
     await startGame(page, { players: 3, names: ['A', 'B', 'C'] });
-    await page.locator('#card-0').focus();
+    await focusCard(page, 0);
     await page.keyboard.press('+');
     await page.evaluate(() => rotatePlayers());
     await page.evaluate(() => confirmReset());
