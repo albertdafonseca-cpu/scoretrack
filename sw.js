@@ -1,7 +1,7 @@
 // ScoreTrack Test — Service Worker
 // Incrémenter VERSION (et la meta app-version de index.html) à chaque déploiement.
 const PREFIX = 'st-test-';
-const VERSION = '75';
+const VERSION = '76';
 const CACHE = PREFIX + 'v' + VERSION;
 
 const PRECACHE = [
@@ -34,6 +34,7 @@ const PRECACHE = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',
+  './icons/splash.png',
 ];
 
 self.addEventListener('install', e => {
