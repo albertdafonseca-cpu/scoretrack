@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://scoretrack-light.newgames.app/sitemap.xml

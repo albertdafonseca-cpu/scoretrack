@@ -29,35 +29,49 @@
 </script>
 <meta name="apple-mobile-web-app-title" content="ScoreTrack Light">
 <meta name="theme-color" id="meta-theme-color" content="#020d12">
-<meta name="app-version" content="62">
+<meta name="app-version" content="63">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/favicon-64.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<link rel="apple-touch-startup-image" id="dyn-splash">
-<script>
-// Splash iOS 2732×2732 — généré après le chargement, hors du chemin critique
-window.addEventListener('load',()=>{
-  const run=()=>{
-    try{
-      const img=new Image();
-      img.onload=()=>{
-        try{
-          const sc=document.createElement('canvas');sc.width=2732;sc.height=2732;
-          const sctx=sc.getContext('2d');sctx.fillStyle='#020d12';sctx.fillRect(0,0,2732,2732);
-          sctx.drawImage(img,(2732-512)/2,(2732-512)/2,512,512);
-          const sp=document.getElementById('dyn-splash');if(sp)sp.href=sc.toDataURL('image/png');
-        }catch(e){}
-      };
-      img.src='icons/icon-512.png';
-    }catch(e){}
-  };
-  if('requestIdleCallback' in window)requestIdleCallback(run,{timeout:3000});else setTimeout(run,1500);
-});
-</script>
+<!-- Splash iOS 2732×2732 : PNG statique pré-généré (l'ancienne génération canvas + toDataURL bloquait le thread principal ~1 s) -->
+<link rel="apple-touch-startup-image" href="icons/splash.png">
 <link rel="stylesheet" href="fonts/fonts-core.css">
-<link rel="stylesheet" href="fonts/fonts-retro.css">
-<link rel="stylesheet" href="fonts/fonts-classic.css">
-<title>ScoreTrack Light</title>
+<!-- fonts-retro.css (arcade) et fonts-classic.css (ldm, ldm-day) : chargées à la demande par applyTheme() -->
+<title>ScoreTrack Light — compteur de scores pour jeux de société</title>
+<meta name="description" content="Compteur de scores gratuit pour jeux de société, de 2 à 6 joueurs : comptez les points, annulez une erreur, consultez le récap. Fonctionne hors ligne.">
+<link rel="canonical" href="https://scoretrack-light.newgames.app/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="ScoreTrack">
+<meta property="og:title" content="ScoreTrack Light — compteur de scores pour jeux de société">
+<meta property="og:description" content="Compteur de scores gratuit pour jeux de société, de 2 à 6 joueurs : comptez les points, annulez une erreur, consultez le récap. Fonctionne hors ligne.">
+<meta property="og:url" content="https://scoretrack-light.newgames.app/">
+<meta property="og:image" content="https://scoretrack-light.newgames.app/icons/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Icône ScoreTrack Light (plus et moins) sur fond sombre, avec le titre ScoreTrack Light">
+<meta property="og:locale" content="fr_FR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="ScoreTrack Light — compteur de scores pour jeux de société">
+<meta name="twitter:description" content="Compteur de scores gratuit pour jeux de société, de 2 à 6 joueurs : comptez les points, annulez une erreur, consultez le récap. Fonctionne hors ligne.">
+<meta name="twitter:image" content="https://scoretrack-light.newgames.app/icons/og-image.png">
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@type": "WebApplication",
+ "name": "ScoreTrack Light",
+ "url": "https://scoretrack-light.newgames.app/",
+ "description": "Compteur de scores gratuit pour jeux de société, de 2 à 6 joueurs : comptez les points, annulez une erreur, consultez le récap. Fonctionne hors ligne.",
+ "applicationCategory": "GameApplication",
+ "operatingSystem": "Web",
+ "inLanguage": "fr",
+ "image": "https://scoretrack-light.newgames.app/icons/og-image.png",
+ "offers": {
+  "@type": "Offer",
+  "price": "0",
+  "priceCurrency": "EUR"
+ }
+}
+</script>
 <style>
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;touch-action:manipulation;}
@@ -4094,7 +4108,16 @@ function _lk(el){
 function _lkId(id){_lk(document.getElementById(id));}
 function _lkAll(ids){ids.forEach(_lkId);}
 // ═══════════════════════════════════════════════════════════════
+// Polices des thèmes arcade (retro) et ldm/ldm-day (classic) : feuille chargée une seule fois,
+// à la demande (non bloquante pour le rendu initial)
+const THEME_FONTS={arcade:'retro',ldm:'classic','ldm-day':'classic'};
+function loadThemeFonts(id){
+  const f=THEME_FONTS[id];if(!f||document.getElementById('fonts-'+f))return;
+  const l=document.createElement('link');l.id='fonts-'+f;l.rel='stylesheet';l.href='fonts/fonts-'+f+'.css';
+  document.head.appendChild(l);
+}
 function applyTheme(id){
+  loadThemeFonts(id);
   document.documentElement.setAttribute('data-theme',id==='cyber'?'':id);
   selectedTheme=id;
   const colors={cyber:'#020d12',dark:'#0a0a0f','neon-pink':'#0d0010',arcade:'#0a0800',nature:'#051208',sunset:'#120508',ocean:'#020810',mono:'#080808','ldm-day':'#f5f0e8',ldm:'#0d0a12'};
@@ -7039,6 +7062,35 @@ function closeResetModal(){document.getElementById('reset-modal').classList.add(
   const MODALS=['score-modal','winner-modal','reset-modal','elim-modal','endgame-modal','recap','pro-popup'];
   const isOpen=el=>el.id==='pro-popup'?el.classList.contains('show'):!el.classList.contains('hidden');
   const state={};
+  // Pile des modales ouvertes (seule la dernière compte) + arrière-plan inert
+  const stack=[];let inerted=[];
+  // Jamais inert : zone d'annonce, overlays d'animation (ils s'affichent par-dessus), bannière de MAJ
+  const NO_INERT=['sr-status','fin-anim-overlay','win-anim-overlay','elim-anim-overlay','update-banner'];
+  const topModal=()=>{for(let i=stack.length-1;i>=0;i--){const el=document.getElementById(stack[i]);if(el&&isOpen(el))return el;}return null;};
+  function syncInert(){
+    inerted.forEach(n=>{n.inert=false;});inerted=[];
+    const m=topModal();if(!m)return;
+    // Frères de la modale et de chacun de ses ancêtres (jamais un ancêtre lui-même)
+    for(let n=m;n&&n.parentElement&&n!==document.body;n=n.parentElement){
+      for(const sib of n.parentElement.children){
+        if(sib===n||sib.inert||NO_INERT.includes(sib.id)||/^(SCRIPT|STYLE|LINK|META|TEMPLATE)$/.test(sib.tagName))continue;
+        sib.inert=true;inerted.push(sib);
+      }
+    }
+  }
+  const focusables=m=>[...m.querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])')]
+    .filter(e=>!e.disabled&&e.tabIndex>=0&&e.getClientRects().length&&getComputedStyle(e).visibility!=='hidden');
+  // Piège de focus : Tab / Maj+Tab bouclent dans la modale du dessus
+  document.addEventListener('keydown',e=>{
+    if(e.key!=='Tab'||e.ctrlKey||e.metaKey||e.altKey)return;
+    const m=topModal();if(!m)return;
+    const f=focusables(m);
+    if(!f.length){e.preventDefault();return;}
+    const first=f[0],last=f[f.length-1],a=document.activeElement;
+    if(!m.contains(a)){e.preventDefault();(e.shiftKey?last:first).focus();}
+    else if(e.shiftKey&&a===first){e.preventDefault();last.focus();}
+    else if(!e.shiftKey&&a===last){e.preventDefault();first.focus();}
+  });
   const mo=new MutationObserver(muts=>{
     muts.forEach(m=>{
       const el=m.target;
@@ -7046,25 +7098,32 @@ function closeResetModal(){document.getElementById('reset-modal').classList.add(
       const open=isOpen(el);
       if(open===state[el.id])return;
       state[el.id]=open;
+      const i=stack.indexOf(el.id);if(i>=0)stack.splice(i,1);
       if(open){
         const a=document.activeElement;
         el._returnFocus=(a&&a!==document.body&&!el.contains(a))?{el:a,id:a.id}:null;
+        stack.push(el.id);syncInert();
         requestAnimationFrame(()=>{
           if(!isOpen(el))return;
           const f=el.querySelector('[data-autofocus]')||el.querySelector('button,[href],input,[tabindex]:not([tabindex="-1"])');
           if(f)f.focus({preventScroll:true});
         });
       } else {
+        syncInert(); // retirer inert AVANT de rendre le focus
         const r=el._returnFocus;el._returnFocus=null;
         if(r&&el.contains(document.activeElement)||r&&document.activeElement===document.body){
           let tgt=r.el;
           if(!tgt.isConnected&&r.id)tgt=document.getElementById(r.id);
           if(tgt&&tgt.isConnected&&tgt.offsetParent!==null)tgt.focus({preventScroll:true});
         }
+        // Une modale reste ouverte dessous : le focus y retourne s'il est resté dehors
+        const t=topModal();
+        if(t&&!t.contains(document.activeElement)){const f=focusables(t);if(f.length)f[0].focus({preventScroll:true});}
       }
     });
   });
-  MODALS.forEach(id=>{const el=document.getElementById(id);if(el){state[id]=isOpen(el);mo.observe(el,{attributes:true,attributeFilter:['class']});}});
+  MODALS.forEach(id=>{const el=document.getElementById(id);if(el){state[id]=isOpen(el);if(state[id])stack.push(id);mo.observe(el,{attributes:true,attributeFilter:['class']});}});
+  syncInert();
   // aria-pressed synchronisé avec les classes on/selected/active des chips
   mo.observe(document.body,{attributes:true,attributeFilter:['class','style'],subtree:true});
 })();

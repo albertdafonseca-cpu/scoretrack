@@ -188,3 +188,90 @@ test.describe('Accessibilité', () => {
     await expect.poll(() => page.evaluate(() => document.getElementById('winner-modal').contains(document.activeElement))).toBe(true);
   });
 });
+
+test.describe('Piège de focus des modales', () => {
+  const inModal = (page, id) => page.evaluate((id) => document.getElementById(id).contains(document.activeElement), id);
+  /** Arrière-plan inert, ni la modale ni ses ancêtres. */
+  const inertState = (page, id) => page.evaluate((id) => {
+    const m = document.getElementById(id);
+    return {
+      modal: !!m.closest('[inert]'),
+      setup: document.getElementById('setup-page').inert,
+      // les modales sont dans #game-screen : ce sont ses autres enfants (cartes, barre) qui sont inert
+      game: document.getElementById('players-wrap').inert && document.getElementById('bar').inert,
+      count: document.querySelectorAll('[inert]').length,
+    };
+  }, id);
+  async function cycle(page, id, n = 14) {
+    for (let i = 0; i < n; i++) {
+      await page.keyboard.press('Tab');
+      expect(await inModal(page, id), `Tab n°${i + 1}`).toBe(true);
+    }
+    for (let i = 0; i < n; i++) {
+      await page.keyboard.press('Shift+Tab');
+      expect(await inModal(page, id), `Maj+Tab n°${i + 1}`).toBe(true);
+    }
+  }
+
+  test('modale de score : Tab / Maj+Tab bouclent, arrière-plan inert, focus rendu à la carte', async ({ page }) => {
+    await startGame(page, { players: 2 });
+    await focusCard(page, 1);
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#score-modal')).toBeVisible();
+    await expect.poll(() => inModal(page, 'score-modal')).toBe(true);
+    expect(await inertState(page, 'score-modal')).toMatchObject({ modal: false, setup: true, game: true });
+    await cycle(page, 'score-modal', 20); // plus que le nombre d'éléments (pavé de 12 touches + 4 boutons)
+    // Boucle exacte : depuis le dernier élément, Tab revient au premier (et inversement)
+    const ends = await page.evaluate(() => {
+      const f = [...document.querySelectorAll('#score-modal button')].filter((b) => b.getClientRects().length);
+      return [f[0].id || f[0].textContent, f[f.length - 1].id || f[f.length - 1].textContent];
+    });
+    await page.locator('#score-modal-cancel').focus();
+    await page.keyboard.press('Tab');
+    expect(await page.evaluate(() => document.activeElement.id || document.activeElement.textContent)).toBe(ends[0]);
+    await page.keyboard.press('Shift+Tab');
+    expect(await page.evaluate(() => document.activeElement.id || document.activeElement.textContent)).toBe(ends[1]);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#score-modal')).toBeHidden();
+    expect((await inertState(page, 'score-modal')).count).toBe(0);
+    await expect(page.locator('#card-1')).toBeFocused();
+  });
+
+  test('modale de reset : Tab / Maj+Tab bouclent, arrière-plan inert, focus rendu au bouton Reset', async ({ page }) => {
+    await startGame(page, { players: 2 });
+    await openBar(page);
+    const trigger = page.locator('.bar-btn.danger');
+    await trigger.click();
+    await expect(page.locator('#reset-modal')).toBeVisible();
+    await expect(page.locator('#btn-back-reset')).toBeFocused();
+    expect(await inertState(page, 'reset-modal')).toMatchObject({ modal: false, setup: true, game: true });
+    await cycle(page, 'reset-modal');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#reset-modal')).toBeHidden();
+    expect((await inertState(page, 'reset-modal')).count).toBe(0);
+    await expect(trigger).toBeFocused();
+  });
+
+  test('modales successives : seule la dernière ouverte compte', async ({ page }) => {
+    await startGame(page, { players: 2 });
+    await openBar(page);
+    await page.locator('.bar-btn.danger').click();
+    await expect(page.locator('#btn-back-reset')).toBeFocused();
+    await page.evaluate(() => _spop());
+    await expect(page.locator('#pro-popup')).toBeVisible();
+    await expect.poll(() => inModal(page, 'pro-popup')).toBe(true);
+    expect(await page.evaluate(() => !!document.getElementById('reset-modal').closest('[inert]'))).toBe(true); // via #game-screen
+    expect(await inertState(page, 'pro-popup')).toMatchObject({ modal: false, setup: true });
+    expect(await page.evaluate(() => document.getElementById('game-screen').inert)).toBe(true);
+    await cycle(page, 'pro-popup', 6);
+    await page.keyboard.press('Escape'); // ferme la fenêtre Pro, la modale de reset reste ouverte
+    await expect(page.locator('#pro-popup')).toBeHidden();
+    await expect(page.locator('#reset-modal')).toBeVisible();
+    expect(await inertState(page, 'reset-modal')).toMatchObject({ modal: false, game: true });
+    await expect.poll(() => inModal(page, 'reset-modal')).toBe(true);
+    await cycle(page, 'reset-modal', 6);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#reset-modal')).toBeHidden();
+    expect((await inertState(page, 'reset-modal')).count).toBe(0);
+  });
+});
