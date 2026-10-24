@@ -1,0 +1,12 @@
+{
+  "name": "scoretrack-test-e2e",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Tests de bout en bout (Playwright) de ScoreTrack Test",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1"
+  }
+}
