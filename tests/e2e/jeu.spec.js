@@ -231,7 +231,14 @@ test.describe('Parcours de jeu', () => {
       }))).observe(document.documentElement, { childList: true, subtree: true });
     });
     await page.fill('#pdf-game-name', 'Test <b>PDF</b>');
-    const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 30_000 }), page.click('#btn-pdf-dl')]);
+    const [dl] = await Promise.all([
+      page.waitForEvent('download', { timeout: 25_000 }).catch(async () => {
+        // Diagnostic : erreurs console, alertes et étape atteinte, pour comprendre un échec propre à un navigateur
+        const state = await page.evaluate(() => ({ jspdf: !!window.jspdf, h2c: !!window.html2canvas, iframes: document.querySelectorAll('iframe').length }));
+        throw new Error('Aucun téléchargement PDF. ' + JSON.stringify({ state, problems: page.problems, dialogs: page.dialogs }));
+      }),
+      page.click('#btn-pdf-dl'),
+    ]);
     const file = await dl.path();
     const buf = fs.readFileSync(file);
     expect(dl.suggestedFilename()).toMatch(/\.pdf$/i);
