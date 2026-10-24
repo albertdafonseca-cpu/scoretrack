@@ -4,7 +4,9 @@ const { expect } = base;
 
 const APP = {
   id: 'test',
-  title: 'ScoreTrack',
+  title: 'ScoreTrack Test — compteur de scores pour jeux de société',
+  url: 'https://scoretrack-test.newgames.app/',
+  indexable: false, // version de test : noindex, ni sitemap ni JSON-LD
   manifestName: 'ScoreTrack Test',
   cachePrefix: 'st-test-',
   cacheRe: /^st-test-v\d+$/,
