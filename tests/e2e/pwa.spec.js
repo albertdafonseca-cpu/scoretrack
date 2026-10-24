@@ -90,4 +90,15 @@ test.describe('PWA', () => {
     const vp = await page.locator('meta[name=viewport]').getAttribute('content');
     expect(vp).not.toMatch(/user-scalable\s*=\s*(no|0)|maximum-scale|minimum-scale/);
   });
+  test('polices des thèmes Arcade / Loi du Milieu chargées à la demande (pas de CSS bloquant)', async ({ page }) => {
+    await page.goto('/');
+    const sheets = () => page.evaluate(() => [...document.querySelectorAll('link[rel=stylesheet]')].map((l) => l.getAttribute('href')));
+    expect(await sheets()).toEqual(['fonts/fonts-core.css']);
+    await page.evaluate(() => applyTheme('arcade'));
+    await expect.poll(sheets).toContain('fonts/fonts-retro.css');
+    await expect.poll(() => page.evaluate(async () => { await document.fonts.load("12px 'Press Start 2P'"); return document.fonts.check("12px 'Press Start 2P'"); })).toBe(true);
+    expect(await sheets()).not.toContain('fonts/fonts-classic.css');
+    await page.evaluate(() => applyTheme('ldm'));
+    await expect.poll(sheets).toContain('fonts/fonts-classic.css');
+  });
 });
