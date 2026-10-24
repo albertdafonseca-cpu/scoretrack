@@ -1,7 +1,7 @@
 // ScoreTrack Test — Service Worker
 // Incrémenter VERSION (et la meta app-version de index.html) à chaque déploiement.
 const PREFIX = 'st-test-';
-const VERSION = '76';
+const VERSION = '77';
 const CACHE = PREFIX + 'v' + VERSION;
 
 const PRECACHE = [
