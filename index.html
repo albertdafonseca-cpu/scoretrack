@@ -788,23 +788,63 @@ function cardLabel(pi) {
   // élément focalisé à l'ouverture : action principale, ou l'option la moins destructive pour les confirmations
   const FIRST = { 'score-modal': '.modal-btn.primary', 'elim-modal': '#btn-cancel-elim', 'endgame-modal': '#endgame-btn-cancel', 'reset-modal': '#btn-back-reset', 'recap': '#recap-close-btn' };
   const openers = {};
+  // Piège de focus : pile des modales ouvertes (seule la dernière ouverte compte) ; l'arrière-plan
+  // (frères de la modale et de ses ancêtres, jamais un ancêtre) reçoit `inert` pendant l'ouverture.
+  // Restent actifs : la zone d'annonce et les overlays d'animation (cliquables pour passer).
+  const stack = [];
+  const INERT_SKIP = '#sr-status,#fin-anim-overlay,#win-anim-overlay,#elim-anim-overlay,script,style';
+  let inerted = [];
+  const topModal = () => { for (let i = stack.length - 1; i >= 0; i--) { const m = $(stack[i]); if (isOpen(m)) return m } return null };
+  function updateInert() {
+    inerted.forEach(el => el.inert = false);
+    inerted = [];
+    const m = topModal();
+    if (!m) return;
+    for (let n = m; n && n !== document.body && n.parentElement; n = n.parentElement) {
+      for (const sib of n.parentElement.children) {
+        if (sib === n || sib.inert || sib.matches(INERT_SKIP)) continue;
+        sib.inert = true;
+        inerted.push(sib);
+      }
+    }
+  }
+  const visible = el => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+  const tabbables = m => [...m.querySelectorAll(FOCUSABLE + ',a[href],select:not([disabled]),textarea:not([disabled])')]
+    .filter(el => !el.closest('[inert]') && visible(el));
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Tab' || e.ctrlKey || e.metaKey || e.altKey) return;
+    const m = topModal();
+    if (!m) return;
+    const list = tabbables(m);
+    if (!list.length) { e.preventDefault(); return }
+    const first = list[0], last = list[list.length - 1], a = document.activeElement;
+    if (!m.contains(a)) { e.preventDefault(); (e.shiftKey ? last : first).focus() }
+    else if (e.shiftKey && a === first) { e.preventDefault(); last.focus() }
+    else if (!e.shiftKey && a === last) { e.preventDefault(); first.focus() }
+  });
   Object.keys(MODALS).forEach(id => {
     const m = $(id);
     if (!m) return;
     let was = isOpen(m);
+    if (was) { stack.push(id); updateInert() }
     new MutationObserver(() => {
       const now = isOpen(m);
       if (now === was) return;
       was = now;
+      const k = stack.indexOf(id);
+      if (k >= 0) stack.splice(k, 1);
+      if (now) stack.push(id);
       if (now) {
         const a = document.activeElement;
         openers[id] = a && a !== document.body && !m.contains(a) ? a : null;
+        updateInert();
         setTimeout(() => {
           if (!isOpen(m) || m.contains(document.activeElement)) return;
           const f = (FIRST[id] && m.querySelector(FIRST[id])) || m.querySelector(FOCUSABLE);
           if (f) f.focus({ preventScroll: true });
         }, 30);
       } else {
+        updateInert(); // inert retiré AVANT de rendre le focus au déclencheur
         const o = openers[id];
         openers[id] = null;
         if (!o) return;

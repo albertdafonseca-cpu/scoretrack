@@ -183,4 +183,96 @@ test.describe('Accessibilité', () => {
     await expect(page.locator('#winner-modal')).toHaveAttribute('role', 'dialog');
     await expect.poll(() => page.evaluate(() => document.getElementById('winner-modal').contains(document.activeElement))).toBe(true);
   });
+
+  // ── Piège de focus des modales ──
+  /** Appuie N fois sur Tab (ou Maj+Tab) et vérifie à chaque pas que le focus reste dans la modale. */
+  async function tabStaysIn(page, id, key, n = 25) {
+    const seen = new Set();
+    for (let i = 0; i < n; i++) {
+      await page.keyboard.press(key);
+      const r = await page.evaluate((id) => {
+        const a = document.activeElement;
+        return { inside: document.getElementById(id).contains(a), tag: a && (a.id || a.className || a.tagName) };
+      }, id);
+      expect(r.inside, `${key} n°${i + 1} : focus sur ${r.tag}`).toBe(true);
+      seen.add(r.tag);
+    }
+    return seen;
+  }
+  const inertState = (page, id) => page.evaluate((id) => {
+    const m = document.getElementById(id);
+    return {
+      // les modales sont dans #game-screen (ancêtre jamais inert) : ce sont les cartes et la barre qui le deviennent
+      bg: !!document.getElementById('card-0').closest('[inert]') && !!document.getElementById('setup-page').closest('[inert]'),
+      ancestor: !!document.getElementById('game-screen').closest('[inert]'),
+      bar: !!document.getElementById('bar').closest('[inert]'),
+      modal: !!m.closest('[inert]'),
+      count: document.querySelectorAll('[inert]').length,
+    };
+  }, id);
+
+  test('piège de focus : modale de saisie (Tab / Maj+Tab bouclent, arrière-plan inert, focus rendu)', async ({ page }) => {
+    await startGame(page, { players: 3 });
+    // comme applyDelta : l'ouverture peut être ignorée juste après le premier rendu
+    await expect(async () => {
+      await focusCard(page, 1);
+      await page.keyboard.press('Enter');
+      await expect(page.locator('#score-modal')).toBeVisible({ timeout: 800 });
+    }).toPass({ timeout: 10_000 });
+    await expect.poll(() => page.evaluate(() => document.getElementById('score-modal').contains(document.activeElement))).toBe(true);
+    expect(await inertState(page, 'score-modal')).toMatchObject({ bg: true, bar: true, modal: false, ancestor: false });
+    // le pavé compte plus de 10 boutons : 25 pressions font au moins un tour complet dans chaque sens
+    const fwd = await tabStaysIn(page, 'score-modal', 'Tab');
+    expect(fwd.size).toBeGreaterThan(5);
+    await tabStaysIn(page, 'score-modal', 'Shift+Tab');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#score-modal')).toBeHidden();
+    expect(await inertState(page, 'score-modal')).toMatchObject({ bg: false, bar: false, count: 0 });
+    await expect(page.locator('#card-1')).toBeFocused();
+  });
+
+  test('piège de focus : modale de reset (boucle premier ↔ dernier, inert levé à la fermeture)', async ({ page }) => {
+    await startGame(page, { players: 2 });
+    await openBar(page);
+    const opener = page.locator('.bar-btn.danger');
+    await opener.focus();
+    await page.keyboard.press('Enter');
+    const modal = page.locator('#reset-modal');
+    await expect(modal).toBeVisible();
+    await expect(page.locator('#btn-back-reset')).toBeFocused();
+    expect(await inertState(page, 'reset-modal')).toMatchObject({ bg: true, bar: true, modal: false, ancestor: false });
+    const btns = modal.locator('button:visible');
+    const n = await btns.count();
+    expect(n).toBeGreaterThanOrEqual(2);
+    // depuis le dernier bouton, Tab revient au premier ; depuis le premier, Maj+Tab va au dernier
+    await btns.nth(n - 1).focus();
+    await page.keyboard.press('Tab');
+    await expect(btns.first()).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(btns.nth(n - 1)).toBeFocused();
+    await tabStaysIn(page, 'reset-modal', 'Tab', 3 * n);
+    await tabStaysIn(page, 'reset-modal', 'Shift+Tab', 3 * n);
+    // le déclencheur (arrière-plan) est inert tant que la modale est ouverte
+    expect(await page.evaluate(() => { const b = document.querySelector('.bar-btn.danger'); return b.closest('[inert]') !== null; })).toBe(true);
+    await page.keyboard.press('Escape');
+    await expect(modal).toBeHidden();
+    expect(await inertState(page, 'reset-modal')).toMatchObject({ bg: false, bar: false, count: 0 });
+    await expect(opener).toBeFocused();
+  });
+
+  test('piège de focus : modales successives (élimination → fin), seule la dernière compte', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await startGame(page, { players: 2, names: ['A', 'B'] });
+    await applyDelta(page, 0, -20);
+    await expect(page.locator('#elim-modal')).toBeVisible();
+    await expect.poll(() => page.evaluate(() => document.getElementById('elim-modal').contains(document.activeElement))).toBe(true);
+    await tabStaysIn(page, 'elim-modal', 'Tab', 6);
+    await tabStaysIn(page, 'elim-modal', 'Shift+Tab', 6);
+    await page.click('#btn-elim-confirm-txt');
+    await expect(page.locator('#winner-modal')).toBeVisible();
+    await expect.poll(() => page.evaluate(() => document.getElementById('winner-modal').contains(document.activeElement))).toBe(true);
+    expect(await inertState(page, 'winner-modal')).toMatchObject({ bg: true, modal: false, ancestor: false });
+    await tabStaysIn(page, 'winner-modal', 'Tab', 8);
+    await tabStaysIn(page, 'winner-modal', 'Shift+Tab', 8);
+  });
 });
