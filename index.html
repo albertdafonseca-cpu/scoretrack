@@ -29,34 +29,14 @@
 </script>
 <meta name="apple-mobile-web-app-title" content="ScoreTrack Light">
 <meta name="theme-color" id="meta-theme-color" content="#020d12">
-<meta name="app-version" content="62">
+<meta name="app-version" content="63">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/favicon-64.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<link rel="apple-touch-startup-image" id="dyn-splash">
-<script>
-// Splash iOS 2732×2732 — généré après le chargement, hors du chemin critique
-window.addEventListener('load',()=>{
-  const run=()=>{
-    try{
-      const img=new Image();
-      img.onload=()=>{
-        try{
-          const sc=document.createElement('canvas');sc.width=2732;sc.height=2732;
-          const sctx=sc.getContext('2d');sctx.fillStyle='#020d12';sctx.fillRect(0,0,2732,2732);
-          sctx.drawImage(img,(2732-512)/2,(2732-512)/2,512,512);
-          const sp=document.getElementById('dyn-splash');if(sp)sp.href=sc.toDataURL('image/png');
-        }catch(e){}
-      };
-      img.src='icons/icon-512.png';
-    }catch(e){}
-  };
-  if('requestIdleCallback' in window)requestIdleCallback(run,{timeout:3000});else setTimeout(run,1500);
-});
-</script>
+<!-- Splash iOS 2732×2732 : PNG statique pré-généré (l'ancienne génération canvas + toDataURL bloquait le thread principal ~1 s) -->
+<link rel="apple-touch-startup-image" href="icons/splash.png">
 <link rel="stylesheet" href="fonts/fonts-core.css">
-<link rel="stylesheet" href="fonts/fonts-retro.css">
-<link rel="stylesheet" href="fonts/fonts-classic.css">
+<!-- fonts-retro.css (arcade) et fonts-classic.css (ldm, ldm-day) : chargées à la demande par applyTheme() -->
 <title>ScoreTrack Light</title>
 <style>
 
@@ -4094,7 +4074,16 @@ function _lk(el){
 function _lkId(id){_lk(document.getElementById(id));}
 function _lkAll(ids){ids.forEach(_lkId);}
 // ═══════════════════════════════════════════════════════════════
+// Polices des thèmes arcade (retro) et ldm/ldm-day (classic) : feuille chargée une seule fois,
+// à la demande (non bloquante pour le rendu initial)
+const THEME_FONTS={arcade:'retro',ldm:'classic','ldm-day':'classic'};
+function loadThemeFonts(id){
+  const f=THEME_FONTS[id];if(!f||document.getElementById('fonts-'+f))return;
+  const l=document.createElement('link');l.id='fonts-'+f;l.rel='stylesheet';l.href='fonts/fonts-'+f+'.css';
+  document.head.appendChild(l);
+}
 function applyTheme(id){
+  loadThemeFonts(id);
   document.documentElement.setAttribute('data-theme',id==='cyber'?'':id);
   selectedTheme=id;
   const colors={cyber:'#020d12',dark:'#0a0a0f','neon-pink':'#0d0010',arcade:'#0a0800',nature:'#051208',sunset:'#120508',ocean:'#020810',mono:'#080808','ldm-day':'#f5f0e8',ldm:'#0d0a12'};
