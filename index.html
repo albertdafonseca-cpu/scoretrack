@@ -790,10 +790,33 @@ const MODAL_CANCEL={
   'winner-modal':()=>closeModal('winner-modal'),
   'recap':()=>closeModal('recap'),
 };
+// Piège de focus : pile des modales ouvertes, seule la dernière compte ; le reste de la page est inert
+const _modalStack=[];
+const topModal=()=>{for(let i=_modalStack.length-1;i>=0;i--){const m=document.getElementById(_modalStack[i]);if(m&&!m.classList.contains('hidden'))return m;}return null;};
+function syncInert(){
+  const top=topModal();
+  [...document.body.children].forEach(el=>{
+    const want=!!top&&el!==top&&el.id!=='sr-status'&&el.tagName!=='SCRIPT';
+    if(want&&!el.inert){el.inert=true;el.dataset.trapInert='1';}
+    else if(!want&&el.dataset.trapInert){el.inert=false;delete el.dataset.trapInert;}
+  });
+}
+const focusables=m=>[...m.querySelectorAll('button,input,select,textarea,a[href],[tabindex]:not([tabindex="-1"])')].filter(e=>!e.disabled&&e.getClientRects().length&&getComputedStyle(e).visibility!=='hidden');
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Tab')return;
+  const m=topModal();if(!m)return;
+  const f=focusables(m);if(!f.length){e.preventDefault();return;}
+  const first=f[0],last=f[f.length-1],a=document.activeElement;
+  if(!m.contains(a)){e.preventDefault();(e.shiftKey?last:first).focus();}
+  else if(e.shiftKey&&a===first){e.preventDefault();last.focus();}
+  else if(!e.shiftKey&&a===last){e.preventDefault();first.focus();}
+});
 function openModal(id){
   const m=document.getElementById(id);if(!m)return;
   if(m.classList.contains('hidden'))_modalOpeners[id]=document.activeElement;
   m.classList.remove('hidden');
+  const i=_modalStack.indexOf(id);if(i>=0)_modalStack.splice(i,1);_modalStack.push(id);
+  syncInert();
   const f=m.querySelector('button:not([disabled]),[tabindex="0"],input');
   if(f)setTimeout(()=>{try{f.focus({preventScroll:true})}catch(e){}},30);
 }
@@ -801,6 +824,8 @@ function closeModal(id){
   const m=document.getElementById(id);if(!m)return;
   const wasOpen=!m.classList.contains('hidden');
   m.classList.add('hidden');
+  const i=_modalStack.indexOf(id);if(i>=0)_modalStack.splice(i,1);
+  syncInert(); // inert retiré AVANT de rendre le focus
   const o=_modalOpeners[id];delete _modalOpeners[id];
   if(wasOpen&&o&&document.contains(o)&&o.offsetParent!==null){try{o.focus({preventScroll:true})}catch(e){}}
 }

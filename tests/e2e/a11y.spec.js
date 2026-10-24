@@ -1,5 +1,25 @@
 const { test, expect, startGame, score, contrastByTheme, focusCard } = require('./helpers');
 
+/** N×Tab puis N×Maj+Tab : le focus ne quitte jamais la modale `id`. */
+async function expectFocusTrapped(page, id, n = 20) {
+  const inside = () => page.evaluate((m) => document.getElementById(m).contains(document.activeElement), id);
+  await expect.poll(inside).toBe(true);
+  for (const key of ['Tab', 'Shift+Tab']) {
+    for (let i = 0; i < n; i++) {
+      await page.keyboard.press(key);
+      expect(await inside(), `${key} n°${i + 1} hors de #${id}`).toBe(true);
+    }
+  }
+}
+/** État inert : la modale (et ses ancêtres) jamais inert ; l'arrière-plan inert tant qu'elle est ouverte. */
+const inertState = (page, id) => page.evaluate((m) => {
+  const modal = document.getElementById(m);
+  const anc = []; for (let e = modal; e; e = e.parentElement) if (e.inert) anc.push(e.id || e.tagName);
+  return { ancestors: anc, game: document.getElementById('game-screen').inert, bar: document.getElementById('bar').inert,
+    setup: document.getElementById('setup-page').inert, live: document.getElementById('sr-status').inert,
+    anyInert: [...document.querySelectorAll('[inert]')].map((e) => e.id || e.tagName) };
+}, id);
+
 test.describe('Accessibilité', () => {
   test('carte joueur : focusable, role=group, aria-label mis à jour au clavier', async ({ page }) => {
     await startGame(page, { players: 3, names: ['Alice', 'Bob', 'Chloé'] });
@@ -161,5 +181,68 @@ test.describe('Accessibilité', () => {
     const back = await page.locator('.back-btn').boundingBox();
     expect(back.width).toBeGreaterThanOrEqual(44);
     expect(back.height).toBeGreaterThanOrEqual(44);
+  });
+  test.describe('Piège de focus des modales', () => {
+    test('modale de score : Tab/Maj+Tab bouclent, arrière-plan inert, focus rendu à la carte', async ({ page }) => {
+      await startGame(page, { players: 3 });
+      await focusCard(page, 1);
+      await page.keyboard.press('Enter');
+      await expect(page.locator('#score-modal')).toBeVisible();
+      let st = await inertState(page, 'score-modal');
+      expect(st.ancestors).toEqual([]);
+      expect(st).toMatchObject({ game: true, bar: true, setup: true, live: false });
+      await expectFocusTrapped(page, 'score-modal', 25);
+      await page.keyboard.press('Escape');
+      await expect(page.locator('#score-modal')).toBeHidden();
+      st = await inertState(page, 'score-modal');
+      expect(st.anyInert).toEqual([]);
+      await expect(page.locator('#card-1')).toBeFocused();
+    });
+
+    test('modale de reset : Tab/Maj+Tab bouclent, inert retiré à la fermeture, focus rendu au déclencheur', async ({ page }) => {
+      await startGame(page, { players: 2 });
+      const trigger = page.locator('.bar-btn.danger');
+      await trigger.focus();
+      await page.keyboard.press('Enter');
+      await expect(page.locator('#reset-modal')).toBeVisible();
+      const st = await inertState(page, 'reset-modal');
+      expect(st.ancestors).toEqual([]);
+      expect(st).toMatchObject({ game: true, bar: true, live: false });
+      await expectFocusTrapped(page, 'reset-modal', 6);
+      // Fermeture au clavier par « Annuler »
+      await page.locator('#reset-modal .modal-btn.secondary').focus();
+      await page.keyboard.press('Enter');
+      await expect(page.locator('#reset-modal')).toBeHidden();
+      expect((await inertState(page, 'reset-modal')).anyInert).toEqual([]);
+      await expect(trigger).toBeFocused();
+    });
+
+    test('modales successives (élimination → fin → récap) : seule la dernière ouverte compte', async ({ page }) => {
+      await startGame(page, { players: 1, points: 10 });
+      await page.evaluate(() => { openScoreModal(0); setSign(-1); pressKey(1); pressKey(0); confirmScoreModal(); });
+      await expect(page.locator('#elim-modal')).toBeVisible();
+      await expectFocusTrapped(page, 'elim-modal', 5);
+      await page.locator('.btn-elim-confirm').focus();
+      await page.keyboard.press('Enter');
+      await expect(page.locator('#winner-modal')).toBeVisible();
+      await expect.poll(async () => (await inertState(page, 'winner-modal')).ancestors).toEqual([]);
+      await expectFocusTrapped(page, 'winner-modal', 5);
+      // Ouvrir le récap par-dessus la fin : la modale de fin devient inert
+      const recapBtn = page.locator('#winner-modal .modal-btn.primary');
+      await recapBtn.focus();
+      await page.keyboard.press('Enter');
+      await expect(page.locator('#recap')).toBeVisible();
+      expect(await page.evaluate(() => document.getElementById('winner-modal').inert)).toBe(true);
+      expect((await inertState(page, 'recap')).ancestors).toEqual([]);
+      await expectFocusTrapped(page, 'recap', 5);
+      // Fermer le récap : la fin redevient active et récupère le focus
+      await page.keyboard.press('Escape');
+      await expect(page.locator('#recap')).toBeHidden();
+      const st = await inertState(page, 'winner-modal');
+      expect(st.ancestors).toEqual([]);
+      expect(st.game).toBe(true);
+      await expect(recapBtn).toBeFocused();
+      await expectFocusTrapped(page, 'winner-modal', 5);
+    });
   });
 });
