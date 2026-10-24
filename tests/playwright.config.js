@@ -1,7 +1,7 @@
 // @ts-check
 const { defineConfig, devices } = require('@playwright/test');
 
-const PORT = 4171; // port propre à ce dépôt (light : 4172, test : 4173)
+const PORT = Number(process.env.ST_TEST_PORT) || 4171; // port propre à ce dépôt (light : 4172, test : 4173), surchargeable
 const executablePath = process.env.PW_CHROMIUM_PATH || undefined;
 
 module.exports = defineConfig({

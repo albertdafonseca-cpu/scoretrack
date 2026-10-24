@@ -4,7 +4,7 @@ const { expect } = base;
 
 const APP = {
   id: 'main',
-  title: 'ScoreTrack',
+  title: 'ScoreTrack — compteur de scores universel',
   manifestName: 'ScoreTrack',
   cachePrefix: 'st-main-',
   cacheRe: /^st-main-v\d+$/,
