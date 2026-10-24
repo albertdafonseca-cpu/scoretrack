@@ -7062,6 +7062,35 @@ function closeResetModal(){document.getElementById('reset-modal').classList.add(
   const MODALS=['score-modal','winner-modal','reset-modal','elim-modal','endgame-modal','recap','pro-popup'];
   const isOpen=el=>el.id==='pro-popup'?el.classList.contains('show'):!el.classList.contains('hidden');
   const state={};
+  // Pile des modales ouvertes (seule la dernière compte) + arrière-plan inert
+  const stack=[];let inerted=[];
+  // Jamais inert : zone d'annonce, overlays d'animation (ils s'affichent par-dessus), bannière de MAJ
+  const NO_INERT=['sr-status','fin-anim-overlay','win-anim-overlay','elim-anim-overlay','update-banner'];
+  const topModal=()=>{for(let i=stack.length-1;i>=0;i--){const el=document.getElementById(stack[i]);if(el&&isOpen(el))return el;}return null;};
+  function syncInert(){
+    inerted.forEach(n=>{n.inert=false;});inerted=[];
+    const m=topModal();if(!m)return;
+    // Frères de la modale et de chacun de ses ancêtres (jamais un ancêtre lui-même)
+    for(let n=m;n&&n.parentElement&&n!==document.body;n=n.parentElement){
+      for(const sib of n.parentElement.children){
+        if(sib===n||sib.inert||NO_INERT.includes(sib.id)||/^(SCRIPT|STYLE|LINK|META|TEMPLATE)$/.test(sib.tagName))continue;
+        sib.inert=true;inerted.push(sib);
+      }
+    }
+  }
+  const focusables=m=>[...m.querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])')]
+    .filter(e=>!e.disabled&&e.tabIndex>=0&&e.getClientRects().length&&getComputedStyle(e).visibility!=='hidden');
+  // Piège de focus : Tab / Maj+Tab bouclent dans la modale du dessus
+  document.addEventListener('keydown',e=>{
+    if(e.key!=='Tab'||e.ctrlKey||e.metaKey||e.altKey)return;
+    const m=topModal();if(!m)return;
+    const f=focusables(m);
+    if(!f.length){e.preventDefault();return;}
+    const first=f[0],last=f[f.length-1],a=document.activeElement;
+    if(!m.contains(a)){e.preventDefault();(e.shiftKey?last:first).focus();}
+    else if(e.shiftKey&&a===first){e.preventDefault();last.focus();}
+    else if(!e.shiftKey&&a===last){e.preventDefault();first.focus();}
+  });
   const mo=new MutationObserver(muts=>{
     muts.forEach(m=>{
       const el=m.target;
@@ -7069,25 +7098,32 @@ function closeResetModal(){document.getElementById('reset-modal').classList.add(
       const open=isOpen(el);
       if(open===state[el.id])return;
       state[el.id]=open;
+      const i=stack.indexOf(el.id);if(i>=0)stack.splice(i,1);
       if(open){
         const a=document.activeElement;
         el._returnFocus=(a&&a!==document.body&&!el.contains(a))?{el:a,id:a.id}:null;
+        stack.push(el.id);syncInert();
         requestAnimationFrame(()=>{
           if(!isOpen(el))return;
           const f=el.querySelector('[data-autofocus]')||el.querySelector('button,[href],input,[tabindex]:not([tabindex="-1"])');
           if(f)f.focus({preventScroll:true});
         });
       } else {
+        syncInert(); // retirer inert AVANT de rendre le focus
         const r=el._returnFocus;el._returnFocus=null;
         if(r&&el.contains(document.activeElement)||r&&document.activeElement===document.body){
           let tgt=r.el;
           if(!tgt.isConnected&&r.id)tgt=document.getElementById(r.id);
           if(tgt&&tgt.isConnected&&tgt.offsetParent!==null)tgt.focus({preventScroll:true});
         }
+        // Une modale reste ouverte dessous : le focus y retourne s'il est resté dehors
+        const t=topModal();
+        if(t&&!t.contains(document.activeElement)){const f=focusables(t);if(f.length)f[0].focus({preventScroll:true});}
       }
     });
   });
-  MODALS.forEach(id=>{const el=document.getElementById(id);if(el){state[id]=isOpen(el);mo.observe(el,{attributes:true,attributeFilter:['class']});}});
+  MODALS.forEach(id=>{const el=document.getElementById(id);if(el){state[id]=isOpen(el);if(state[id])stack.push(id);mo.observe(el,{attributes:true,attributeFilter:['class']});}});
+  syncInert();
   // aria-pressed synchronisé avec les classes on/selected/active des chips
   mo.observe(document.body,{attributes:true,attributeFilter:['class','style'],subtree:true});
 })();
