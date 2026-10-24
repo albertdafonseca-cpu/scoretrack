@@ -4,7 +4,7 @@
 //  de index.html synchronisée) → invalide le cache de CETTE app uniquement
 // ─────────────────────────────────────────────────────────────────
 const PREFIX='st-light-';
-const VERSION='63';
+const VERSION='64';
 const CACHE=PREFIX+'v'+VERSION;
 
 // Uniquement des fichiers présents dans le dépôt
