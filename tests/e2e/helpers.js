@@ -4,7 +4,7 @@ const { expect } = base;
 
 const APP = {
   id: 'light',
-  title: 'ScoreTrack Light',
+  title: 'ScoreTrack Light — compteur de scores pour jeux de société',
   manifestName: 'ScoreTrack Light',
   cachePrefix: 'st-light-',
   cacheRe: /^st-light-v\d+$/,
