@@ -227,7 +227,7 @@ test.describe('Parcours de jeu', () => {
     await page.evaluate(() => {
       window.__iframes = [];
       new MutationObserver((ms) => ms.forEach((m) => m.addedNodes.forEach((n) => {
-        if (n.tagName === 'IFRAME') window.__iframes.push({ sandbox: n.getAttribute('sandbox'), hasSrcdoc: n.hasAttribute('srcdoc') });
+        if (n.tagName === 'IFRAME') window.__iframes.push(n);
       }))).observe(document.documentElement, { childList: true, subtree: true });
     });
     await page.fill('#pdf-game-name', 'Test <b>PDF</b>');
@@ -247,9 +247,13 @@ test.describe('Parcours de jeu', () => {
     const srcs = await page.evaluate(() => [...document.scripts].map((s) => s.src).filter(Boolean));
     expect(srcs.some((s) => s.endsWith('/vendor/jspdf.umd.min.js'))).toBe(true);
     expect(srcs.some((s) => s.endsWith('/vendor/html2canvas.min.js'))).toBe(true);
-    const iframes = await page.evaluate(() => window.__iframes);
+    // Pas de sandbox (Safari y bloque html2canvas) : le contenu exporté interdit les scripts par une CSP
+    const iframes = await page.evaluate(() => window.__iframes.map((n) => ({ sandbox: n.getAttribute('sandbox'), srcdoc: n.getAttribute('srcdoc') || '' })));
+    expect(iframes.length).toBeGreaterThan(0);
     for (const f of iframes) {
-      expect(f.sandbox).toBe('allow-same-origin'); // pas de allow-scripts
+      expect(f.sandbox || '').not.toContain('allow-scripts');
+      expect(f.srcdoc).toMatch(/http-equiv="Content-Security-Policy" content="script-src 'none'/);
+      expect(f.srcdoc).not.toMatch(/<b>PDF<\/b>|<b>B<\/b>/); // noms et titre échappés
     }
     expect(page.external).toEqual([]);
   });
