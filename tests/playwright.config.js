@@ -28,6 +28,9 @@ module.exports = defineConfig({
         launchOptions: executablePath ? { executablePath } : {},
       },
     },
+    // Moteur de Safari (iPhone, iPad, Mac) et Firefox : même taille d'écran que Chromium
+    { name: 'webkit', use: { ...devices['Desktop Safari'], viewport: { width: 390, height: 844 } } },
+    { name: 'firefox', use: { ...devices['Desktop Firefox'], viewport: { width: 390, height: 844 } } },
   ],
   // Sert la racine du dépôt en statique (comme Vercel)
   webServer: {
