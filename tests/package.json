@@ -1,10 +1,12 @@
 {
-  "name": "scoretrack-light-e2e",
+  "name": "scoretrack-e2e",
   "private": true,
   "version": "1.0.0",
-  "description": "Tests de bout en bout (Playwright) de ScoreTrack Light",
+  "description": "Tests de bout en bout (Playwright) de ScoreTrack Light et Test",
   "scripts": {
-    "test": "playwright test"
+    "test": "VARIANT=light playwright test && VARIANT=test playwright test",
+    "test:light": "VARIANT=light playwright test",
+    "test:test": "VARIANT=test playwright test"
   },
   "devDependencies": {
     "@playwright/test": "1.56.1"

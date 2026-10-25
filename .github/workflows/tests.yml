@@ -8,18 +8,22 @@ on:
 
 jobs:
   e2e:
+    name: ${{ matrix.variant }} · ${{ matrix.project }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
+        variant: [light, test]
         project: [chromium, webkit, firefox]
     timeout-minutes: 15
+    env:
+      VARIANT: ${{ matrix.variant }}
     defaults:
       run:
         working-directory: tests
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -32,9 +36,9 @@ jobs:
         run: npx playwright test --project=${{ matrix.project }}
       - name: Publier le rapport en cas d'échec
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: playwright-report-${{ matrix.project }}
+          name: playwright-report-${{ matrix.variant }}-${{ matrix.project }}
           path: |
             tests/playwright-report/
             tests/test-results/

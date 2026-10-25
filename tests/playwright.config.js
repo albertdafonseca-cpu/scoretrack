@@ -1,11 +1,15 @@
 // @ts-check
 const { defineConfig, devices } = require('@playwright/test');
 
-const PORT = 4172; // port propre à ce dépôt (main : 4171, test : 4173)
+// Variante testée : VARIANT=light (par défaut) ou VARIANT=test
+const VARIANT = process.env.VARIANT || 'light';
+const PORTS = { light: 4172, test: 4173 }; // main (dépôt figé) : 4171
+if (!PORTS[VARIANT]) throw new Error(`VARIANT inconnue : ${VARIANT}`);
+const PORT = PORTS[VARIANT];
 const executablePath = process.env.PW_CHROMIUM_PATH || undefined;
 
 module.exports = defineConfig({
-  testDir: './e2e',
+  testDir: `./e2e/${VARIANT}`,
   retries: 0,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
@@ -32,9 +36,9 @@ module.exports = defineConfig({
     { name: 'webkit', use: { ...devices['Desktop Safari'], viewport: { width: 390, height: 844 } } },
     { name: 'firefox', use: { ...devices['Desktop Firefox'], viewport: { width: 390, height: 844 } } },
   ],
-  // Sert la racine du dépôt en statique (comme Vercel)
+  // Construit la variante puis sert dist/<variante> en statique (comme Vercel)
   webServer: {
-    command: `python3 -m http.server ${PORT} --bind 127.0.0.1`,
+    command: `node tools/build.mjs ${VARIANT} && python3 -m http.server ${PORT} --bind 127.0.0.1 --directory dist/${VARIANT}`,
     cwd: '..',
     url: `http://127.0.0.1:${PORT}/index.html`,
     reuseExistingServer: !process.env.CI,
