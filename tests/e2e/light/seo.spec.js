@@ -4,7 +4,7 @@ const { test, expect } = require('./helpers');
 
 // Light est la version de référence pour les moteurs de recherche
 const CANONICAL = 'https://scoretrack-light.newgames.app/';
-const ROOT = path.join(__dirname, '..', '..');
+const ROOT = path.join(__dirname, '..', '..', '..', 'dist', 'light'); // site construit
 
 test.describe('SEO', () => {
   test('title, description, canonical et robots', async ({ page }) => {
