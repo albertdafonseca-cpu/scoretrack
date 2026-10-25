@@ -1,0 +1,75 @@
+/* ── Animation élimination ──────────────────────────────── */
+#elim-anim-overlay{
+  position:fixed;inset:0;z-index:19999;
+  display:none;
+  flex-direction:column;align-items:center;justify-content:center;
+  gap:16px;pointer-events:auto;overflow:hidden;cursor:pointer;
+}
+#elim-anim-noise{position:absolute;inset:0;z-index:5;width:100%;height:100%;pointer-events:none;}
+#elim-anim-skull{position:absolute;z-index:3;line-height:1;transform-origin:center center;font-size:4px;}
+#elim-anim-texts{
+  position:relative;z-index:4;
+  display:flex;flex-direction:column;align-items:center;gap:14px;
+  padding:0 24px;max-width:100%;
+}
+#elim-anim-name{
+  font-family:var(--btn-font);font-size:clamp(28px,8vw,60px);font-weight:900;
+  color:#ff7a00;text-transform:uppercase;letter-spacing:0.10em;
+  text-shadow:0 0 32px rgba(255,122,0,0.9);max-width:90vw;text-align:center;
+  opacity:0;transform:scale(0.85);
+}
+#elim-anim-msg{
+  font-family:'Share Tech Mono',monospace;font-size:clamp(14px,4vw,24px);
+  color:#fff;letter-spacing:0.22em;text-transform:uppercase;
+  max-width:90vw;text-align:center;opacity:0;transform:translateY(8px);
+}
+#elim-anim-score{
+  font-family:'Share Tech Mono',monospace;font-size:clamp(28px,7vw,52px);
+  color:#ff7a00;text-shadow:0 0 24px rgba(255,122,0,0.5);
+  text-align:center;opacity:0;transform:translateY(8px);
+}
+@keyframes elimFadeOut{from{opacity:1}to{opacity:0}}
+
+/* ── Animation finisher ──────────────────────────────────── */
+#fin-anim-overlay{position:fixed;inset:0;z-index:19999;display:none;
+  flex-direction:column;align-items:center;justify-content:center;
+  gap:16px;pointer-events:auto;overflow:hidden;cursor:pointer;}
+#fin-anim-canvas{position:absolute;inset:0;z-index:1;width:100%;height:100%;pointer-events:none;}
+#fin-anim-texts{position:relative;z-index:4;display:flex;flex-direction:column;
+  align-items:center;gap:14px;padding:0 24px;max-width:100%;}
+#fin-anim-name{font-family:var(--btn-font);font-size:clamp(28px,8vw,60px);font-weight:900;
+  color:#ffd700;text-transform:uppercase;letter-spacing:0.10em;
+  text-shadow:0 0 40px rgba(255,215,0,1),0 0 80px rgba(255,215,0,0.5);
+  max-width:90vw;text-align:center;opacity:0;transform:scale(0.5);}
+#fin-anim-msg{font-family:'Share Tech Mono',monospace;font-size:clamp(16px,5vw,28px);
+  color:#fff;letter-spacing:0.22em;text-transform:uppercase;
+  max-width:90vw;text-align:center;opacity:0;transform:translateY(12px);}
+#fin-anim-score{font-family:'Share Tech Mono',monospace;font-size:clamp(22px,6vw,44px);
+  color:var(--accent);text-shadow:0 0 20px rgba(0,255,224,0.8);
+  text-align:center;opacity:0;transform:translateY(12px);}
+#win-anim-overlay{
+  position:fixed;inset:0;z-index:19999;
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  gap:16px;pointer-events:auto;overflow:hidden;cursor:pointer;
+}
+#win-anim-canvas{position:absolute;inset:0;z-index:1;width:100%;height:100%;pointer-events:none;}
+#win-anim-texts{position:relative;z-index:4;display:flex;flex-direction:column;align-items:center;gap:14px;padding:0 24px;max-width:100%;}
+#win-anim-trophy-canvas{opacity:0;transform:scale(0.02) rotate(-20deg);width:clamp(80px,20vw,140px);height:clamp(80px,20vw,140px);display:block;margin:0 auto;}
+#win-anim-name{
+  font-family:var(--btn-font);font-size:clamp(28px,8vw,60px);font-weight:900;
+  color:#ffd700;text-transform:uppercase;letter-spacing:0.10em;
+  text-shadow:0 0 40px rgba(255,215,0,1),0 0 80px rgba(255,215,0,0.5);
+  max-width:90vw;text-align:center;opacity:0;transform:scale(0.5);
+}
+#win-anim-msg{
+  font-family:'Share Tech Mono',monospace;font-size:clamp(16px,5vw,28px);
+  color:#fff;letter-spacing:0.22em;text-transform:uppercase;
+  max-width:90vw;text-align:center;opacity:0;transform:translateY(12px);
+}
+#win-anim-score{
+  font-family:'Share Tech Mono',monospace;font-size:clamp(22px,6vw,44px);
+  color:var(--accent);text-shadow:0 0 20px rgba(0,255,224,0.8);
+  text-align:center;opacity:0;transform:translateY(12px);
+}
+@keyframes winFadeOut{from{opacity:1}to{opacity:0}}
+

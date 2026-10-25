@@ -1,0 +1,109 @@
+/* Textures de cartes — sur .pcard (ne tourne pas avec card-inner) */
+/* Correspond exactement aux textures du --bg-grad de chaque thème   */
+.pcard::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:1;
+  background-image:var(--card-texture);
+  background-size:var(--card-texture-size);
+  opacity:var(--card-texture-opacity,0);}
+
+/* cyber : hexagones — même motif que bg-grad */
+:root{
+  --card-texture:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='46'%3E%3Cpath d='M20 3l17 10v20L20 43 3 33V13z' fill='none' stroke='%2300ffe0' stroke-width='0.8'/%3E%3C/svg%3E");
+  --card-texture-size:40px 46px;--card-texture-opacity:0.12;}
+
+/* dark : diagonales croisées — même motif que bg-grad */
+[data-theme="dark"]{
+  --card-texture:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M0 32L32 0M0 16L16 0M16 32L32 16' stroke='%23a78bfa' stroke-width='0.5' opacity='0.12'/%3E%3C/svg%3E");
+  --card-texture-size:32px 32px;--card-texture-opacity:0.9;}
+
+/* neon-pink : points — même motif que bg-grad */
+[data-theme="neon-pink"]{
+  --card-texture:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18'%3E%3Ccircle cx='9' cy='9' r='1' fill='%23ff00cc' opacity='0.18'/%3E%3C/svg%3E");
+  --card-texture-size:18px 18px;--card-texture-opacity:1;}
+
+@keyframes elimNoisePulse{
+  0%{opacity:0}
+  10%{opacity:0.18}
+  65%{opacity:0.18}
+  100%{opacity:0}
+}
+#elim-anim-noise{opacity:1;}
+/* arcade : scanlines horizontales — même motif que bg-grad */
+[data-theme="arcade"]{
+  --card-texture:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect y='0' width='4' height='2' fill='%23ffdc00' opacity='0.07'/%3E%3C/svg%3E");
+  --card-texture-size:4px 4px;--card-texture-opacity:1;}
+
+/* nature : courbes organiques — même motif que bg-grad */
+[data-theme="nature"]{
+  --card-texture:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Cpath d='M0 40 Q20 20 40 40 Q60 60 80 40' fill='none' stroke='%2388dd44' stroke-width='0.8' opacity='0.15'/%3E%3Cpath d='M0 60 Q20 40 40 60 Q60 80 80 60' fill='none' stroke='%2350c850' stroke-width='0.5' opacity='0.1'/%3E%3C/svg%3E");
+  --card-texture-size:80px 80px;--card-texture-opacity:1;}
+
+/* sunset : diagonales chaudes — même motif que bg-grad */
+[data-theme="sunset"]{
+  --card-texture:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cpath d='M0 40L40 0' stroke='%23ff6040' stroke-width='0.6' opacity='0.12'/%3E%3Cpath d='M-10 30L30 -10' stroke='%23ffaa00' stroke-width='0.4' opacity='0.08'/%3E%3C/svg%3E");
+  --card-texture-size:40px 40px;--card-texture-opacity:1;}
+
+/* ocean : vagues — même motif que bg-grad */
+[data-theme="ocean"]{
+  --card-texture:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='30'%3E%3Cpath d='M0 15 Q15 4 30 15 Q45 26 60 15' fill='none' stroke='%2300ccff' stroke-width='0.8' opacity='0.14'/%3E%3Cpath d='M0 25 Q15 14 30 25 Q45 36 60 25' fill='none' stroke='%230096ff' stroke-width='0.5' opacity='0.1'/%3E%3C/svg%3E");
+  --card-texture-size:60px 30px;--card-texture-opacity:1;}
+
+/* mono : aucune texture */
+[data-theme="mono"]{--card-texture:none;--card-texture-opacity:0;}
+
+/* gold : grille croisée — même motif que bg-grad */
+[data-theme="gold"]{
+  --card-texture:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cline x1='12' y1='0' x2='12' y2='24' stroke='%23ffee44' stroke-width='0.5' opacity='0.14'/%3E%3Cline x1='0' y1='12' x2='24' y2='12' stroke='%23ddb800' stroke-width='0.5' opacity='0.10'/%3E%3C/svg%3E");
+  --card-texture-size:24px 24px;--card-texture-opacity:1;}
+
+/* light : points bleus — même motif que bg-grad */
+[data-theme="light"]{
+  --card-texture:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Ccircle cx='10' cy='10' r='0.8' fill='%234455dd' opacity='0.18'/%3E%3C/svg%3E");
+  --card-texture-size:20px 20px;--card-texture-opacity:1;}
+
+/* mono-light : aucune texture */
+[data-theme="mono-light"]{--card-texture:none;--card-texture-opacity:0;}
+
+/* sobre : grille très fine — même motif que bg-grad */
+[data-theme="sobre"]{
+  --card-texture:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cpath d='M24 0v24M0 24h24' stroke='%23ffffff' stroke-width='0.3' opacity='0.07'/%3E%3C/svg%3E");
+  --card-texture-size:24px 24px;--card-texture-opacity:1;}
+
+/* ldm : losanges or — même motif que bg-grad */
+[data-theme="ldm"]{
+  --card-texture:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M16 2l14 14-14 14L2 16z' fill='none' stroke='%23f0c040' stroke-width='0.8'/%3E%3C/svg%3E");
+  --card-texture-size:32px 32px;--card-texture-opacity:0.14;}
+
+/* ldm-day : losanges brun — même motif que bg-grad */
+[data-theme="ldm-day"]{
+  --card-texture:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M16 2l14 14-14 14L2 16z' fill='none' stroke='%237a5500' stroke-width='0.6'/%3E%3C/svg%3E");
+  --card-texture-size:32px 32px;--card-texture-opacity:0.10;}
+.rot-0 .card-inner{width:100%;height:100%;transform:rotate(0deg);}
+.rot-180 .card-inner{width:100%;height:100%;transform:rotate(180deg);transform-origin:center center;}
+.rot-l .card-inner{transform-origin:top left;transform:rotate(90deg) translateY(-100%);will-change:transform;}
+.rot-r .card-inner{transform-origin:top left;transform:rotate(-90deg) translateX(-100%);will-change:transform;}
+/* Ligne décorative : horizontale sur rot-0/180, verticale sur rot-l/rot-r */
+.rot-l .card-inner::before,.rot-r .card-inner::before{top:0;left:0;right:auto;bottom:0;width:2px;height:auto;background:linear-gradient(180deg,transparent,var(--accent),transparent);}
+@keyframes scoreBlink{0%,100%{opacity:1}50%{opacity:0.15}}
+.tap-zone{flex:1;min-height:0;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;cursor:pointer;overflow:hidden;padding:4% 5%;gap:0;transition:background 0.12s;}
+.tap-zone.flash-pos{background:rgba(255,255,255,0.14);}
+.tap-zone.flash-neg{background:rgba(0,0,0,0.2);}
+/* Tailles initiales à 0 — tout est calculé par fitTexts */
+.tap-sign-minus,.tap-sign-plus{font-family:var(--btn-font);font-size:0;font-weight:900;line-height:1;pointer-events:none;opacity:0.65;position:absolute;bottom:2%;color:#fff;text-shadow:none;}
+.tap-sign-minus{left:3%;}
+.tap-sign-plus{right:3%;}
+[data-theme="mono-light"] .tap-sign-minus,[data-theme="mono-light"] .tap-sign-plus{color:#111;opacity:0.4;}
+.pplayer{font-family:var(--btn-font);font-size:0;font-weight:700;letter-spacing:0.04em;color:#fff;text-align:center;line-height:1.1;pointer-events:none;overflow:hidden;text-overflow:ellipsis;width:90%;max-width:90%;white-space:nowrap;text-shadow:0 1px 4px rgba(0,0,0,0.6);}
+.pplayer-ghost{display:block;height:0;}
+.score-wrap{position:relative;pointer-events:none;display:flex;align-items:center;justify-content:center;flex:1;min-height:0;min-width:0;width:100%;overflow:hidden;}
+.score{font-family:var(--score-font);font-size:0;line-height:1;color:var(--card-score,var(--accent));text-align:center;white-space:nowrap;text-shadow:0 2px 6px rgba(0,0,0,0.6);}
+.score.low{color:var(--card-red,var(--red));text-shadow:0 2px 6px rgba(0,0,0,0.9);}
+/* Critique : 3 clignotements max + indicateur statique (soulignement) */
+.score.crit{color:#ffffff;text-shadow:0 2px 8px rgba(0,0,0,0.95);animation:scoreBlink 0.9s ease-in-out 3;text-decoration:underline;text-decoration-thickness:0.07em;text-underline-offset:0.12em;}
+.delta-flash{position:absolute;top:5%;right:2%;font-family:var(--score-font);font-size:0;opacity:0;pointer-events:none;color:var(--accent);text-shadow:0 1px 4px rgba(0,0,0,0.8);}
+.delta-flash.go{animation:flashUp 0.9s ease-out forwards;}
+@keyframes flashUp{0%{opacity:1;transform:translateY(0)}70%{opacity:1}100%{opacity:0;transform:translateY(-3vmin)}}
+.elim-tag{position:absolute;inset:0;z-index:4;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;background:rgba(0,0,0,0.85);gap:0.15em;}
+.elim-icon{line-height:1;}
+.elim-label{font-family:var(--btn-font);font-weight:700;letter-spacing:0.22em;color:#fff;text-transform:uppercase;}
+.elim-name{font-family:var(--btn-font);letter-spacing:0.1em;color:#c8c8c8;text-transform:uppercase;}
+
