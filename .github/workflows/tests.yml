@@ -9,6 +9,10 @@ on:
 jobs:
   e2e:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [chromium, webkit, firefox]
     timeout-minutes: 15
     defaults:
       run:
@@ -22,15 +26,15 @@ jobs:
           cache-dependency-path: tests/package-lock.json
       - name: Installer les dépendances
         run: npm ci
-      - name: Installer Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Installer le navigateur
+        run: npx playwright install --with-deps ${{ matrix.project }}
       - name: Lancer les tests E2E
-        run: npx playwright test
+        run: npx playwright test --project=${{ matrix.project }}
       - name: Publier le rapport en cas d'échec
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.project }}
           path: |
             tests/playwright-report/
             tests/test-results/
