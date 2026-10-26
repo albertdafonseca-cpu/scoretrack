@@ -2296,7 +2296,7 @@ Object.assign(T.fr,{
   errObjectif:'Entrez un nombre entier.',
   ariaDeleteProfile:'Supprimer le profil {n}',
   pdfLoadError:'Impossible de charger le module PDF. Réessayez une fois connecté.',
-  confirmClearData:'Supprimer toutes les données de ScoreTrack Light (réglages, partie en cours, prénoms mémorisés) sur cet appareil ?',
+  confirmClearData:'Supprimer toutes les données de {{APP_NAME}} (réglages, partie en cours, prénoms mémorisés) sur cet appareil ?',
   Score:'Score',
   pdfDate:'Date',
   pdfColStatus:'Statut',
@@ -2318,7 +2318,7 @@ Object.assign(T.en,{
   errObjectif:'Enter a whole number.',
   ariaDeleteProfile:'Delete profile {n}',
   pdfLoadError:'Could not load the PDF module. Please try again when online.',
-  confirmClearData:'Delete all ScoreTrack Light data (settings, current game, saved names) on this device?',
+  confirmClearData:'Delete all {{APP_NAME}} data (settings, current game, saved names) on this device?',
   updated:'Updated',
   Score:'Score',
   pdfDate:'Date',
@@ -2341,7 +2341,7 @@ Object.assign(T.pt,{
   errObjectif:'Digite um número inteiro.',
   ariaDeleteProfile:'Excluir o perfil {n}',
   pdfLoadError:'Não foi possível carregar o módulo PDF. Tente novamente quando estiver online.',
-  confirmClearData:'Excluir todos os dados do ScoreTrack Light (configurações, jogo em andamento, nomes salvos) neste dispositivo?',
+  confirmClearData:'Excluir todos os dados do {{APP_NAME}} (configurações, jogo em andamento, nomes salvos) neste dispositivo?',
   pdfDate:'Data',
   pdfColStatus:'Status',
   pdfTotal:'Total',
@@ -2356,7 +2356,7 @@ Object.assign(T.es,{
   errObjectif:'Introduzca un número entero.',
   ariaDeleteProfile:'Eliminar el perfil {n}',
   pdfLoadError:'No se pudo cargar el módulo PDF. Inténtelo de nuevo cuando esté conectado.',
-  confirmClearData:'¿Eliminar todos los datos de ScoreTrack Light (ajustes, partida en curso, nombres guardados) en este dispositivo?',
+  confirmClearData:'¿Eliminar todos los datos de {{APP_NAME}} (ajustes, partida en curso, nombres guardados) en este dispositivo?',
   pdfDate:'Fecha', pdfColStatus:'Estado', pdfTotal:'Total',
 });
 Object.assign(T.de,{
@@ -2368,7 +2368,7 @@ Object.assign(T.de,{
   errObjectif:'Geben Sie eine ganze Zahl ein.',
   ariaDeleteProfile:'Profil {n} löschen',
   pdfLoadError:'Das PDF-Modul konnte nicht geladen werden. Bitte versuchen Sie es mit Internetverbindung erneut.',
-  confirmClearData:'Alle Daten von ScoreTrack Light (Einstellungen, laufendes Spiel, gespeicherte Namen) auf diesem Gerät löschen?',
+  confirmClearData:'Alle Daten von {{APP_NAME}} (Einstellungen, laufendes Spiel, gespeicherte Namen) auf diesem Gerät löschen?',
   pdfDate:'Datum', pdfColStatus:'Status', pdfTotal:'Gesamt',
 });
 Object.assign(T.it,{
@@ -2380,7 +2380,7 @@ Object.assign(T.it,{
   errObjectif:'Inserisci un numero intero.',
   ariaDeleteProfile:'Elimina il profilo {n}',
   pdfLoadError:'Impossibile caricare il modulo PDF. Riprova quando sei online.',
-  confirmClearData:'Eliminare tutti i dati di ScoreTrack Light (impostazioni, partita in corso, nomi salvati) su questo dispositivo?',
+  confirmClearData:'Eliminare tutti i dati di {{APP_NAME}} (impostazioni, partita in corso, nomi salvati) su questo dispositivo?',
   pdfDate:'Data', pdfColStatus:'Stato', pdfTotal:'Totale',
 });
 Object.assign(T.nl,{
@@ -2392,7 +2392,7 @@ Object.assign(T.nl,{
   errObjectif:'Voer een geheel getal in.',
   ariaDeleteProfile:'Profiel {n} verwijderen',
   pdfLoadError:'De PDF-module kon niet worden geladen. Probeer het opnieuw wanneer u online bent.',
-  confirmClearData:'Alle gegevens van ScoreTrack Light (instellingen, lopend spel, opgeslagen namen) op dit apparaat verwijderen?',
+  confirmClearData:'Alle gegevens van {{APP_NAME}} (instellingen, lopend spel, opgeslagen namen) op dit apparaat verwijderen?',
   pdfDate:'Datum', pdfColStatus:'Status', pdfTotal:'Totaal',
 });
 Object.assign(T.pl,{
@@ -2404,7 +2404,7 @@ Object.assign(T.pl,{
   errObjectif:'Wpisz liczbę całkowitą.',
   ariaDeleteProfile:'Usuń profil {n}',
   pdfLoadError:'Nie udało się wczytać modułu PDF. Spróbuj ponownie po połączeniu z internetem.',
-  confirmClearData:'Usunąć wszystkie dane ScoreTrack Light (ustawienia, bieżącą grę, zapisane imiona) na tym urządzeniu?',
+  confirmClearData:'Usunąć wszystkie dane {{APP_NAME}} (ustawienia, bieżącą grę, zapisane imiona) na tym urządzeniu?',
   pdfDate:'Data', pdfColStatus:'Status', pdfTotal:'Suma',
 });
 Object.assign(T.ru,{
@@ -2416,7 +2416,7 @@ Object.assign(T.ru,{
   errObjectif:'Введите целое число.',
   ariaDeleteProfile:'Удалить профиль {n}',
   pdfLoadError:'Не удалось загрузить модуль PDF. Повторите попытку при подключении к интернету.',
-  confirmClearData:'Удалить все данные ScoreTrack Light (настройки, текущую игру, сохранённые имена) на этом устройстве?',
+  confirmClearData:'Удалить все данные {{APP_NAME}} (настройки, текущую игру, сохранённые имена) на этом устройстве?',
   pdfDate:'Дата', pdfColStatus:'Статус', pdfTotal:'Итого',
 });
 Object.assign(T.zh,{
@@ -2428,7 +2428,7 @@ Object.assign(T.zh,{
   errObjectif:'请输入整数。',
   ariaDeleteProfile:'删除档案 {n}',
   pdfLoadError:'无法加载 PDF 模块。请在联网后重试。',
-  confirmClearData:'删除此设备上 ScoreTrack Light 的所有数据（设置、进行中的游戏、已保存的名字）？',
+  confirmClearData:'删除此设备上 {{APP_NAME}} 的所有数据（设置、进行中的游戏、已保存的名字）？',
   pdfDate:'日期', pdfColStatus:'状态', pdfTotal:'总计',
 });
 Object.assign(T.ja,{
@@ -2440,7 +2440,7 @@ Object.assign(T.ja,{
   errObjectif:'整数を入力してください。',
   ariaDeleteProfile:'プロフィール {n} を削除',
   pdfLoadError:'PDF モジュールを読み込めませんでした。オンライン時にもう一度お試しください。',
-  confirmClearData:'この端末の ScoreTrack Light のデータ（設定、進行中のゲーム、保存した名前）をすべて削除しますか？',
+  confirmClearData:'この端末の {{APP_NAME}} のデータ（設定、進行中のゲーム、保存した名前）をすべて削除しますか？',
   pdfDate:'日付', pdfColStatus:'状態', pdfTotal:'合計',
 });
 Object.assign(T.ko,{
@@ -2452,7 +2452,7 @@ Object.assign(T.ko,{
   errObjectif:'정수를 입력하세요.',
   ariaDeleteProfile:'프로필 {n} 삭제',
   pdfLoadError:'PDF 모듈을 불러오지 못했습니다. 온라인 상태에서 다시 시도하세요.',
-  confirmClearData:'이 기기에서 ScoreTrack Light의 모든 데이터(설정, 진행 중인 게임, 저장된 이름)를 삭제할까요?',
+  confirmClearData:'이 기기에서 {{APP_NAME}}의 모든 데이터(설정, 진행 중인 게임, 저장된 이름)를 삭제할까요?',
   pdfDate:'날짜', pdfColStatus:'상태', pdfTotal:'합계',
 });
 Object.assign(T.ar,{
@@ -2464,7 +2464,7 @@ Object.assign(T.ar,{
   errObjectif:'أدخل عدداً صحيحاً.',
   ariaDeleteProfile:'حذف الملف الشخصي {n}',
   pdfLoadError:'تعذّر تحميل وحدة PDF. حاول مرة أخرى عند الاتصال بالإنترنت.',
-  confirmClearData:'حذف كل بيانات ScoreTrack Light (الإعدادات، اللعبة الجارية، الأسماء المحفوظة) على هذا الجهاز؟',
+  confirmClearData:'حذف كل بيانات {{APP_NAME}} (الإعدادات، اللعبة الجارية، الأسماء المحفوظة) على هذا الجهاز؟',
   pdfDate:'التاريخ', pdfColStatus:'الحالة', pdfTotal:'المجموع',
 });
 Object.assign(T.tr,{
@@ -2476,7 +2476,7 @@ Object.assign(T.tr,{
   errObjectif:'Bir tam sayı girin.',
   ariaDeleteProfile:'{n} profilini sil',
   pdfLoadError:'PDF modülü yüklenemedi. İnternete bağlıyken tekrar deneyin.',
-  confirmClearData:'Bu cihazdaki tüm ScoreTrack Light verileri (ayarlar, devam eden oyun, kayıtlı isimler) silinsin mi?',
+  confirmClearData:'Bu cihazdaki tüm {{APP_NAME}} verileri (ayarlar, devam eden oyun, kayıtlı isimler) silinsin mi?',
   pdfDate:'Tarih', pdfColStatus:'Durum', pdfTotal:'Toplam',
 });
 Object.assign(T.sv,{
@@ -2488,7 +2488,7 @@ Object.assign(T.sv,{
   errObjectif:'Ange ett heltal.',
   ariaDeleteProfile:'Radera profilen {n}',
   pdfLoadError:'Det gick inte att läsa in PDF-modulen. Försök igen när du är online.',
-  confirmClearData:'Radera all data för ScoreTrack Light (inställningar, pågående spel, sparade namn) på den här enheten?',
+  confirmClearData:'Radera all data för {{APP_NAME}} (inställningar, pågående spel, sparade namn) på den här enheten?',
   pdfDate:'Datum', pdfColStatus:'Status', pdfTotal:'Totalt',
 });
 Object.assign(T.da,{
@@ -2500,7 +2500,7 @@ Object.assign(T.da,{
   errObjectif:'Indtast et heltal.',
   ariaDeleteProfile:'Slet profilen {n}',
   pdfLoadError:'PDF-modulet kunne ikke indlæses. Prøv igen, når du er online.',
-  confirmClearData:'Slet alle data for ScoreTrack Light (indstillinger, igangværende spil, gemte navne) på denne enhed?',
+  confirmClearData:'Slet alle data for {{APP_NAME}} (indstillinger, igangværende spil, gemte navne) på denne enhed?',
   pdfDate:'Dato', pdfColStatus:'Status', pdfTotal:'I alt',
 });
 Object.assign(T.fi,{
@@ -2512,7 +2512,7 @@ Object.assign(T.fi,{
   errObjectif:'Anna kokonaisluku.',
   ariaDeleteProfile:'Poista profiili {n}',
   pdfLoadError:'PDF-moduulia ei voitu ladata. Yritä uudelleen, kun olet verkossa.',
-  confirmClearData:'Poistetaanko kaikki ScoreTrack Lightin tiedot (asetukset, käynnissä oleva peli, tallennetut nimet) tältä laitteelta?',
+  confirmClearData:'Poistetaanko kaikki {{APP_NAME}}in tiedot (asetukset, käynnissä oleva peli, tallennetut nimet) tältä laitteelta?',
   pdfDate:'Päivämäärä', pdfColStatus:'Tila', pdfTotal:'Yhteensä',
 });
 Object.assign(T.nb,{
@@ -2524,7 +2524,7 @@ Object.assign(T.nb,{
   errObjectif:'Skriv inn et heltall.',
   ariaDeleteProfile:'Slett profilen {n}',
   pdfLoadError:'Kunne ikke laste inn PDF-modulen. Prøv igjen når du er på nett.',
-  confirmClearData:'Slette alle data for ScoreTrack Light (innstillinger, pågående spill, lagrede navn) på denne enheten?',
+  confirmClearData:'Slette alle data for {{APP_NAME}} (innstillinger, pågående spill, lagrede navn) på denne enheten?',
   pdfDate:'Dato', pdfColStatus:'Status', pdfTotal:'Totalt',
 });
 

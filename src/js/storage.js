@@ -1,7 +1,7 @@
 // ══════════════════════════════════════════════════════════════════
 //  STOCKAGE ISOLÉ PAR APP — clés st:<APP_ID>:<nom>, aucun accès direct ailleurs
 // ══════════════════════════════════════════════════════════════════
-const APP_ID='light';
+const APP_ID='{{APP_ID}}';
 const K=n=>'st:'+APP_ID+':'+n;
 const store={get(k){try{return localStorage.getItem(K(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(K(k),v);return true}catch(e){return false}},del(k){try{localStorage.removeItem(K(k))}catch(e){}}};
 function readJSON(k,fallback){try{const r=store.get(k);if(r===null||r===undefined)return fallback;const v=JSON.parse(r);return (v===null||v===undefined)?fallback:v;}catch(e){return fallback;}}

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<script>
+  if(screen.orientation?.lock)screen.orientation.lock('portrait').catch(()=>{});
+  document.addEventListener('contextmenu',e=>e.preventDefault());
+  // Zoom pinch autorisé — pas de preventDefault sur multi-touch
+  // Service Worker (fichier ./sw.js) — fonctionnement hors ligne + mise à jour automatique
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('./sw.js',{scope:'./'}).catch(e=>console.warn('SW',e));
+    // Reçoit la notification de mise à jour du SW
+    navigator.serviceWorker.addEventListener('message', e => {
+      if (e.data?.type === 'SW_UPDATED' && !document.getElementById('update-banner')) {
+        // Bannière discrète en bas — tap pour recharger
+        const b = document.createElement('button');
+        b.id = 'update-banner'; b.type = 'button';
+        b.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#00ffe0;color:#020d12;font-family:Orbitron,monospace;font-size:11px;font-weight:700;letter-spacing:0.12em;padding:10px 20px;min-height:44px;border:none;border-radius:30px;z-index:9999;cursor:pointer;box-shadow:0 4px 20px rgba(0,255,224,0.4);white-space:nowrap;';
+        b.textContent = (typeof t==='function') ? t('updateBanner') : 'Mise à jour disponible';
+        b.onclick = () => location.reload();
+        document.body.appendChild(b);
+      }
+    });
+  }
+</script>
+<meta name="apple-mobile-web-app-title" content="ScoreTrack">
+<meta name="theme-color" id="meta-theme-color" content="#020d12">
+<meta name="app-version" content="77">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon-64.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="apple-touch-startup-image" id="dyn-splash" href="icons/splash.png">
+<title>ScoreTrack Test — compteur de scores pour jeux de société</title>
+<meta name="description" content="Version de test de ScoreTrack : compteur de scores gratuit pour jeux de société et de cartes, jusqu'à 12 joueurs, hors ligne, avec récapitulatif et export PDF.">
+<!-- Version de test : invisible des moteurs (pas de sitemap ni de JSON-LD), aperçus de partage conservés -->
+<meta name="robots" content="noindex, nofollow">
+<link rel="canonical" href="https://scoretrack-test.newgames.app/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="ScoreTrack">
+<meta property="og:locale" content="fr_FR">
+<meta property="og:title" content="ScoreTrack Test — compteur de scores pour jeux de société">
+<meta property="og:description" content="Version de test de ScoreTrack : compteur de scores gratuit pour jeux de société et de cartes, jusqu'à 12 joueurs, hors ligne, avec récapitulatif et export PDF.">
+<meta property="og:url" content="https://scoretrack-test.newgames.app/">
+<meta property="og:image" content="https://scoretrack-test.newgames.app/icons/og-image.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Icône ScoreTrack (plus et moins) et texte « ScoreTrack Test » sur fond sombre">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="ScoreTrack Test — compteur de scores pour jeux de société">
+<meta name="twitter:description" content="Version de test de ScoreTrack : compteur de scores gratuit pour jeux de société et de cartes, jusqu'à 12 joueurs, hors ligne, avec récapitulatif et export PDF.">
+<meta name="twitter:image" content="https://scoretrack-test.newgames.app/icons/og-image.png">
+<meta name="twitter:image:alt" content="Icône ScoreTrack (plus et moins) et texte « ScoreTrack Test » sur fond sombre">
+<!-- Polices non bloquantes : la feuille est préchargée puis appliquée (font-display:swap) ; latin Inter + Orbitron préchargés -->
+<link rel="preload" href="fonts/6ab57b19c69b.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/e8a5b1bf533e.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/fonts-core.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="fonts/fonts-core.css"></noscript>

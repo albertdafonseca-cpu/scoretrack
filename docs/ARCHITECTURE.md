@@ -13,17 +13,21 @@ reçoit plus d'évolution et ne fait pas partie de ce dépôt.
 ## Organisation
 
 ```
-src/index.html      gabarit de la page : balises + lignes « @include chemin »
-src/html/           en-tête (SEO), corps, superpositions d'animation
+src/index.html      gabarit de la page : balises, « @include chemin », blocs « @if [!]drapeau » … « @endif »
+src/html/           en-têtes SEO par site (head-light, head-test), corps, superpositions, fenêtre Pro (Light seul)
 src/css/            base, thèmes, mise en page, cartes, interface, animations, accessibilité
 src/i18n/strings.js dictionnaire des 18 langues
 src/js/             stockage, verrous Light, configuration, rendu, saisie, récap/PDF, animations, partie, accessibilité
+variants/<nom>.json dossier statique, drapeaux (pro) et jetons {{APP_ID}}, {{APP_NAME}}, {{IS_PRO}}, {{HEAD}}
 apps/<variante>/    fichiers statiques publiés tels quels (sw.js, manifest, icônes, polices, vendor…)
 tools/build.mjs     assemble et publie dans dist/<variante>/
 ```
 
-Pour modifier l'app Light : éditer `src/`, jamais `dist/`. Test garde pour l'instant sa page
-minifiée dans `apps/test/index.html` (remplacée à l'étape 5).
+Pour modifier l'app : éditer `src/`, jamais `dist/`. Variantes construites depuis `src/` :
+`light` (site Light) et `pro` (future page de Test : identité Test, IS_PRO=true, sans verrous ni
+fenêtre « Passer à Pro »). Test garde pour l'instant sa page minifiée dans `apps/test/index.html`
+(remplacée par `pro` à l'étape 5). En CI, `pro` passe la suite `tests/e2e/pro` (copie adaptée de
+`tests/e2e/test`, qui disparaîtra avec la page minifiée).
 
 ## Construction
 
@@ -52,7 +56,7 @@ version en ligne reste inchangée.
 1. ✅ Regrouper Light et Test dans ce dépôt, sortie identique à l'octet près (`apps/<variante>/` recopié).
 2. Brancher le projet Vercel Test sur ce dépôt (`SCORETRACK_VARIANT=test`), archiver `scoretrack-test`.
 3. ✅ Découper Light en sources (`src/css`, `src/html`, `src/js`, `src/i18n`) — sortie identique à l'octet près.
-4. Variantes (`variants/*.json`, blocs `/*@if PRO*/ … /*@endif*/`) : produire la version Pro depuis les sources.
+4. ✅ Variantes (`variants/*.json`, blocs `/*@if PRO*/ … /*@endif*/`) : produire la version Pro depuis les sources.
 5. Générer Test par le build ; supprimer `apps/test/index.html` minifié.
 6. Corriger une seule fois les bugs relevés par l'analyse de duplication et unifier les comportements ci-dessus.
 7. Version du service worker calculée à partir du contenu.
