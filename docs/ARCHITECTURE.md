@@ -10,6 +10,21 @@ Ce dépôt produit deux sites à partir d'une même base :
 Le site principal (https://scoretrack.newgames.app, dépôt `scoretrack`) est **figé tel quel** : il ne
 reçoit plus d'évolution et ne fait pas partie de ce dépôt.
 
+## Organisation
+
+```
+src/index.html      gabarit de la page : balises + lignes « @include chemin »
+src/html/           en-tête (SEO), corps, superpositions d'animation
+src/css/            base, thèmes, mise en page, cartes, interface, animations, accessibilité
+src/i18n/strings.js dictionnaire des 18 langues
+src/js/             stockage, verrous Light, configuration, rendu, saisie, récap/PDF, animations, partie, accessibilité
+apps/<variante>/    fichiers statiques publiés tels quels (sw.js, manifest, icônes, polices, vendor…)
+tools/build.mjs     assemble et publie dans dist/<variante>/
+```
+
+Pour modifier l'app Light : éditer `src/`, jamais `dist/`. Test garde pour l'instant sa page
+minifiée dans `apps/test/index.html` (remplacée à l'étape 5).
+
 ## Construction
 
 ```
@@ -36,7 +51,7 @@ version en ligne reste inchangée.
 
 1. ✅ Regrouper Light et Test dans ce dépôt, sortie identique à l'octet près (`apps/<variante>/` recopié).
 2. Brancher le projet Vercel Test sur ce dépôt (`SCORETRACK_VARIANT=test`), archiver `scoretrack-test`.
-3. Découper Light en sources (`src/css`, `src/html`, `src/js`, `src/i18n`) — sortie toujours identique.
+3. ✅ Découper Light en sources (`src/css`, `src/html`, `src/js`, `src/i18n`) — sortie identique à l'octet près.
 4. Variantes (`variants/*.json`, blocs `/*@if PRO*/ … /*@endif*/`) : produire la version Pro depuis les sources.
 5. Générer Test par le build ; supprimer `apps/test/index.html` minifié.
 6. Corriger une seule fois les bugs relevés par l'analyse de duplication et unifier les comportements ci-dessus.

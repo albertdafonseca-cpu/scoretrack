@@ -1,0 +1,291 @@
+</head>
+<body>
+<div id="sr-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+
+<div id="splash" aria-hidden="true">
+  <canvas id="splash-icon" class="splash-icon" width="96" height="96"></canvas>
+  <script>
+  (function(){
+    const c=document.getElementById('splash-icon');
+    const ctx=c.getContext('2d');const s=96/64;
+    const r=14*s;ctx.beginPath();ctx.moveTo(r,0);ctx.lineTo(96-r,0);ctx.quadraticCurveTo(96,0,96,r);ctx.lineTo(96,96-r);ctx.quadraticCurveTo(96,96,96-r,96);ctx.lineTo(r,96);ctx.quadraticCurveTo(0,96,0,96-r);ctx.lineTo(0,r);ctx.quadraticCurveTo(0,0,r,0);ctx.closePath();ctx.fillStyle='#1a1a1a';ctx.fill();
+    ctx.strokeStyle='#3a3a3a';ctx.lineWidth=1.2*s;ctx.beginPath();ctx.moveTo(14*s,38*s);ctx.lineTo(50*s,38*s);ctx.stroke();
+    ctx.strokeStyle='#66CCEE';ctx.lineWidth=2.5*s;ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(32*s,11*s);ctx.lineTo(32*s,27*s);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(24*s,19*s);ctx.lineTo(40*s,19*s);ctx.stroke();
+    ctx.strokeStyle='#EE6677';ctx.beginPath();ctx.moveTo(24*s,51*s);ctx.lineTo(40*s,51*s);ctx.stroke();
+  })();
+  </script>
+  <div class="splash-title">ScoreTrack</div>
+  <div class="splash-sub">Compteur universel</div>
+</div>
+
+<div id="setup-page" class="page active">
+  <div class="logo">
+    <button class="logo-gear" id="btn-theme-gear" aria-label="Thème" onclick="showThemeFromSetup()"><span aria-hidden="true">🎨</span></button>
+    <div class="logo-lang" id="lang-picker">
+      <button class="lang-flag-btn" id="lang-flag-btn" aria-label="Langue" aria-haspopup="true" onclick="toggleLangDropdown()">🇬🇧</button>
+      <div class="lang-dropdown hidden" id="lang-dropdown"></div>
+    </div>
+    <div class="logo-mark" aria-hidden="true">
+      <svg width="36" height="36" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+        <line x1="14" y1="38" x2="50" y2="38" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"/>
+        <line x1="32" y1="11" x2="32" y2="27" stroke="#66CCEE" stroke-width="4" stroke-linecap="round"/>
+        <line x1="24" y1="19" x2="40" y2="19" stroke="#66CCEE" stroke-width="4" stroke-linecap="round"/>
+        <line x1="24" y1="51" x2="40" y2="51" stroke="#EE6677" stroke-width="4" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div class="logo-name">ScoreTrack</div>
+    <div class="logo-sub" id="logo-sub">Compteur universel</div>
+  </div>
+  <div class="restore-banner hidden" id="restore-banner">
+    <div class="restore-banner-text" id="restore-banner-text">🎮 Partie en cours<br>sauvegardée</div>
+    <div class="restore-banner-btns">
+      <button class="restore-btn yes" id="restore-btn-yes" onclick="restoreGame()">Reprendre</button>
+      <button class="restore-btn no" id="restore-btn-no" onclick="discardSave()">Effacer</button>
+    </div>
+  </div>
+  <div class="setup-divider">
+    <span class="setup-divider-label" id="label-presets">Jeux préconfigurés</span>
+  </div>
+  <div class="setup-section">
+    <div class="presets-grid" id="presets-grid"></div>
+  </div>
+  <div class="setup-divider">
+    <span class="setup-divider-label" id="label-custom">Modifications &amp; sur-mesure</span>
+  </div>
+  <div class="setup-section">
+    <span class="setup-label" id="label-players">Nombre de joueurs</span>
+    <div class="players-grid" id="players-grid"></div>
+  </div>
+  <div class="setup-section">
+    <span class="setup-label" id="label-start">Points de départ</span>
+    <div class="points-presets" id="start-presets">
+      <div class="points-chip" data-val="0">0</div>
+      <div class="points-chip" data-val="10">10</div>
+      <div class="points-chip" data-val="20">20</div>
+      <div class="points-chip" data-val="40">40</div>
+      <div class="points-chip" data-val="50">50</div>
+      <div class="points-chip" data-val="100">100</div>
+    </div>
+    <input class="points-input" id="points-custom" type="number" inputmode="numeric" placeholder="" min="0" aria-describedby="points-custom-err" >
+    <div class="field-error" id="points-custom-err" aria-live="polite"></div>
+  </div>
+
+  <div class="setup-section">
+    <span class="setup-label" id="label-endgame">Conditions de fin de jeu</span>
+    <div class="objectif-row">
+      <div class="objectif-chip" id="obj-win"  onclick="selectedPresetIdx=-1;document.querySelectorAll('.preset-card').forEach(c=>c.classList.remove('on'));selectObjectif('win')">Victoire</div>
+      <div class="objectif-chip" id="obj-elim" onclick="selectedPresetIdx=-1;document.querySelectorAll('.preset-card').forEach(c=>c.classList.remove('on'));selectObjectif('elim')">Défaite</div>
+      <div class="objectif-chip on" id="obj-none" onclick="selectedPresetIdx=-1;document.querySelectorAll('.preset-card').forEach(c=>c.classList.remove('on'));selectObjectif('none')">No limit</div>
+    </div>
+    <div id="objectif-input">
+      <div class="objectif-presets" id="objectif-presets">
+        <div class="points-chip" data-oval="0"   onclick="selectedPresetIdx=-1;document.querySelectorAll('.preset-card').forEach(c=>c.classList.remove('on'));selectObjectifPreset(0)">0</div>
+        <div class="points-chip" data-oval="10"  onclick="selectedPresetIdx=-1;document.querySelectorAll('.preset-card').forEach(c=>c.classList.remove('on'));selectObjectifPreset(10)">10</div>
+        <div class="points-chip" data-oval="20"  onclick="selectedPresetIdx=-1;document.querySelectorAll('.preset-card').forEach(c=>c.classList.remove('on'));selectObjectifPreset(20)">20</div>
+        <div class="points-chip" data-oval="50"  onclick="selectedPresetIdx=-1;document.querySelectorAll('.preset-card').forEach(c=>c.classList.remove('on'));selectObjectifPreset(50)">50</div>
+        <div class="points-chip" data-oval="100" onclick="selectedPresetIdx=-1;document.querySelectorAll('.preset-card').forEach(c=>c.classList.remove('on'));selectObjectifPreset(100)">100</div>
+        <div class="points-chip" data-oval="150" onclick="selectedPresetIdx=-1;document.querySelectorAll('.preset-card').forEach(c=>c.classList.remove('on'));selectObjectifPreset(150)">150</div>
+      </div>
+      <input class="points-input" id="objectif-custom" type="number" inputmode="numeric" placeholder="" aria-describedby="objectif-custom-err" >
+      <div class="field-error" id="objectif-custom-err" aria-live="polite"></div>
+    </div>
+    <!-- Options victoire (visibles seulement si mode=win) -->
+    <div id="win-options">
+      <div class="win-option-row" id="row-single-winner" role="switch" tabindex="0" aria-checked="false" aria-labelledby="label-single-winner" aria-describedby="label-single-winner-sub" onclick="toggleSingleWinner()">
+        <div class="win-option-toggle" id="toggle-single-winner" aria-hidden="true"></div>
+        <div class="win-option-texts">
+          <div class="win-option-label" id="label-single-winner">Fin dès la première victoire</div>
+          <div class="win-option-sub" id="label-single-winner-sub">Les autres joueurs sont automatiquement perdants</div>
+        </div>
+      </div>
+      <div class="win-option-row" id="row-last-loser" role="switch" tabindex="0" aria-checked="false" aria-labelledby="label-last-loser" aria-describedby="label-last-loser-sub" onclick="toggleLastLoser()">
+        <div class="win-option-toggle" id="toggle-last-loser" aria-hidden="true"></div>
+        <div class="win-option-texts">
+          <div class="win-option-label" id="label-last-loser">Dernier joueur perdant</div>
+          <div class="win-option-sub" id="label-last-loser-sub">Le dernier non-vainqueur est automatiquement éliminé</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <button class="go-btn" id="go-btn" disabled onclick="showNamesScreen()">Suivant →</button>
+  <div class="setup-btn-row">
+    <button class="names-back names-back-flex" id="btn-savedefault" onclick="saveAsDefault(event)"><span class="btn-emoji">💾</span><span class="btn-label">Enregistrer ces<br>réglages</span></button>
+    <button class="names-back names-back-flex" id="btn-restoredefault" onclick="restoreSavedDefaults(event)"><span class="btn-emoji">↺</span><span class="btn-label">Restaurer les<br>réglages</span></button>
+    <button class="names-back names-back-flex" id="btn-cleardefault" onclick="clearSavedDefaults(event)"><span class="btn-emoji">🗑</span><span class="btn-label">Rien à<br>effacer</span></button>
+  </div>
+</div>
+
+<div id="settings-page" class="page">
+  <div class="page-top-spacer"></div>
+  <div class="settings-header">
+    <button class="back-btn" id="settings-back-btn" aria-label="Retour" onclick="backFromTheme()"><span aria-hidden="true">←</span></button>
+    <div class="settings-title" id="settings-title-txt">🎨 Thème</div>
+  </div>
+  <div class="setup-section">
+    <span class="setup-label" id="label-theme">Thème visuel</span>
+    <div class="themes-grid" id="themes-grid"></div>
+  </div>
+  <div class="save-confirm" id="save-confirm"></div>
+  <button class="save-btn btn-privacy-link" id="btn-privacy-txt" onclick="showPrivacy()">🔒 Politique de confidentialité</button>
+</div>
+
+<div class="page" id="privacy-modal">
+  <div class="page-top-spacer"></div>
+  <div class="settings-header">
+    <button class="back-btn" id="privacy-back-btn" aria-label="Retour" onclick="closePrivacy()"><span aria-hidden="true">←</span></button>
+    <div class="settings-title" id="privacy-title-txt">🔒 Confidentialité</div>
+  </div>
+  <div class="logo-lang" id="lang-picker-privacy">
+    <button class="lang-flag-btn" id="lang-flag-btn-privacy" aria-label="Langue" aria-haspopup="true" onclick="toggleLangDropdownPrivacy()">🇬🇧</button>
+    <div class="lang-dropdown hidden" id="lang-dropdown-privacy"></div>
+  </div>
+  <div class="setup-section">
+    <div class="st-privacy-body">
+      <p class="st-privacy-intro" id="privacy-intro">ScoreTrack ne collecte aucune donnée personnelle.</p>
+      <p class="st-privacy-p"><strong class="privacy-strong" id="privacy-s1t">Stockage local uniquement</strong><br>
+      <span id="privacy-s1">ScoreTrack utilise le stockage local de votre navigateur (localStorage) pour sauvegarder vos préférences (thème, paramètres par défaut), la partie en cours et les prénoms mémorisés. Ces données restent exclusivement sur votre appareil.</span></p>
+      <p class="st-privacy-p"><strong class="privacy-strong" id="privacy-s2t">Aucune transmission</strong><br>
+      <span id="privacy-s2">Aucune donnée n'est envoyée à un serveur, partagée avec des tiers, ni utilisée à des fins publicitaires ou analytiques.</span></p>
+      <p class="st-privacy-p"><strong class="privacy-strong" id="privacy-s3t">Cookies</strong><br>
+      <span id="privacy-s3">ScoreTrack n'utilise pas de cookies. Le localStorage employé est strictement nécessaire au fonctionnement de l'application et est exempté de consentement selon la réglementation RGPD et la directive ePrivacy.</span></p>
+      <p class="st-privacy-p"><strong class="privacy-strong" id="privacy-s4t">Vos droits</strong><br>
+      <span id="privacy-s4">Vous pouvez supprimer toutes les données stockées à tout moment en effaçant les données du site dans les paramètres de votre navigateur.</span></p>
+      <div id="privacy-s5-section"><p class="st-privacy-p st-privacy-p-last"><strong class="privacy-strong" id="privacy-s5t">Effacer mes données</strong><br>
+      <button class="btn-clear-all" id="btn-cleardata" onclick="clearAllData()">🗑 Supprimer toutes les données</button></p></div>
+      <p class="st-privacy-date" id="privacy-date">Dernière mise à jour : avril 2026</p>
+      <button class="go-btn hidden" id="btn-privacy-accept" onclick="acceptPrivacy()"></button>
+    </div>
+  </div>
+</div>
+
+<div id="names-page" class="page">
+  <div class="page-top-spacer"></div>
+  <div class="names-title" id="names-title">Joueurs</div>
+  <div class="names-sub" id="names-sub">Optionnel — laisser vide pour jouer sans nom</div>
+  <div class="names-actions">
+    <button class="names-action-btn" id="btn-shuffle" onclick="shufflePlayers()">🔀 Mélanger</button>
+    <button class="names-action-btn" id="btn-memorize" onclick="saveProfiles()">💾 Mémoriser</button>
+    <button class="names-action-btn" id="btn-clearfields" onclick="clearNames()">↺ Vider les cases</button>
+    <button class="names-action-btn" id="btn-clearnames" onclick="clearAll()">✕ Tout effacer</button>
+  </div>
+  <div class="profiles-list hidden" id="profiles-list"></div>
+  <div id="names-list"></div>
+  <button class="names-go-btn" id="names-go-btn" onclick="startGame()">Lancer ▶</button>
+  <button class="names-back" id="btn-back-names" onclick="showSetup()">← Retour</button>
+</div>
+
+<div id="game-screen">
+  <div class="game-header"><div class="game-header-title">ScoreTrack</div></div>
+  <div class="players-wrap" id="players-wrap"></div>
+  <div id="bar">
+    <div id="bar-handle-zone">
+      <div id="bar-handle"></div>
+    </div>
+    <div id="bar-buttons">
+    <button class="bar-btn" id="undo-btn" disabled>
+      <span class="btn-icon" aria-hidden="true">↩</span><span class="btn-label" id="bar-undo-label">Annuler</span>
+    </button>
+    <button class="bar-btn accent-btn" onclick="rotatePlayers()">
+      <span class="btn-icon" aria-hidden="true">🔄</span><span class="btn-label" id="bar-rotate-label">Rotation</span>
+    </button>
+    <button class="bar-btn" onclick="showRecap()">
+      <span class="btn-icon" aria-hidden="true">📋</span><span class="btn-label" id="bar-recap-label">Récap</span>
+    </button>
+    <button class="bar-btn" onclick="showThemeFromGame()">
+      <span class="btn-icon" aria-hidden="true">🎨</span><span class="btn-label" id="bar-theme-label">Thème</span>
+    </button>
+    <button class="bar-btn danger" onclick="openResetModal()">
+      <span class="btn-icon" aria-hidden="true">✕</span><span class="btn-label" id="bar-reset-label">Reset</span>
+    </button>
+  </div>
+</div>
+
+<div id="modal-backdrop" class="hidden" aria-hidden="true"></div>
+<div class="modal-overlay hidden" id="score-modal" role="dialog" aria-modal="true" aria-labelledby="score-modal-player">
+  <div class="modal-box">
+    <div class="modal-content-rotatable" id="modal-content-rotatable">
+      <div class="modal-handle"></div>
+      <div class="modal-player" id="score-modal-player"></div>
+      <div class="modal-score-display pos" id="score-modal-display" aria-live="polite">▲ +0</div>
+      <div class="modal-sign-row">
+        <button class="sign-btn minus" id="sign-minus" onclick="setSign(-1)">－ Perte</button>
+        <button class="sign-btn plus active" id="sign-plus" onclick="setSign(1)">＋ Gain</button>
+      </div>
+      <div class="modal-keypad" id="modal-keypad"></div>
+      <div class="modal-confirm-row">
+        <button class="modal-btn primary" id="score-modal-ok" aria-label="Valider" data-autofocus onclick="confirmScoreModal()"><span aria-hidden="true">✅</span></button>
+        <button class="modal-btn secondary" id="score-modal-cancel" aria-label="Annuler" onclick="closeScoreModal()"><span aria-hidden="true">❌</span></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="winner-modal" role="dialog" aria-modal="true" aria-labelledby="winner-name" aria-describedby="winner-sub">
+  <div class="modal-box winner-modal-box">
+    <div class="winner-icon" id="winner-icon" aria-hidden="true">🏆</div>
+    <div class="winner-name" id="winner-name">—</div>
+    <div class="winner-sub" id="winner-sub">—</div>
+    <div class="winner-btns">
+      <button class="modal-btn primary" id="btn-seerecap" data-autofocus onclick="showRecap()">Voir le récap</button>
+      <button class="modal-btn secondary" id="btn-newgame" onclick="startNewGameSameSetup()">Nouvelle partie</button>
+      <button class="modal-btn secondary" id="btn-returnmenu" onclick="confirmReset()">Retour au menu</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="reset-modal" role="alertdialog" aria-modal="true" aria-labelledby="reset-sub-txt">
+  <div class="simple-modal-box">
+    <div class="winner-sub reset-sub" id="reset-sub-txt"></div>
+    <div class="simple-modal-btns">
+      <button class="modal-btn primary" id="btn-newgame-reset" onclick="startNewGameSameSetup()"><span id="reset-btn-newgame">Nouvelle partie</span></button>
+      <button class="modal-btn secondary" id="btn-menu-reset" onclick="confirmReset()"><span id="reset-btn-menu">Retour au menu</span></button>
+      <button class="modal-btn secondary" id="btn-back-reset" data-autofocus onclick="closeResetModal()"><span id="reset-btn-back">Retour au jeu</span></button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="elim-modal" role="alertdialog" aria-modal="true" aria-labelledby="elim-confirm-name" aria-describedby="elim-confirm-sub">
+  <div class="simple-modal-box">
+    <div class="winner-icon" aria-hidden="true">💀</div>
+    <div class="winner-name" id="elim-confirm-name">—</div>
+    <div class="winner-sub" id="elim-confirm-sub">Score à 0 — confirmer l'élimination ?</div>
+    <div class="simple-modal-btns">
+      <button class="modal-btn primary" id="btn-elim-confirm-txt" onclick="confirmElim()">Confirmer</button>
+      <button class="modal-btn secondary" id="btn-cancel-elim" data-autofocus onclick="cancelElim()">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="endgame-modal" role="alertdialog" aria-modal="true" aria-labelledby="endgame-modal-title" aria-describedby="endgame-modal-sub">
+  <div class="simple-modal-box">
+    <div class="winner-icon" id="endgame-modal-icon" aria-hidden="true">🏁</div>
+    <div class="winner-name" id="endgame-modal-title">Fin de partie</div>
+    <div class="winner-sub" id="endgame-modal-sub">Confirmer la fin de la partie ?</div>
+    <div class="simple-modal-btns">
+      <button class="modal-btn primary" id="endgame-modal-confirm-btn" onclick="confirmEndgame()">Confirmer</button>
+      <button class="modal-btn secondary" id="endgame-btn-cancel" data-autofocus onclick="cancelEndgame()">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<div class="fullpage hidden" id="recap" role="dialog" aria-modal="true" aria-labelledby="recap-title-txt">
+  <div class="fullpage-header">
+    <div class="fullpage-title" id="recap-title-txt">Récapitulatif</div>
+    <button class="fullpage-close" id="recap-close-btn" aria-label="Fermer" data-autofocus><span aria-hidden="true">✕</span></button>
+  </div>
+  <!-- Panneau export PDF -->
+  <div class="pdf-panel" id="pdf-panel">
+    <div class="pdf-panel-title" id="pdf-panel-title">⬇ Export PDF</div>
+    <input class="pdf-name-input" id="pdf-game-name" type="text" maxlength="60" placeholder="Nom de la partie (optionnel)" aria-label="Nom de la partie (optionnel)">
+    <div class="pdf-checks">
+      <label class="pdf-check-row"><input type="checkbox" id="pdf-chk-scores" checked><span class="pdf-check-label" id="pdf-lbl-scores">Scores finaux</span></label>
+      <label class="pdf-check-row"><input type="checkbox" id="pdf-chk-history" checked><span class="pdf-check-label" id="pdf-lbl-history">Historique des actions</span></label>
+      <label class="pdf-check-row"><input type="checkbox" id="pdf-chk-info"><span class="pdf-check-label" id="pdf-lbl-info">Infos partie (preset, date)</span></label>
+    </div>
+    <button class="btn-pdf" id="btn-pdf-dl" onclick="exportRecapPDF()">📄 Télécharger PDF</button>
+  </div>
+  <div id="recap-body"></div>
+</div>
+

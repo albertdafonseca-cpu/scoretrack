@@ -1,0 +1,60 @@
+/* ══ Thème Loi du Milieu Nuit — or/brun foncé, inspiré du jeu physique ══ */
+[data-theme="ldm"]{
+  --bg:#2e2418;--bg2:#261e13;--surface:#3d3020;--surface2:#483828;
+  --border:rgba(240,192,64,0.28);--accent:#f0c040;--accent2:#ffe070;
+  --green:#56B4E9;--red:#FF8A3D;--text:#fff8e8;--muted:#B38A45;--muted2:#C9A152;
+  --btn-font:'Cinzel',Georgia,serif;--score-font:'Bebas Neue',sans-serif;--radius:8px;
+  --chip-bg:#3d3020;--chip-text:#c8a050;--chip-on:#CCBB44;--chip-on-text:#000000;
+  --bg-grad:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M16 2l14 14-14 14L2 16z' fill='none' stroke='%23f0c040' stroke-width='0.6' opacity='0.1'/%3E%3C/svg%3E"),radial-gradient(ellipse at 50% 0%,#3d3020 0%,#2e2418 70%);
+  --modal-bg:rgba(20,14,4,0.95);--modal-glow:0 -8px 40px rgba(240,192,64,0.18);
+  --card-green:#8ECDF0;--card-red:#FFB381;}
+
+/* Score Loi du Milieu Nuit — or, sans halos */
+[data-theme="ldm"] .score{color:var(--accent);text-shadow:none;}
+[data-theme="ldm"] .score.low{color:var(--card-red,var(--red));text-shadow:none;}
+[data-theme="ldm"] .score.crit{color:var(--text);text-shadow:none;}
+[data-theme="ldm"] .pplayer{text-shadow:none;}
+[data-theme="ldm"] .logo-name{text-shadow:none;}
+[data-theme="ldm"] .logo-sub{text-shadow:none;}
+[data-theme="ldm"] .setup-label{text-shadow:none;}
+[data-theme="ldm"] .game-header-title{text-shadow:none;}
+[data-theme="ldm"] .logo-mark{box-shadow:none;}
+[data-theme="ldm"] .delta-flash{text-shadow:none;}
+[data-theme="ldm"] .tap-sign-minus,[data-theme="ldm"] .tap-sign-plus{text-shadow:none;}
+[data-theme="ldm"] .card-inner::before{opacity:0.3;}
+
+/* ══ Thème Loi du Milieu Jour — parchemin clair, même univers ══ */
+[data-theme="ldm-day"]{
+  --bg:#f5f0e8;--bg2:#ede6d8;--surface:#ddd5c0;--surface2:#cfc6ae;
+  --border:rgba(120,85,0,0.35);--accent:#7a5500;--accent2:#9e7000;
+  --green:#0B5A94;--red:#A94400;--text:#2e2418;--muted:#6D5741;--muted2:#5a4220;
+  --btn-font:'Cinzel',Georgia,serif;--score-font:'Bebas Neue',sans-serif;--radius:8px;
+  --chip-bg:#ddd5c0;--chip-text:#5a4220;--chip-on:#4477AA;--chip-on-text:#ffffff;
+  --bg-grad:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M16 2l14 14-14 14L2 16z' fill='none' stroke='%237a5500' stroke-width='0.6' opacity='0.12'/%3E%3C/svg%3E"),linear-gradient(160deg,#ede6d8 0%,#f5f0e8 60%,#ede8df 100%);
+  --modal-bg:rgba(20,14,4,0.65);--modal-glow:0 -8px 40px rgba(120,85,0,0.12);
+  --card-red:#A24100;}
+
+/* Textes Loi du Milieu Jour — sombres pour contraste sur fond clair */
+[data-theme="ldm-day"] .pplayer{color:#2e2418;text-shadow:none;}
+[data-theme="ldm-day"] .score{color:var(--accent);text-shadow:none;}
+[data-theme="ldm-day"] .score.low{color:var(--card-red,var(--red));text-shadow:none;}
+[data-theme="ldm-day"] .score.crit{color:#221166;text-shadow:none;}
+[data-theme="ldm-day"] .tap-sign-minus,[data-theme="ldm-day"] .tap-sign-plus{color:#2e2418;opacity:0.45;text-shadow:none;}
+[data-theme="ldm-day"] .card-inner::before{opacity:0.2;}
+[data-theme="ldm-day"] .delta-flash{color:var(--accent);}
+[data-theme="ldm-day"] .game-header-title{color:#2e2418;}
+[data-theme="ldm-day"] #bar{background:var(--bg2);border-color:var(--border);}
+[data-theme="ldm-day"] .bar-btn{color:#2e2418;}
+[data-theme="ldm-day"] .setup-label{text-shadow:none;}
+[data-theme="ldm-day"] .logo-name{text-shadow:none;}
+[data-theme="ldm-day"] .logo-sub{color:var(--muted2);}
+[data-theme="ldm-day"] .modal-box,[data-theme="ldm-day"] .simple-modal-box{background:var(--surface);color:var(--text);}
+[data-theme="ldm-day"] .winner-name,[data-theme="ldm-day"] .winner-sub{color:var(--text);}
+
+html{overflow-x:hidden;width:100%;min-height:100dvh;background:var(--bg-grad);background-color:var(--bg);}
+body{min-height:100dvh;width:100%;background:var(--bg-grad);background-color:var(--bg);color:var(--text);font-family:'Inter',sans-serif;overflow-x:hidden;}
+body {
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: pan-x pan-y pinch-zoom; /* Indique au navigateur comment gérer le tactile */
+}

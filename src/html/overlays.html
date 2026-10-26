@@ -1,0 +1,40 @@
+<!-- Overlay animation finisher -->
+<div id="fin-anim-overlay" role="button" tabindex="0" aria-label="Passer l'animation" onclick="stopFinAnim()">
+  <canvas id="fin-anim-canvas"></canvas>
+  <div id="fin-anim-texts">
+    <div id="fin-anim-name"></div>
+    <div id="fin-anim-msg"></div>
+    <div id="fin-anim-score"></div>
+  </div>
+</div>
+<!-- Overlay animation victoire -->
+<div id="win-anim-overlay" role="button" tabindex="0" aria-label="Passer l'animation" onclick="stopWinAnim()">
+  <canvas id="win-anim-canvas"></canvas>
+  <div id="win-anim-texts">
+    <canvas id="win-anim-trophy-canvas" width="160" height="160"></canvas>
+    <div id="win-anim-name"></div>
+    <div id="win-anim-msg"></div>
+    <div id="win-anim-score"></div>
+  </div>
+</div>
+<!-- Overlay animation élimination -->
+<div id="elim-anim-overlay" role="button" tabindex="0" aria-label="Passer l'animation" onclick="stopElimAnim()">
+  <canvas id="elim-anim-noise"></canvas>
+  <div id="elim-anim-skull" aria-hidden="true">☠️</div>
+  <div id="elim-anim-texts">
+    <div id="elim-anim-name"></div>
+    <div id="elim-anim-msg"></div>
+    <div id="elim-anim-score"></div>
+  </div>
+</div>
+</div><!-- /game-screen -->
+<div id="pro-popup" role="dialog" aria-modal="true" aria-labelledby="pro-popup-title" onclick="if(event.target===this)_hpop()">
+  <div class="pro-box">
+    <h3 id="pro-popup-title"><span aria-hidden="true">⭐</span> SCORETRACK PRO</h3>
+    <p>Débloquez toutes les fonctionnalités : 12 joueurs, tous les presets, thèmes, langues, export PDF et plus.</p>
+    <a href="#" target="_blank" rel="noopener noreferrer">Obtenir ScoreTrack Pro →</a>
+    <button type="button" data-autofocus onclick="_hpop()">Fermer</button>
+  </div>
+</div>
+</body>
+</html>
