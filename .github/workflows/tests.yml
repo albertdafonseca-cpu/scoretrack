@@ -23,6 +23,14 @@ jobs:
           mv dist dist-1
           node tools/build.mjs
           diff -r dist-1 dist
+      # Garde-fous Vercel : le domaine de production impose sa variante
+      - name: Vérifier les garde-fous de domaine
+        run: |
+          SCORETRACK_VARIANT=pro VERCEL_PROJECT_PRODUCTION_URL=scoretrack.newgames.app node tools/build.mjs --vercel
+          VERCEL_PROJECT_PRODUCTION_URL=scoretrack-light.newgames.app node tools/build.mjs --vercel
+          SCORETRACK_VARIANT=test VERCEL_PROJECT_PRODUCTION_URL=scoretrack-test.newgames.app node tools/build.mjs --vercel
+          if VERCEL_PROJECT_PRODUCTION_URL=scoretrack.newgames.app node tools/build.mjs --vercel; then echo "Le principal sans SCORETRACK_VARIANT=pro aurait dû échouer"; exit 1; fi
+          if SCORETRACK_VARIANT=pro VERCEL_PROJECT_PRODUCTION_URL=scoretrack-light.newgames.app node tools/build.mjs --vercel; then echo "Light publié en pro aurait dû échouer"; exit 1; fi
 
   e2e:
     name: ${{ matrix.variant }} · ${{ matrix.project }}
@@ -30,7 +38,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        variant: [light, test]
+        variant: [light, pro, test]
         project: [chromium, webkit, firefox]
     timeout-minutes: 15
     env:

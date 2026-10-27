@@ -1,9 +1,9 @@
 // @ts-check
 const { defineConfig, devices } = require('@playwright/test');
 
-// Variante testée : VARIANT=light (par défaut) ou VARIANT=test
+// Variante testée : VARIANT=light (par défaut), pro ou test
 const VARIANT = process.env.VARIANT || 'light';
-const PORTS = { light: 4172, test: 4173 }; // main (dépôt figé) : 4171
+const PORTS = { pro: 4171, light: 4172, test: 4173 };
 if (!PORTS[VARIANT]) throw new Error(`VARIANT inconnue : ${VARIANT}`);
 const PORT = PORTS[VARIANT];
 const executablePath = process.env.PW_CHROMIUM_PATH || undefined;

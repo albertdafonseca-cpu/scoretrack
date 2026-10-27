@@ -122,6 +122,14 @@ test.describe('Parcours de jeu', () => {
   });
 
   test.describe('Spécificités Light', () => {
+    test('la fenêtre « Passer à Pro » renvoie vers la version complète (scoretrack.newgames.app)', async ({ page }) => {
+      await page.goto('/');
+      const a = page.locator('#pro-popup a');
+      await expect(a).toHaveAttribute('href', 'https://scoretrack.newgames.app/');
+      await expect(a).toHaveAttribute('target', '_blank');
+      await expect(a).toHaveText(/ScoreTrack Pro/);
+    });
+
     test('victoire à 0 : le joueur est marqué vainqueur, la partie continue pour les autres', async ({ page }) => {
       await startGame(page, { players: 3, names: ['A', 'B', 'C'] });
       await applyDelta(page, 0, -20);

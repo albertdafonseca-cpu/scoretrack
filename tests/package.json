@@ -2,9 +2,10 @@
   "name": "scoretrack-e2e",
   "private": true,
   "version": "1.0.0",
-  "description": "Tests de bout en bout (Playwright) de ScoreTrack Light et Test",
+  "description": "Tests de bout en bout (Playwright) de ScoreTrack Pro, Light et Test",
   "scripts": {
-    "test": "VARIANT=light playwright test && VARIANT=test playwright test",
+    "test": "VARIANT=pro playwright test && VARIANT=light playwright test && VARIANT=test playwright test",
+    "test:pro": "VARIANT=pro playwright test",
     "test:light": "VARIANT=light playwright test",
     "test:test": "VARIANT=test playwright test"
   },
