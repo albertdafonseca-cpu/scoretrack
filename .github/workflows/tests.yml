@@ -7,6 +7,23 @@ on:
     branches: [main]
 
 jobs:
+  build:
+    name: build reproductible
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      # Même contenu → même version : sinon chaque déploiement viderait le cache hors ligne pour rien
+      - name: Construire deux fois et comparer
+        run: |
+          node tools/build.mjs
+          mv dist dist-1
+          node tools/build.mjs
+          diff -r dist-1 dist
+
   e2e:
     name: ${{ matrix.variant }} · ${{ matrix.project }}
     runs-on: ubuntu-latest

@@ -7,7 +7,7 @@ const APP = {
   title: 'ScoreTrack Light — compteur de scores pour jeux de société',
   manifestName: 'ScoreTrack Light',
   cachePrefix: 'st-light-',
-  cacheRe: /^st-light-v\d+$/,
+  cacheRe: /^st-light-v[0-9a-f]{10}$/, // version = empreinte du contenu (tools/build.mjs)
   maxPlayers: 6, // limite Light (2 à 6 joueurs)
 };
 const XSS_NAME = '<img src=x onerror=alert(1)>';
