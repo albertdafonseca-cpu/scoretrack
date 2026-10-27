@@ -166,7 +166,7 @@ function buildCard(pi,rot){
   const card=document.createElement('div');card.className=`pcard color-${(pi%COLORS.length)+1} ${rot}${p.eliminated?' elim':''}`;card.id=`card-${pi}`;
   card.style.setProperty('--pc',pColor(pi));
   // Accessibilité : carte focalisable, nom + score annoncés, contrôle clavier
-  card.tabIndex=0;card.setAttribute('role','group');card.setAttribute('aria-label',cardLabel(pi));
+  card.tabIndex=0;card.setAttribute('role','group');card.setAttribute('aria-label',cardLabel(pi));card.setAttribute('aria-description',t('cardHint'));
   p.rot=rot; // mémoriser la rotation pour le modal
   const inner=document.createElement('div');inner.className='card-inner';inner.id=`inner-${pi}`;
   const cls=scoreClass(p.score);
@@ -498,7 +498,7 @@ function updateDisplay(i,zone,delta){
   sc.textContent=fmtNum(p.score);
   sc.className='score '+scoreClass(p.score);
   const _card=document.getElementById(`card-${i}`);if(_card)_card.setAttribute('aria-label',cardLabel(i));
-  if(delta)announce(pName(i)+' '+(delta>0?'+':'')+fmtNum(delta)+', '+t('total')+' '+fmtNum(p.score));
+  if(delta)announce(pName(i)+' '+(delta>0?'+':'')+fmtNum(delta)+', '+t('total')+' '+fmtNum(p.score)+(scoreClass(p.score)==='crit'?', '+t('srCrit'):''));
 
   // Invalider le cache de cette carte pour forcer le recalcul du fontSize
   const card=sc.closest('.pcard');

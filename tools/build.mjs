@@ -3,28 +3,25 @@
 //   node tools/build.mjs              → toutes les variantes, dans dist/<variante>/
 //   node tools/build.mjs light        → une seule variante
 //   node tools/build.mjs --vercel     → la variante du projet Vercel, dans site/
-// Une variante décrite par variants/<nom>.json est assemblée depuis src/ :
+// Chaque variante, décrite par variants/<nom>.json, est assemblée depuis src/ :
 //   - fichiers statiques recopiés depuis son dossier « static » ;
 //   - index.html = src/index.html, où chaque ligne « @include chemin » est remplacée par src/chemin
 //     et chaque {{JETON}} par sa valeur dans « tokens » ;
 //   - les lignes entre « @if drapeau » (ou « @if !drapeau ») et « @endif » ne sont gardées que si
 //     le drapeau de « flags » est vrai (ou faux). Pas d'imbrication.
-// Sans fichier de variante (test, jusqu'à l'étape 5), apps/<nom>/ est recopié tel quel.
 import { cpSync, rmSync, readdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-// Publiables sur Vercel ; « pro » est la future page de Test produite depuis src/ (étape 4)
-const VARIANTS = ['light', 'test', 'pro'];
-const DEPLOYABLE = ['light', 'test'];
+const VARIANTS = ['light', 'test'];
 
 // Sur Vercel : SCORETRACK_VARIANT (réglé dans le projet), sinon light.
 // Garde-fou : un projet dont le domaine contient « test » ne publie jamais autre chose que Test.
 function vercelVariant() {
   const v = process.env.SCORETRACK_VARIANT || 'light';
   const domain = process.env.VERCEL_PROJECT_PRODUCTION_URL || '';
-  if (!DEPLOYABLE.includes(v)) throw new Error(`SCORETRACK_VARIANT inconnue : ${v}`);
+  if (!VARIANTS.includes(v)) throw new Error(`SCORETRACK_VARIANT inconnue : ${v}`);
   if (/scoretrack-test/.test(domain) && v !== 'test') {
     throw new Error(`Le projet ${domain} doit définir SCORETRACK_VARIANT=test`);
   }
@@ -62,16 +59,11 @@ function copyStatic(src, out) {
 }
 
 function build(variant, out) {
-  const def = join(ROOT, 'variants', `${variant}.json`);
-  if (existsSync(def)) {
-    const spec = JSON.parse(readFileSync(def, 'utf8'));
-    copyStatic(join(ROOT, spec.static), out);
-    const html = fill(render('index.html', spec), spec.tokens, 'index.html');
-    if (/^@(if|endif|include)\b/m.test(html)) throw new Error(`Directive non traitée dans ${variant}/index.html`);
-    writeFileSync(join(out, 'index.html'), html);
-  } else {
-    copyStatic(join(ROOT, 'apps', variant), out);
-  }
+  const spec = JSON.parse(readFileSync(join(ROOT, 'variants', `${variant}.json`), 'utf8'));
+  copyStatic(join(ROOT, spec.static), out);
+  const html = fill(render('index.html', spec), spec.tokens, 'index.html');
+  if (/^@(if|endif|include)\b/m.test(html)) throw new Error(`Directive non traitée dans ${variant}/index.html`);
+  writeFileSync(join(out, 'index.html'), html);
   console.log(`${variant} → ${out.slice(ROOT.length + 1)} (${readdirSync(out).length} entrées)`);
 }
 

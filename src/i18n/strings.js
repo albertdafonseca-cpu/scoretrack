@@ -2528,3 +2528,22 @@ Object.assign(T.nb,{
   pdfDate:'Dato', pdfColStatus:'Status', pdfTotal:'Totalt',
 });
 
+// ── Libellés repris de Test : indication clavier des cartes, score critique (lecteurs d’écran) ──
+Object.assign(T.fr,{cardHint:'Plus ou flèche haut : +1, moins ou flèche bas : −1, Entrée : saisir un score',srCrit:'score critique'});
+Object.assign(T.en,{cardHint:'Plus or arrow up: +1, minus or arrow down: −1, Enter: enter a score',srCrit:'critical score'});
+Object.assign(T.pt,{cardHint:'Mais ou seta para cima: +1, menos ou seta para baixo: −1, Enter: inserir uma pontuação',srCrit:'pontuação crítica'});
+Object.assign(T.es,{cardHint:'Más o flecha arriba: +1, menos o flecha abajo: −1, Intro: introducir una puntuación',srCrit:'puntuación crítica'});
+Object.assign(T.de,{cardHint:'Plus oder Pfeil hoch: +1, Minus oder Pfeil runter: −1, Eingabe: Punktzahl eingeben',srCrit:'kritische Punktzahl'});
+Object.assign(T.it,{cardHint:'Più o freccia su: +1, meno o freccia giù: −1, Invio: inserisci un punteggio',srCrit:'punteggio critico'});
+Object.assign(T.nl,{cardHint:'Plus of pijl omhoog: +1, min of pijl omlaag: −1, Enter: score invoeren',srCrit:'kritieke score'});
+Object.assign(T.pl,{cardHint:'Plus lub strzałka w górę: +1, minus lub strzałka w dół: −1, Enter: wpisz wynik',srCrit:'krytyczny wynik'});
+Object.assign(T.ru,{cardHint:'Плюс или стрелка вверх: +1, минус или стрелка вниз: −1, Enter: ввести счёт',srCrit:'критический счёт'});
+Object.assign(T.zh,{cardHint:'加号或上箭头：+1，减号或下箭头：−1，回车：输入分数',srCrit:'临界分数'});
+Object.assign(T.ja,{cardHint:'プラスまたは上矢印：+1、マイナスまたは下矢印：−1、Enter：スコアを入力',srCrit:'危険なスコア'});
+Object.assign(T.ko,{cardHint:'플러스 또는 위쪽 화살표: +1, 마이너스 또는 아래쪽 화살표: −1, Enter: 점수 입력',srCrit:'위험 점수'});
+Object.assign(T.ar,{cardHint:'زائد أو السهم لأعلى: +1، ناقص أو السهم لأسفل: −1، Enter: إدخال نتيجة',srCrit:'نتيجة حرجة'});
+Object.assign(T.tr,{cardHint:'Artı veya yukarı ok: +1, eksi veya aşağı ok: −1, Enter: puan gir',srCrit:'kritik puan'});
+Object.assign(T.sv,{cardHint:'Plus eller pil upp: +1, minus eller pil ned: −1, Enter: ange poäng',srCrit:'kritisk poäng'});
+Object.assign(T.da,{cardHint:'Plus eller pil op: +1, minus eller pil ned: −1, Enter: indtast point',srCrit:'kritisk pointtal'});
+Object.assign(T.fi,{cardHint:'Plus tai nuoli ylös: +1, miinus tai nuoli alas: −1, Enter: syötä pisteet',srCrit:'kriittinen pistemäärä'});
+Object.assign(T.nb,{cardHint:'Pluss eller pil opp: +1, minus eller pil ned: −1, Enter: skriv inn poeng',srCrit:'kritisk poengsum'});

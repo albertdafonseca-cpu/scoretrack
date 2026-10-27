@@ -98,11 +98,11 @@ test.describe('PWA', () => {
     await context.setOffline(false);
   });
 
-  test('jsPDF et html2canvas locaux sont servis (chargé à la demande, jamais depuis un CDN)', async ({ page }) => {
+  test('jsPDF local est servi (chargé à la demande, jamais depuis un CDN), html2canvas retiré', async ({ page }) => {
     await page.goto('/');
     const s = await page.evaluate(async () => (await fetch('vendor/jspdf.umd.min.js')).status);
     expect(s).toBe(200);
-    expect(await page.evaluate(async () => (await fetch('vendor/html2canvas.min.js')).status)).toBe(200);
+    expect(await page.evaluate(async () => (await fetch('vendor/html2canvas.min.js')).status)).toBe(404);
     expect(await page.evaluate(() => !!window.jspdf)).toBe(false);
   });
 
