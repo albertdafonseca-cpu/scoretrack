@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        variant: [light, test, pro]
+        variant: [light, test]
         project: [chromium, webkit, firefox]
     timeout-minutes: 15
     env:

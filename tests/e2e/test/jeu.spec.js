@@ -120,10 +120,10 @@ test.describe('Parcours de jeu', () => {
     await page.locator('.name-input').nth(0).fill('Zed');
     await page.locator('.name-input').nth(1).fill('Yan');
     await page.click('#btn-memorize');
-    await expect(page.locator('.profile-chip > span:first-child')).toHaveText(['Zed', 'Yan']);
+    await expect(page.locator('.profile-chip-name')).toHaveText(['Zed', 'Yan']);
     expect(json((await storage(page))['st:test:profiles'])).toEqual(['Zed', 'Yan']);
     await page.locator('.profile-chip-del').first().click();
-    await expect(page.locator('.profile-chip > span:first-child')).toHaveText(['Yan']);
+    await expect(page.locator('.profile-chip-name')).toHaveText(['Yan']);
     expect(json((await storage(page))['st:test:profiles'])).toEqual(['Yan']);
   });
 
@@ -216,25 +216,18 @@ test.describe('Parcours de jeu', () => {
     });
   });
 
-  test('export PDF : fichier PDF valide, scripts chargés à la demande depuis ./vendor', async ({ page }) => {
+  test('export PDF : fichier PDF valide, jsPDF seul, chargé à la demande depuis ./vendor', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await startGame(page, { players: 2, names: ['A <b>B</b>', 'Bob'] });
     await applyDelta(page, 1, 3);
     await page.evaluate(() => showRecap());
     await expect(page.locator('#recap')).toBeVisible();
     expect(await page.evaluate(() => [...document.scripts].filter((s) => /jspdf|html2canvas/.test(s.src)).length)).toBe(0);
-    // Le contenu exporté est rendu dans une iframe : on relève ses attributs de sécurité à sa création
-    await page.evaluate(() => {
-      window.__iframes = [];
-      new MutationObserver((ms) => ms.forEach((m) => m.addedNodes.forEach((n) => {
-        if (n.tagName === 'IFRAME') window.__iframes.push(n);
-      }))).observe(document.documentElement, { childList: true, subtree: true });
-    });
     await page.fill('#pdf-game-name', 'Test <b>PDF</b>');
     const [dl] = await Promise.all([
       page.waitForEvent('download', { timeout: 25_000 }).catch(async () => {
         // Diagnostic : erreurs console, alertes et étape atteinte, pour comprendre un échec propre à un navigateur
-        const state = await page.evaluate(() => ({ jspdf: !!window.jspdf, h2c: !!window.html2canvas, iframes: document.querySelectorAll('iframe').length }));
+        const state = await page.evaluate(() => ({ jspdf: !!window.jspdf }));
         throw new Error('Aucun téléchargement PDF. ' + JSON.stringify({ state, problems: page.problems, dialogs: page.dialogs }));
       }),
       page.click('#btn-pdf-dl'),
@@ -244,17 +237,11 @@ test.describe('Parcours de jeu', () => {
     expect(dl.suggestedFilename()).toMatch(/\.pdf$/i);
     expect(buf.length).toBeGreaterThan(2000);
     expect(buf.subarray(0, 5).toString()).toBe('%PDF-');
+    // PDF dessiné par jsPDF : ni capture d'écran (html2canvas), ni page HTML intermédiaire
     const srcs = await page.evaluate(() => [...document.scripts].map((s) => s.src).filter(Boolean));
     expect(srcs.some((s) => s.endsWith('/vendor/jspdf.umd.min.js'))).toBe(true);
-    expect(srcs.some((s) => s.endsWith('/vendor/html2canvas.min.js'))).toBe(true);
-    // Pas de sandbox (Safari y bloque html2canvas) : le contenu exporté interdit les scripts par une CSP
-    const iframes = await page.evaluate(() => window.__iframes.map((n) => ({ sandbox: n.getAttribute('sandbox'), srcdoc: n.getAttribute('srcdoc') || '' })));
-    expect(iframes.length).toBeGreaterThan(0);
-    for (const f of iframes) {
-      expect(f.sandbox || '').not.toContain('allow-scripts');
-      expect(f.srcdoc).toMatch(/http-equiv="Content-Security-Policy" content="script-src 'none'/);
-      expect(f.srcdoc).not.toMatch(/<b>PDF<\/b>|<b>B<\/b>/); // noms et titre échappés
-    }
+    expect(srcs.some((s) => /html2canvas/.test(s))).toBe(false);
+    await expect(page.locator('iframe')).toHaveCount(0);
     expect(page.external).toEqual([]);
   });
 

@@ -23,11 +23,9 @@ apps/<variante>/    fichiers statiques publiés tels quels (sw.js, manifest, ic�
 tools/build.mjs     assemble et publie dans dist/<variante>/
 ```
 
-Pour modifier l'app : éditer `src/`, jamais `dist/`. Variantes construites depuis `src/` :
-`light` (site Light) et `pro` (future page de Test : identité Test, IS_PRO=true, sans verrous ni
-fenêtre « Passer à Pro »). Test garde pour l'instant sa page minifiée dans `apps/test/index.html`
-(remplacée par `pro` à l'étape 5). En CI, `pro` passe la suite `tests/e2e/pro` (copie adaptée de
-`tests/e2e/test`, qui disparaîtra avec la page minifiée).
+Pour modifier l'app : éditer `src/`, jamais `dist/`. Les deux sites sont construits depuis `src/` :
+`light` (IS_PRO=false, verrous et fenêtre « Passer à Pro ») et `test` (pré-production de la version
+Pro : IS_PRO=true, sans verrous). Chaque suite de `tests/e2e/<variante>` tourne sur son site construit.
 
 ## Construction
 
@@ -47,8 +45,8 @@ version en ligne reste inchangée.
 - Stockage isolé par app : clés `st:<APP_ID>:…`, cache du service worker `st-<APP_ID>-…`. Ne jamais changer un APP_ID (les parties enregistrées seraient perdues).
 - Accessibilité daltonisme : palette bleu/orange (Okabe-Ito), toujours doublée d'un repère (▲/▼, forme, texte).
 - Test est invisible des moteurs ; le canonical du site principal pointe vers Light.
-- Export PDF : **jsPDF** (dessiné) pour toutes les variantes ; html2canvas sera retiré de Test.
-- Plus de code minifié à la main : Test sera produit par le build depuis les sources lisibles.
+- Export PDF : **jsPDF** (dessiné) pour toutes les variantes ; html2canvas a été retiré.
+- Plus de code minifié à la main : Test est produit par le build depuis les sources lisibles.
 - Comportements unifiés (étape 6) : pavé 7-8-9 en haut ; touche + / − = changer le signe ; Échap ferme la fenêtre de victoire ; bande de couleur en haut de la carte ; repère « score critique » = contour + symbole ⚠ ; prénom jusqu'à 18 caractères (coupé par « … » sur la carte).
 
 ## Plan de migration
@@ -56,7 +54,7 @@ version en ligne reste inchangée.
 1. ✅ Regrouper Light et Test dans ce dépôt, sortie identique à l'octet près (`apps/<variante>/` recopié).
 2. Brancher le projet Vercel Test sur ce dépôt (`SCORETRACK_VARIANT=test`), archiver `scoretrack-test`.
 3. ✅ Découper Light en sources (`src/css`, `src/html`, `src/js`, `src/i18n`) — sortie identique à l'octet près.
-4. ✅ Variantes (`variants/*.json`, blocs `/*@if PRO*/ … /*@endif*/`) : produire la version Pro depuis les sources.
-5. Générer Test par le build ; supprimer `apps/test/index.html` minifié.
+4. ✅ Variantes (`variants/*.json`, blocs `@if [!]drapeau` … `@endif`) : produire la version Pro depuis les sources.
+5. ✅ Générer Test par le build ; `apps/test/index.html` minifié supprimé.
 6. Corriger une seule fois les bugs relevés par l'analyse de duplication et unifier les comportements ci-dessus.
 7. Version du service worker calculée à partir du contenu.

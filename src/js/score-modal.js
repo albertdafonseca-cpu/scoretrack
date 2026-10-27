@@ -6,7 +6,7 @@ function openScoreModal(pi, forceRot){
   const openGroup=history.find(h=>h.playerIdx===pi&&h.open);
   if(openGroup){openGroup.open=false;if(groupTimers[pi]){clearTimeout(groupTimers[pi]);delete groupTimers[pi];}}
   modalPlayerIdx=pi;modalValue='0';modalSign=bloquerMode==='max'?-1:1;
-  document.getElementById('score-modal-player').textContent=(p.playerName||`Joueur ${pi+1}`)+' — '+fmtNum(p.score);
+  document.getElementById('score-modal-player').textContent=(p.playerName||`${t('player')} ${pi+1}`)+' — '+fmtNum(p.score);
   updateModalDisplay();
   setSign(modalSign);
   // Orienter : forcé par le swipe, ou rotation de la carte pour l'appui long

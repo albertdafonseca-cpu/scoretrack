@@ -8,7 +8,7 @@ test.describe('Sécurité', () => {
     await page.fill('#points-custom', '20');
     await page.click('#go-btn');
 
-    const chips = page.locator('#profiles-list .profile-chip > span:first-child');
+    const chips = page.locator('#profiles-list .profile-chip-name');
     await expect(chips).toHaveText([XSS_NAME, 'O\'Brien"><b>x']);
     await expect(page.locator('#profiles-list img, #profiles-list b')).toHaveCount(0);
     await expect(page.locator('#profiles-list [onclick]')).toHaveCount(0);

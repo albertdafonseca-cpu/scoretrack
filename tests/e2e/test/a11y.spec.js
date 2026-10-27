@@ -7,6 +7,8 @@ test.describe('Accessibilité', () => {
     await expect(card).toHaveAttribute('tabindex', '0');
     await expect(card).toHaveAttribute('role', 'group');
     await expect(card).toHaveAttribute('aria-label', /^Bob, 20/);
+    // Indication des raccourcis clavier, lue après le nom de la carte
+    await expect(card).toHaveAttribute('aria-description', /Entrée/);
     await card.focus();
     for (const k of ['+', 'ArrowUp', 'ArrowDown', '-', '-']) await page.keyboard.press(k);
     await expect(page.locator('#sc-1')).toHaveText('19');
@@ -101,7 +103,7 @@ test.describe('Accessibilité', () => {
     await acceptPrivacyIfAsked(page);
     await page.fill('#points-custom', '-5');
     await expect(page.locator('#points-custom')).toHaveAttribute('aria-invalid', 'true');
-    await expect(page.locator('#points-custom-error')).not.toBeEmpty();
+    await expect(page.locator('#points-custom-err')).not.toBeEmpty();
     await page.fill('#points-custom', '20');
     await expect(page.locator('#points-custom')).not.toHaveAttribute('aria-invalid', 'true');
   });
