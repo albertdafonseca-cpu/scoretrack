@@ -11,8 +11,8 @@ function applyTheme(id){
   loadThemeFonts(id);
   document.documentElement.setAttribute('data-theme',id==='cyber'?'':id);
   selectedTheme=id;
-  const colors={cyber:'#020d12',dark:'#0a0a0f','neon-pink':'#0d0010',arcade:'#0a0800',nature:'#051208',sunset:'#120508',ocean:'#020810',mono:'#080808','ldm-day':'#f5f0e8',ldm:'#0d0a12'};
-  const c=colors[id]||'#020d12';
+  // Barre d'état = fond du thème, lu dans le CSS (source unique, valable pour les 14 thèmes)
+  const c=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()||'#020d12';
   const m=document.getElementById('meta-theme-color');if(m)m.content=c;
 }
 function restoreSavedDefaults(e){
@@ -430,7 +430,8 @@ function showNamesScreen(){
   const effectiveW=isLateral?Math.min(cardVisW,cardVisH):cardVisW;
   const fontSize=effectiveW*0.13*0.84;
   const charWidth=fontSize*0.62;
-  const maxLen=Math.max(3,Math.min(10,Math.floor(effectiveW*0.84/charWidth)));
+  // 12 = ce que la carte affiche à taille normale (au-delà, le nom rétrécit jusqu'à devenir illisible)
+  const maxLen=Math.max(3,Math.min(12,Math.floor(effectiveW*0.84/charWidth)));
 
   for(let i=0;i<numPlayers;i++){
     const row=document.createElement('div');row.className='name-row';

@@ -342,7 +342,7 @@ function pressKey(k){
 function updateModalDisplay(){
   const v=parseInt(modalValue)||0;
   const el=document.getElementById('score-modal-display');
-  el.textContent=(modalSign===1?'▲ +':'▼ -')+fmtNum(v);
+  el.textContent=(modalSign===1?'▲ +':'▼ −')+fmtNum(v);
   el.className='modal-score-display'+(modalSign===1?' pos':' neg');
 }
 function confirmScoreModal(){

@@ -56,6 +56,7 @@ function closeResetModal(){document.getElementById('reset-modal').classList.add(
     else if(visible('score-modal')){closeScoreModal();}
     else if(visible('reset-modal')){closeResetModal();}
     else if(visible('recap')){document.getElementById('recap').classList.add('hidden');}
+    else if(visible('winner-modal')){document.getElementById('winner-modal').classList.add('hidden');}
     else if(!document.getElementById('lang-dropdown')?.classList.contains('hidden')){closeLangDropdown();}
     else if(!document.getElementById('lang-dropdown-privacy')?.classList.contains('hidden')){closeLangDropdownPrivacy();}
     else return;
@@ -66,6 +67,8 @@ function closeResetModal(){document.getElementById('reset-modal').classList.add(
     if(!visible('score-modal')||e.ctrlKey||e.metaKey||e.altKey)return;
     if(/^[0-9]$/.test(e.key)){e.preventDefault();pressKey(Number(e.key));}
     else if(e.key==='Backspace'){e.preventDefault();pressKey('⌫');}
+    // + / − : comme les boutons ± de la modale (change le signe, et valide si un nombre est saisi)
+    else if((e.key==='+'||e.key==='-')&&e.target?.tagName!=='INPUT'){e.preventDefault();setSign(e.key==='+'?1:-1);}
   });
   // Modales : focus déplacé à l'ouverture, rendu au déclencheur à la fermeture
   const MODALS=['score-modal','winner-modal','reset-modal','elim-modal','endgame-modal','recap','pro-popup'];
@@ -156,14 +159,18 @@ function closeResetModal(){document.getElementById('reset-modal').classList.add(
   document.querySelectorAll('#start-presets .points-chip,#objectif-presets .points-chip,.objectif-chip').forEach(_a11yBtn);
   document.getElementById('points-custom').addEventListener('input',function(){document.querySelectorAll('#start-presets .points-chip').forEach(x=>x.classList.remove('on'));selectedPresetIdx=-1;document.querySelectorAll('.preset-card').forEach(c=>c.classList.remove('on'));const v=parseInt(this.value);startPoints=isNaN(v)?-1:v;checkGoBtn();});
   const kp=document.getElementById('modal-keypad');
+  // Tactile traité au touchstart ; souris et clavier passent par click. On n'ignore un click que
+  // s'il suit un appui tactile (PC à écran tactile : la souris doit rester utilisable).
+  let _kpTouchAt=0;
   [7,8,9,4,5,6,1,2,3,'⌫',0,'00'].forEach(k=>{
     const b=document.createElement('button');b.className='key-btn'+(k==='⌫'?' del':'');b.textContent=k;
     b.addEventListener('touchstart', e => {
       if (e.touches.length > 1 || window._isZooming) return;
       e.preventDefault();
+      _kpTouchAt=Date.now();
       pressKey(k);
     }, { passive: false });
-    b.addEventListener('click',e=>{if(e.isTrusted&&!('ontouchstart' in window))pressKey(k);});kp.appendChild(b);
+    b.addEventListener('click',e=>{if(e.isTrusted&&Date.now()-_kpTouchAt>800)pressKey(k);});kp.appendChild(b);
   });
   document.getElementById('objectif-custom').addEventListener('input',()=>{selectedPresetIdx=-1;document.querySelectorAll('.preset-card').forEach(c=>c.classList.remove('on'));
     document.querySelectorAll('#objectif-presets .points-chip').forEach(c=>c.classList.remove('on'));
