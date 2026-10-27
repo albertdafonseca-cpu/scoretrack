@@ -17,17 +17,18 @@ import { join, dirname, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const VARIANTS = ['light', 'test'];
+const VARIANTS = ['light', 'pro', 'test'];
 
 // Sur Vercel : SCORETRACK_VARIANT (réglé dans le projet), sinon light.
-// Garde-fou : un projet dont le domaine contient « test » ne publie jamais autre chose que Test.
+// Garde-fou : le domaine de production d'un projet impose sa variante ; en cas d'écart le build
+// échoue et la version en ligne reste inchangée.
+const DOMAIN_VARIANT = [[/^scoretrack\.newgames\.app$/, 'pro'], [/^scoretrack-light\./, 'light'], [/^scoretrack-test\./, 'test']];
 function vercelVariant() {
   const v = process.env.SCORETRACK_VARIANT || 'light';
   const domain = process.env.VERCEL_PROJECT_PRODUCTION_URL || '';
   if (!VARIANTS.includes(v)) throw new Error(`SCORETRACK_VARIANT inconnue : ${v}`);
-  if (/scoretrack-test/.test(domain) && v !== 'test') {
-    throw new Error(`Le projet ${domain} doit définir SCORETRACK_VARIANT=test`);
-  }
+  const expected = DOMAIN_VARIANT.find(([re]) => re.test(domain))?.[1];
+  if (expected && v !== expected) throw new Error(`Le projet ${domain} doit définir SCORETRACK_VARIANT=${expected}`);
   return v;
 }
 
