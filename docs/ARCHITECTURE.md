@@ -47,7 +47,7 @@ version en ligne reste inchangée.
 - Test est invisible des moteurs ; le canonical du site principal pointe vers Light.
 - Export PDF : **jsPDF** (dessiné) pour toutes les variantes ; html2canvas a été retiré.
 - Plus de code minifié à la main : Test est produit par le build depuis les sources lisibles.
-- Comportements unifiés (étape 6) : pavé 7-8-9 en haut ; touche + / − = changer le signe ; Échap ferme la fenêtre de victoire ; bande de couleur en haut de la carte ; repère « score critique » = contour + symbole ⚠ ; prénom jusqu'à 18 caractères (coupé par « … » sur la carte).
+- Comportements unifiés (étape 6) : pavé 7-8-9 en haut ; touches + / − de la saisie = boutons ± (changent le signe, valident si un nombre est saisi) ; Échap ferme la fenêtre de victoire ; bande de couleur en haut de la carte ; repère « score critique » = contour + symbole ⚠ ; prénom jusqu'à 12 caractères (ce que la carte affiche à taille normale ; 18 rendait les noms illisibles à 7-12 joueurs).
 
 ## Plan de migration
 
@@ -56,5 +56,5 @@ version en ligne reste inchangée.
 3. ✅ Découper Light en sources (`src/css`, `src/html`, `src/js`, `src/i18n`) — sortie identique à l'octet près.
 4. ✅ Variantes (`variants/*.json`, blocs `@if [!]drapeau` … `@endif`) : produire la version Pro depuis les sources.
 5. ✅ Générer Test par le build ; `apps/test/index.html` minifié supprimé.
-6. Corriger une seule fois les bugs relevés par l'analyse de duplication et unifier les comportements ci-dessus.
+6. ✅ Corriger une seule fois les bugs relevés par l'analyse de duplication et unifier les comportements ci-dessus.
 7. Version du service worker calculée à partir du contenu.

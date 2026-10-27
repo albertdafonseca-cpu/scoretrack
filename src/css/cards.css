@@ -97,8 +97,10 @@
 .score-wrap{position:relative;pointer-events:none;display:flex;align-items:center;justify-content:center;flex:1;min-height:0;min-width:0;width:100%;overflow:hidden;}
 .score{font-family:var(--score-font);font-size:0;line-height:1;color:var(--card-score,var(--accent));text-align:center;white-space:nowrap;text-shadow:0 2px 6px rgba(0,0,0,0.6);}
 .score.low{color:var(--card-red,var(--red));text-shadow:0 2px 6px rgba(0,0,0,0.9);}
-/* Critique : 3 clignotements max + indicateur statique (soulignement) */
-.score.crit{color:#ffffff;text-shadow:0 2px 8px rgba(0,0,0,0.95);animation:scoreBlink 0.9s ease-in-out 3;text-decoration:underline;text-decoration-thickness:0.07em;text-underline-offset:0.12em;}
+/* Critique : 3 clignotements max + indicateur statique (contour) */
+.score.crit{color:#ffffff;text-shadow:0 2px 8px rgba(0,0,0,0.95);animation:scoreBlink 0.9s ease-in-out 3;outline:max(2px,0.025em) solid currentColor;outline-offset:0.08em;border-radius:0.2em;}
+/* Repère non chromatique du score critique : contour + ⚠ en exposant (forme texte, pas emoji) */
+.score.crit::after{content:"\26A0\FE0E";font-family:system-ui,-apple-system,"Segoe UI Symbol",sans-serif;font-size:0.28em;font-weight:400;vertical-align:1.9em;margin-left:0.12em;}
 .delta-flash{position:absolute;top:5%;right:2%;font-family:var(--score-font);font-size:0;opacity:0;pointer-events:none;color:var(--accent);text-shadow:0 1px 4px rgba(0,0,0,0.8);}
 .delta-flash.go{animation:flashUp 0.9s ease-out forwards;}
 @keyframes flashUp{0%{opacity:1;transform:translateY(0)}70%{opacity:1}100%{opacity:0;transform:translateY(-3vmin)}}
