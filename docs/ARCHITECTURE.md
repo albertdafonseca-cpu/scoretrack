@@ -1,5 +1,9 @@
 # Dépôt commun ScoreTrack
 
+Dépôt GitHub : `albertdafonseca-cpu/scoretrack` (anciennement `scoretrack-light`, renommé ; l'ancien
+nom redirige). Les anciens dépôts `scoretrack-legacy` (ex-site principal) et `scoretrack-test` sont
+archivés, en lecture seule.
+
 Ce dépôt produit trois sites à partir d'une même base :
 
 | Variante | Domaine | Projet Vercel | Rôle | APP_ID (clé de stockage) |
@@ -43,7 +47,7 @@ le domaine de production impose sa variante (`scoretrack.newgames.app` → pro, 
 | Projet Vercel | Dépôt | SCORETRACK_VARIANT |
 |---|---|---|
 | scoretrack-pro (ex-score-track) | ce dépôt | `pro` |
-| scoretrack-light | ce dépôt | rien (valeur par défaut `light`) |
+| scoretrack-light | ce dépôt | `light` (valeur par défaut, à indiquer quand même pour la lisibilité) |
 | scoretrack-test | ce dépôt | `test` |
 
 Le service worker et la meta `app-version` reçoivent au build la même version : les 10 premiers
