@@ -1,15 +1,16 @@
 // @ts-check
 const { defineConfig, devices } = require('@playwright/test');
 
-// Variante testée : VARIANT=light (par défaut) ou VARIANT=test
+// Variante testée : VARIANT=light (par défaut), test, ou pro (page de Test produite depuis src/)
 const VARIANT = process.env.VARIANT || 'light';
-const PORTS = { light: 4172, test: 4173 }; // main (dépôt figé) : 4171
+const PORTS = { light: 4172, test: 4173, pro: 4174 }; // main (dépôt figé) : 4171
+const SUITES = { light: 'light', test: 'test', pro: 'pro' }; // e2e/pro : suite de Test adaptée (remplace e2e/test à l'étape 5)
 if (!PORTS[VARIANT]) throw new Error(`VARIANT inconnue : ${VARIANT}`);
 const PORT = PORTS[VARIANT];
 const executablePath = process.env.PW_CHROMIUM_PATH || undefined;
 
 module.exports = defineConfig({
-  testDir: `./e2e/${VARIANT}`,
+  testDir: `./e2e/${SUITES[VARIANT]}`,
   retries: 0,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,

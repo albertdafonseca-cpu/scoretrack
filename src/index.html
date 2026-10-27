@@ -1,4 +1,4 @@
-@include html/head.html
+@include html/{{HEAD}}.html
 <style>
 @include css/base.css
 @include css/themes.css
@@ -12,7 +12,10 @@
 <script>
 @include i18n/strings.js
 @include js/storage.js
+@include js/flags.js
+@if !pro
 @include js/light-lock.js
+@endif
 @include js/setup.js
 @include js/render.js
 @include js/score-modal.js
@@ -22,3 +25,7 @@
 @include js/a11y.js
 </script>
 @include html/overlays.html
+@if !pro
+@include html/pro-popup.html
+@endif
+@include html/body-end.html

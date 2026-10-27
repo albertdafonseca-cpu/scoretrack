@@ -465,7 +465,7 @@ function clearSavedNames(){
 }
 
 // ── DÉMARRAGE PARTIE ──────────────────────────────────────────────
-function startGame(){_hpop();
+function startGame(){if(!IS_PRO)_hpop();
   bloquerMode='none'; // section gains/pertes supprimée
   applyObjectif();
   // Mémoriser les réglages de cette partie pour le reset + persistance

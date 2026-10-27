@@ -1,5 +1,3 @@
-// ══ SCORETRACK LIGHT ══════════════════════════════════════════
-const IS_PRO=false;
 function _spop(){document.getElementById('pro-popup').classList.add('show');}
 function _hpop(){document.getElementById('pro-popup').classList.remove('show');}
 function _lk(el){

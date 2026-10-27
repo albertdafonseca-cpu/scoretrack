@@ -1,0 +1,12 @@
+{
+  "static": "apps/test",
+  "flags": {
+    "pro": true
+  },
+  "tokens": {
+    "APP_ID": "test",
+    "APP_NAME": "ScoreTrack Test",
+    "IS_PRO": "true",
+    "HEAD": "head-test"
+  }
+}
