@@ -44,11 +44,20 @@ test.describe('Comportements communs', () => {
 
   test('saisie : les touches + et − agissent comme les boutons ±', async ({ page }) => {
     await startGame(page, { players: 2, points: 20 });
+    // Frappe rapide avant que le focus passe dans la modale : la touche part de la carte et ne doit compter qu'une fois
+    await page.evaluate(() => {
+      const card = document.getElementById('card-1');
+      card.focus();
+      openScoreModal(1);
+      for (const key of ['2', '-']) card.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+    });
+    await expect(page.locator('#score-modal')).toBeHidden();
+    await expect.poll(() => score(page, 1)).toBe(18);
     await openScoreModal(page, 1);
     await page.keyboard.press('5');
     await page.keyboard.press('-');
     await expect(page.locator('#score-modal')).toBeHidden();
-    await expect.poll(() => score(page, 1)).toBe(15);
+    await expect.poll(() => score(page, 1)).toBe(13);
     await openScoreModal(page, 1);
     await page.keyboard.press('-');
     await expect(page.locator('#score-modal-display')).toHaveText(/^▼ −/); // vrai signe moins
@@ -57,7 +66,7 @@ test.describe('Comportements communs', () => {
     await page.keyboard.press('3');
     await page.keyboard.press('+');
     await expect(page.locator('#score-modal')).toBeHidden();
-    await expect.poll(() => score(page, 1)).toBe(18);
+    await expect.poll(() => score(page, 1)).toBe(16); // 13 + 3
   });
 
   test('Échap ferme la fenêtre de victoire', async ({ page }) => {

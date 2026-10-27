@@ -234,6 +234,8 @@ function buildCard(pi,rot){
   // Clavier : + / ↑ = +1, - / ↓ = −1, Entrée = saisie manuelle
   card.addEventListener('keydown',e=>{
     if(e.target!==card||e.altKey||e.ctrlKey||e.metaKey)return;
+    // Saisie ouverte (focus pas encore passé dans la modale) : la touche est pour la saisie, pas pour la carte
+    if(!document.getElementById('score-modal').classList.contains('hidden'))return;
     if(e.key==='+'||e.key==='ArrowUp'){e.preventDefault();adjust(pi,+1,zone);}
     else if(e.key==='-'||e.key==='ArrowDown'){e.preventDefault();adjust(pi,-1,zone);}
     else if(e.key==='Enter'){e.preventDefault();openScoreModal(pi);}
