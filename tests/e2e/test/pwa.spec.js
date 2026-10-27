@@ -111,4 +111,18 @@ test.describe('PWA', () => {
     const vp = await page.locator('meta[name=viewport]').getAttribute('content');
     expect(vp).not.toMatch(/user-scalable\s*=\s*(no|0)|maximum-scale|minimum-scale/);
   });
+
+  test('version calculée au build : identique dans la page et le service worker, cache sans fichier manquant', async ({ page }) => {
+    await page.goto('/');
+    const meta = await page.locator('meta[name="app-version"]').getAttribute('content');
+    expect(meta).toMatch(/^[0-9a-f]{10}$/);
+    const sw = await (await page.request.get('/sw.js')).text();
+    expect(sw).toContain(`const VERSION='${meta}';`);
+    expect(sw).not.toMatch(/\{\{\w+\}\}/); // aucun jeton oublié
+    const urls = JSON.parse(sw.match(/const PRECACHE=(\[[\s\S]*?\]);/)[1].replace(/'/g, '"').replace(/,\s*\]/, ']'));
+    expect(urls).toContain('./index.html');
+    expect(urls).toContain('./vendor/jspdf.umd.min.js'); // export PDF disponible hors ligne
+    expect(urls).not.toContain('./sw.js');
+    for (const u of urls) expect((await page.request.get(u)).status(), u).toBe(200);
+  });
 });

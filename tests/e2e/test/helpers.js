@@ -9,7 +9,7 @@ const APP = {
   indexable: false, // version de test : noindex, ni sitemap ni JSON-LD
   manifestName: 'ScoreTrack Test',
   cachePrefix: 'st-test-',
-  cacheRe: /^st-test-v\d+$/,
+  cacheRe: /^st-test-v[0-9a-f]{10}$/, // version = empreinte du contenu (tools/build.mjs)
   maxPlayers: 12,
 };
 const XSS_NAME = '<img src=x onerror=alert(1)>';

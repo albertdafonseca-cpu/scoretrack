@@ -8,9 +8,12 @@
 //   - index.html = src/index.html, où chaque ligne « @include chemin » est remplacée par src/chemin
 //     et chaque {{JETON}} par sa valeur dans « tokens » ;
 //   - les lignes entre « @if drapeau » (ou « @if !drapeau ») et « @endif » ne sont gardées que si
-//     le drapeau de « flags » est vrai (ou faux). Pas d'imbrication.
+//     le drapeau de « flags » est vrai (ou faux). Pas d'imbrication ;
+//   - sw.js = src/sw.js, avec {{VERSION}} (empreinte du contenu publié) et {{PRECACHE}} (fichiers
+//     publiés, hors robots.txt, sitemap.xml et image de partage). {{VERSION}} vaut aussi dans la page.
 import { cpSync, rmSync, readdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { createHash } from 'node:crypto';
+import { join, dirname, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -58,13 +61,38 @@ function copyStatic(src, out) {
   cpSync(src, out, { recursive: true, filter: (p) => !p.slice(src.length).split('/').some((s) => s.startsWith('.')) });
 }
 
+// Fichiers publiés (chemins relatifs, séparateur /), triés pour un résultat stable
+function listFiles(dir) {
+  return readdirSync(dir, { recursive: true, withFileTypes: true })
+    .filter((d) => d.isFile())
+    .map((d) => relative(dir, join(d.parentPath ?? d.path, d.name)).split(sep).join('/'))
+    .sort();
+}
+
+// Inutiles hors ligne : lus par les robots et les aperçus de partage seulement
+const NOT_CACHED = new Set(['sw.js', 'robots.txt', 'sitemap.xml', 'icons/og-image.png']);
+const VERSION_MARK = '\u0000VERSION\u0000'; // remplacé une fois l'empreinte calculée
+
 function build(variant, out) {
   const spec = JSON.parse(readFileSync(join(ROOT, 'variants', `${variant}.json`), 'utf8'));
   copyStatic(join(ROOT, spec.static), out);
-  const html = fill(render('index.html', spec), spec.tokens, 'index.html');
+  const tokens = { ...spec.tokens, VERSION: VERSION_MARK };
+  const html = fill(render('index.html', spec), tokens, 'index.html');
   if (/^@(if|endif|include)\b/m.test(html)) throw new Error(`Directive non traitée dans ${variant}/index.html`);
   writeFileSync(join(out, 'index.html'), html);
-  console.log(`${variant} → ${out.slice(ROOT.length + 1)} (${readdirSync(out).length} entrées)`);
+
+  // Empreinte = contenu de tous les fichiers publiés + modèle du service worker
+  const swSrc = readFileSync(join(ROOT, 'src', 'sw.js'), 'utf8');
+  const files = listFiles(out).filter((f) => f !== 'sw.js');
+  const h = createHash('sha256').update(swSrc);
+  for (const f of files) h.update(f + '\0').update(readFileSync(join(out, f))).update('\0');
+  const version = h.digest('hex').slice(0, 10);
+
+  writeFileSync(join(out, 'index.html'), html.split(VERSION_MARK).join(version));
+  const precache = ['./', ...files.filter((f) => !NOT_CACHED.has(f)).map((f) => './' + f)];
+  const list = '[\n' + precache.map((u) => `  ${JSON.stringify(u).replace(/^"|"$/g, "'")},`).join('\n') + '\n]';
+  writeFileSync(join(out, 'sw.js'), fill(swSrc, { ...spec.tokens, VERSION: version, PRECACHE: list }, 'sw.js'));
+  console.log(`${variant} → ${out.slice(ROOT.length + 1)} (version ${version}, ${precache.length} fichiers en cache)`);
 }
 
 const args = process.argv.slice(2);

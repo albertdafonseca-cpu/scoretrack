@@ -1,45 +1,14 @@
 // ─────────────────────────────────────────────────────────────────
-//  ScoreTrack Light — Service Worker
-//  Incrémenter VERSION à chaque déploiement (garder la meta app-version
-//  de index.html synchronisée) → invalide le cache de CETTE app uniquement
+//  {{APP_NAME}} — Service Worker (généré par tools/build.mjs depuis src/sw.js)
+//  VERSION = empreinte du contenu publié : elle change d'elle-même à chaque
+//  modification → invalide le cache de CETTE app uniquement
 // ─────────────────────────────────────────────────────────────────
-const PREFIX='st-light-';
-const VERSION='66';
+const PREFIX='st-{{APP_ID}}-';
+const VERSION='{{VERSION}}';
 const CACHE=PREFIX+'v'+VERSION;
 
-// Uniquement des fichiers présents dans le dépôt
-const PRECACHE=[
-  './',
-  './index.html',
-  './manifest.webmanifest',
-  './fonts/fonts-core.css',
-  './fonts/fonts-retro.css',
-  './fonts/fonts-classic.css',
-  './fonts/13755630d7d2.woff2',
-  './fonts/306b4441c639.woff2',
-  './fonts/36ccc775c221.woff2',
-  './fonts/39332efa7a67.woff2',
-  './fonts/3b78c6fa6456.woff2',
-  './fonts/46932d16807a.woff2',
-  './fonts/499056d5ded8.woff2',
-  './fonts/56d3066b13fa.woff2',
-  './fonts/6925862a5123.woff2',
-  './fonts/6ab57b19c69b.woff2',
-  './fonts/7baaaf3049b7.woff2',
-  './fonts/99110e439625.woff2',
-  './fonts/a375c31d43e6.woff2',
-  './fonts/b6db4a06c119.woff2',
-  './fonts/da72a9f73897.woff2',
-  './fonts/e8a5b1bf533e.woff2',
-  './fonts/ea98c7d3947e.woff2',
-  './fonts/f059b71e05ff.woff2',
-  './icons/favicon-64.png',
-  './icons/apple-touch-icon.png',
-  './icons/icon-192.png',
-  './icons/icon-512.png',
-  './icons/icon-maskable-512.png',
-  './vendor/jspdf.umd.min.js',
-];
+// Liste produite au build à partir des fichiers réellement publiés
+const PRECACHE={{PRECACHE}};
 
 // ── Installation : tolérante (un fichier manquant ne bloque pas) ──
 self.addEventListener('install',e=>{
