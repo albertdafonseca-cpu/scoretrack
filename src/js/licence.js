@@ -38,12 +38,14 @@ function licenceFromInput(){
   _licenceMsg('licenceChecking');
   licenceActivate(inp?inp.value:'');
 }
+// Redirection vers Stripe Checkout (variable : remplaçable par les tests, qui ne naviguent pas)
+let _licenceGo=url=>location.assign(url);
 async function licenceBuy(){
   _licenceMsg('licenceRedirect');
   try{
     const r=await fetch('/api/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lang:currentLang})});
     const j=await r.json().catch(()=>({}));
-    if(r.ok&&j.url&&/^https:\/\/checkout\.stripe\.com\//.test(j.url)){location.href=j.url;return;}
+    if(r.ok&&j.url&&/^https:\/\/checkout\.stripe\.com\//.test(j.url)){_licenceGo(j.url);return;}
   }catch(e){}
   _licenceMsg('licenceBuyError',true);
 }

@@ -75,12 +75,18 @@ test.describe('Licence Pro', () => {
     await page.unroute('**/api/checkout');
     let body = null;
     await page.route('**/api/checkout', (r) => { body = r.request().postDataJSON(); r.fulfill({ json: { url: 'https://checkout.stripe.com/c/pay/cs_test_x' } }); });
-    await page.route('https://checkout.stripe.com/**', (r) => r.fulfill({ contentType: 'text/html', body: '<title>Stripe</title>' }));
-    // La redirection vers Checkout se voit à la requête émise (WebKit ne signale pas toujours le « load » simulé)
-    const toStripe = page.waitForRequest('https://checkout.stripe.com/**');
+    // La redirection est interceptée (pas de vraie navigation vers stripe.com dans les tests)
+    await page.evaluate(() => { _licenceGo = (u) => { window.__goto = u; }; });
     await page.click('#pro-buy');
-    expect((await toStripe).url()).toBe('https://checkout.stripe.com/c/pay/cs_test_x');
+    await expect.poll(() => page.evaluate(() => window.__goto)).toBe('https://checkout.stripe.com/c/pay/cs_test_x');
     expect(body).toEqual({ lang: 'fr' });
+    // Une adresse qui n'est pas Stripe Checkout n'est jamais suivie
+    await page.unroute('**/api/checkout');
+    await page.route('**/api/checkout', (r) => r.fulfill({ json: { url: 'https://evil.example/pay' } }));
+    await page.evaluate(() => { window.__goto = null; });
+    await page.click('#pro-buy');
+    await expect(page.locator('#licence-msg')).toContainText('Le paiement n\'est pas disponible');
+    expect(await page.evaluate(() => window.__goto)).toBe(null);
   });
 
   test('réglages : état de la licence et bouton d\'achat', async ({ page }) => {
