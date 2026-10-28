@@ -42,8 +42,9 @@ test.describe('Licence Pro', () => {
     const bad = valid().slice(0, -4) + 'AAAA';
     await page.addInitScript(([k, v]) => { if (!sessionStorage.getItem('__lic')) { sessionStorage.setItem('__lic', '1'); localStorage.setItem(k, v); } }, [KEY, bad]);
     await page.goto('/');
-    await expect.poll(async () => (await storage(page))[KEY]).toBeUndefined();
-    expect(await isPro(page)).toBe(false);
+    // La page se recharge après avoir retiré la clé : une lecture pendant le rechargement est ignorée
+    await expect.poll(async () => { try { return (await storage(page))[KEY] ?? null; } catch (e) { return 'rechargement'; } }).toBe(null);
+    await expect.poll(async () => { try { return await isPro(page); } catch (e) { return 'rechargement'; } }).toBe(false);
   });
 
   test('retour de Stripe (?session_id=…) : licence obtenue auprès de /api/licence puis activée', async ({ page }) => {
@@ -75,8 +76,10 @@ test.describe('Licence Pro', () => {
     let body = null;
     await page.route('**/api/checkout', (r) => { body = r.request().postDataJSON(); r.fulfill({ json: { url: 'https://checkout.stripe.com/c/pay/cs_test_x' } }); });
     await page.route('https://checkout.stripe.com/**', (r) => r.fulfill({ contentType: 'text/html', body: '<title>Stripe</title>' }));
+    // La redirection vers Checkout se voit à la requête émise (WebKit ne signale pas toujours le « load » simulé)
+    const toStripe = page.waitForRequest('https://checkout.stripe.com/**');
     await page.click('#pro-buy');
-    await page.waitForURL('https://checkout.stripe.com/**');
+    expect((await toStripe).url()).toBe('https://checkout.stripe.com/c/pay/cs_test_x');
     expect(body).toEqual({ lang: 'fr' });
   });
 
