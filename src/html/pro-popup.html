@@ -1,8 +1,15 @@
 <div id="pro-popup" role="dialog" aria-modal="true" aria-labelledby="pro-popup-title" onclick="if(event.target===this)_hpop()">
   <div class="pro-box">
     <h3 id="pro-popup-title"><span aria-hidden="true">⭐</span> SCORETRACK PRO</h3>
-    <p>Débloquez toutes les fonctionnalités : 12 joueurs, tous les presets, thèmes, langues, export PDF et plus.</p>
-    <a href="{{PRO_URL}}" target="_blank" rel="noopener">Essayer ScoreTrack Pro, gratuit →</a>
-    <button type="button" data-autofocus onclick="_hpop()">Fermer</button>
+    <p id="pro-pitch">Débloquez toutes les fonctionnalités : 12 joueurs, tous les presets, thèmes, langues, export PDF et plus.</p>
+    <p class="pro-price" id="pro-price">{{LICENCE_PRICE}} — achat unique, sans abonnement</p>
+    <button type="button" class="pro-buy" id="pro-buy" onclick="licenceBuy()">Débloquer pour {{LICENCE_PRICE}}</button>
+    <details class="pro-key">
+      <summary id="pro-have-key">J'ai déjà une clé de licence</summary>
+      <input type="text" id="licence-input" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Clé de licence" placeholder="ST1.…">
+      <button type="button" class="pro-activate" id="licence-activate" onclick="licenceFromInput()">Activer</button>
+    </details>
+    <p class="licence-msg" id="licence-msg" role="status" aria-live="polite"></p>
+    <button type="button" id="pro-close" data-autofocus onclick="_hpop()">Fermer</button>
   </div>
 </div>

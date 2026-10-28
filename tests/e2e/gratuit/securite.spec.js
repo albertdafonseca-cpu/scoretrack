@@ -2,7 +2,7 @@ const { test, expect, XSS_NAME, seedStorage, startGame, setName, openBar, applyD
 
 test.describe('Sécurité', () => {
   test('un prénom <img onerror> n\'est jamais exécuté (profils, cartes, récap)', async ({ page }) => {
-    await seedStorage(page, { 'st:light:profiles': [XSS_NAME, 'O\'Brien"><b>x'], 'st:light:privacy': '1', 'st:light:migrated': '1' });
+    await seedStorage(page, { 'st:main:profiles': [XSS_NAME, 'O\'Brien"><b>x'], 'st:main:privacy': '1', 'st:main:migrated': '1' });
     await page.goto('/');
     await page.locator('#players-grid .player-chip', { hasText: /^3$/ }).click();
     await page.fill('#points-custom', '20');
@@ -21,7 +21,7 @@ test.describe('Sécurité', () => {
     expect(await page.evaluate(() => players.some((p) => p.playerName === '<img src=x onerror=alert(1)>'))).toBe(true);
     await expect(page.locator('.pplayer', { hasText: '<img src=x' })).toHaveCount(1);
 
-    // Light n'affiche au récap que les joueurs arrivés au bout : le joueur 1 (nom hostile) atteint 0
+    // La version gratuite n'affiche au récap que les joueurs arrivés au bout : le joueur 1 (nom hostile) atteint 0
     const idx = await page.evaluate(() => players.findIndex((p) => p.playerName.startsWith('<img')));
     await applyDelta(page, idx, -20);
     await page.evaluate(() => showRecap());
@@ -33,8 +33,8 @@ test.describe('Sécurité', () => {
 
   test('un nom hostile restauré depuis le stockage est échappé', async ({ page }) => {
     await seedStorage(page, {
-      'st:light:migrated': '1', 'st:light:privacy': '1',
-      'st:light:save': { app: 'light', saveVersion: 33, players: [{ playerName: XSS_NAME, score: 1 }, { playerName: '<script>alert(2)</script>', score: 2 }], seatOrder: [0, 1], history: [], startPoints: 20, objectifMode: 'win', winPoints: 0 },
+      'st:main:migrated': '1', 'st:main:privacy': '1',
+      'st:main:save': { app: 'main', saveVersion: 33, players: [{ playerName: XSS_NAME, score: 1 }, { playerName: '<script>alert(2)</script>', score: 2 }], seatOrder: [0, 1], history: [], startPoints: 20, objectifMode: 'win', winPoints: 0 },
     });
     await page.goto('/');
     await expect(page.locator('.pcard')).toHaveCount(2);

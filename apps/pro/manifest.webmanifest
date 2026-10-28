@@ -1,6 +1,6 @@
 {
-  "name": "ScoreTrack Pro",
-  "short_name": "ScoreTrack Pro",
+  "name": "ScoreTrack",
+  "short_name": "ScoreTrack",
   "description": "Compteur de scores universel",
   "id": "./",
   "start_url": "./",

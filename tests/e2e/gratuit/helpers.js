@@ -1,14 +1,14 @@
-// Utilitaires communs aux tests E2E de ScoreTrack Light
+// Utilitaires communs aux tests E2E de ScoreTrack sans licence (version gratuite du site principal)
 const base = require('@playwright/test');
 const { expect } = base;
 
 const APP = {
-  id: 'light',
-  title: 'ScoreTrack Light — compteur de scores pour jeux de société',
-  manifestName: 'ScoreTrack Light',
-  cachePrefix: 'st-light-',
-  cacheRe: /^st-light-v[0-9a-f]{10}$/, // version = empreinte du contenu (tools/build.mjs)
-  maxPlayers: 6, // limite Light (2 à 6 joueurs)
+  id: 'main',
+  title: 'ScoreTrack — compteur de scores pour jeux de société',
+  manifestName: 'ScoreTrack',
+  cachePrefix: 'st-main-',
+  cacheRe: /^st-main-v[0-9a-f]{10}$/, // version = empreinte du contenu (tools/build.mjs)
+  maxPlayers: 6, // version gratuite : 2 à 6 joueurs
 };
 const XSS_NAME = '<img src=x onerror=alert(1)>';
 

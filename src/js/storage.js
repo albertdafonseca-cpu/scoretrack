@@ -145,6 +145,7 @@ function applyLang(code){
   ['fin-anim-overlay','win-anim-overlay','elim-anim-overlay'].forEach(id=>_setAriaLabel(id,t('ariaSkipAnim')));
   document.querySelectorAll('.key-btn.del').forEach(b=>b.setAttribute('aria-label',t('ariaDeleteKey')));
   renderThemeGrid();
+  licenceRenderTexts();
 }
 function _setText(id, val, isHtml=false){
   const el=document.getElementById(id); if(!el) return;

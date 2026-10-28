@@ -10,7 +10,7 @@ test.describe('SEO', () => {
   test('title, description, canonical et robots', async ({ page }) => {
     await page.goto('/');
     const title = await page.title();
-    expect(title).toMatch(/^ScoreTrack Pro — /);
+    expect(title).toMatch(/^ScoreTrack — /);
     expect(title.length).toBeLessThanOrEqual(60);
     const desc = await page.locator('meta[name="description"]').getAttribute('content');
     expect(desc.length).toBeGreaterThanOrEqual(140);
@@ -51,7 +51,7 @@ test.describe('SEO', () => {
     expect(blocks.length).toBe(1);
     const ld = JSON.parse(blocks[0]);
     expect(ld).toMatchObject({
-      '@context': 'https://schema.org', '@type': 'WebApplication', name: 'ScoreTrack Pro', url: CANONICAL,
+      '@context': 'https://schema.org', '@type': 'WebApplication', name: 'ScoreTrack', url: CANONICAL,
       applicationCategory: 'GameApplication', operatingSystem: 'Web', inLanguage: 'fr',
       offers: { '@type': 'Offer', price: '0', priceCurrency: 'EUR' },
     });

@@ -17,14 +17,17 @@ import { join, dirname, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const VARIANTS = ['light', 'pro', 'test'];
+const VARIANTS = ['pro', 'test'];
+// Ancien nom : le projet Vercel Light (dont le domaine redirige vers le principal) construit pro
+const ALIASES = { light: 'pro' };
 
-// Sur Vercel : SCORETRACK_VARIANT (réglé dans le projet), sinon light.
+// Sur Vercel : SCORETRACK_VARIANT (réglé dans le projet), sinon pro.
 // Garde-fou : le domaine de production d'un projet impose sa variante ; en cas d'écart le build
 // échoue et la version en ligne reste inchangée.
-const DOMAIN_VARIANT = [[/^scoretrack\.newgames\.app$/, 'pro'], [/^scoretrack-light\./, 'light'], [/^scoretrack-test\./, 'test']];
+const DOMAIN_VARIANT = [[/^scoretrack\.newgames\.app$/, 'pro'], [/^scoretrack-light\./, 'pro'], [/^scoretrack-test\./, 'test']];
 function vercelVariant() {
-  const v = process.env.SCORETRACK_VARIANT || 'light';
+  const asked = process.env.SCORETRACK_VARIANT || 'pro';
+  const v = ALIASES[asked] || asked;
   const domain = process.env.VERCEL_PROJECT_PRODUCTION_URL || '';
   if (!VARIANTS.includes(v)) throw new Error(`SCORETRACK_VARIANT inconnue : ${v}`);
   const expected = DOMAIN_VARIANT.find(([re]) => re.test(domain))?.[1];
@@ -74,9 +77,11 @@ function listFiles(dir) {
 const NOT_CACHED = new Set(['sw.js', 'robots.txt', 'sitemap.xml', 'icons/og-image.png']);
 const VERSION_MARK = '\u0000VERSION\u0000'; // remplacé une fois l'empreinte calculée
 
-function build(variant, out) {
+// overrides : jetons remplacés pour les tests locaux uniquement (jamais sur Vercel)
+function build(variant, out, overrides = {}) {
   const spec = JSON.parse(readFileSync(join(ROOT, 'variants', `${variant}.json`), 'utf8'));
   copyStatic(join(ROOT, spec.static), out);
+  spec.tokens = { ...spec.tokens, ...overrides };
   const tokens = { ...spec.tokens, VERSION: VERSION_MARK };
   const html = fill(render('index.html', spec), tokens, 'index.html');
   if (/^@(if|endif|include)\b/m.test(html)) throw new Error(`Directive non traitée dans ${variant}/index.html`);
@@ -101,8 +106,10 @@ if (args.includes('--vercel')) {
   build(vercelVariant(), join(ROOT, 'site'));
 } else {
   const list = args.length ? args : VARIANTS;
+  // Tests E2E : clé publique jetable, pour signer des licences de test sans la clé privée du site
+  const overrides = process.env.SCORETRACK_TEST_LICENCE_PUBKEY ? { LICENCE_PUBKEY: process.env.SCORETRACK_TEST_LICENCE_PUBKEY } : {};
   for (const v of list) {
     if (!VARIANTS.includes(v)) throw new Error(`Variante inconnue : ${v}`);
-    build(v, join(ROOT, 'dist', v));
+    build(v, join(ROOT, 'dist', v), overrides);
   }
 }

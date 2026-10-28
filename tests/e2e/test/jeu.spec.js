@@ -10,7 +10,9 @@ test.describe('Parcours de jeu', () => {
     await expect(page.locator('#go-btn')).toBeEnabled();
     await page.locator('#players-grid .player-chip', { hasText: /^12$/ }).click();
     expect(await page.evaluate(() => numPlayers)).toBe(12);
-    await expect(page.locator('#pro-popup')).toHaveCount(0);
+    // Licence active : version Pro, la fenêtre « Passer à Pro » ne s'ouvre pas
+    expect(await page.evaluate(() => IS_PRO)).toBe(true);
+    await expect(page.locator('#pro-popup')).not.toHaveClass(/show/);
   });
 
   test('setup → noms → partie : cartes, scores de départ, noms par défaut', async ({ page }) => {

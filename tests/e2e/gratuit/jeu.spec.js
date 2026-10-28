@@ -1,6 +1,6 @@
 const { test, expect, storage, json, startGame, score, applyDelta, tapCard, openBar, acceptPrivacyIfAsked, focusCard } = require('./helpers');
 
-const saved = async (page) => json((await storage(page))['st:light:save']);
+const saved = async (page) => json((await storage(page))['st:main:save']);
 
 test.describe('Parcours de jeu', () => {
   test('setup : valeurs par défaut valides, puces Pro verrouillées', async ({ page }) => {
@@ -90,7 +90,7 @@ test.describe('Parcours de jeu', () => {
     await page.click('#btn-menu-reset');
     await expect(page.locator('#setup-page')).toHaveClass(/active/);
     await expect(page.locator('#restore-banner')).toBeHidden();
-    expect((await storage(page))['st:light:save']).toBeUndefined();
+    expect((await storage(page))['st:main:save']).toBeUndefined();
   });
 
   test('profils : mémoriser, réutiliser puis supprimer', async ({ page }) => {
@@ -103,10 +103,10 @@ test.describe('Parcours de jeu', () => {
     await page.locator('.name-input').nth(1).fill('Yan');
     await page.click('#btn-memorize');
     await expect(page.locator('.profile-chip-name')).toHaveText(['Zed', 'Yan']);
-    expect(json((await storage(page))['st:light:profiles'])).toEqual(['Zed', 'Yan']);
+    expect(json((await storage(page))['st:main:profiles'])).toEqual(['Zed', 'Yan']);
     await page.locator('.profile-chip-del').first().click();
     await expect(page.locator('.profile-chip-name')).toHaveText(['Yan']);
-    expect(json((await storage(page))['st:light:profiles'])).toEqual(['Yan']);
+    expect(json((await storage(page))['st:main:profiles'])).toEqual(['Yan']);
   });
 
   test('langue : le sélecteur change la langue de l\'interface et la mémorise', async ({ page }) => {
@@ -116,18 +116,21 @@ test.describe('Parcours de jeu', () => {
     await page.locator('#lang-dropdown .lang-opt[lang="en"]').click();
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     await expect(page.locator('#go-btn')).toContainText('Next');
-    expect(json((await storage(page))['st:light:settings']).lang).toBe('en');
+    expect(json((await storage(page))['st:main:settings']).lang).toBe('en');
     await page.reload();
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   });
 
-  test.describe('Spécificités Light', () => {
-    test('la fenêtre « Passer à Pro » renvoie vers la version complète (scoretrack.newgames.app)', async ({ page }) => {
+  test.describe('Spécificités de la version gratuite', () => {
+    test('la fenêtre « Passer à Pro » propose l\'achat (4,99 €) et l\'activation d\'une clé', async ({ page }) => {
       await page.goto('/');
-      const a = page.locator('#pro-popup a');
-      await expect(a).toHaveAttribute('href', 'https://scoretrack.newgames.app/');
-      await expect(a).toHaveAttribute('target', '_blank');
-      await expect(a).toHaveText(/ScoreTrack Pro/);
+      await acceptPrivacyIfAsked(page);
+      await page.evaluate(() => _spop());
+      await expect(page.locator('#pro-popup')).toHaveClass(/show/);
+      await expect(page.locator('#pro-buy')).toHaveText('Débloquer pour 4,99 €');
+      await expect(page.locator('#pro-price')).toContainText('achat unique');
+      await page.locator('#pro-have-key').click();
+      await expect(page.locator('#licence-input')).toBeVisible();
     });
 
     test('victoire à 0 : le joueur est marqué vainqueur, la partie continue pour les autres', async ({ page }) => {
@@ -144,7 +147,7 @@ test.describe('Parcours de jeu', () => {
       await applyDelta(page, 1, -20);
       await expect(page.locator('#winner-modal')).toBeVisible();
       await expect(page.locator('#fin-anim-overlay')).toBeHidden();
-      await expect.poll(async () => (await storage(page))['st:light:save']).toBeUndefined();
+      await expect.poll(async () => (await storage(page))['st:main:save']).toBeUndefined();
       // Annuler depuis la fin : modale masquée, dernier score restauré
       await page.evaluate(() => undoLast());
       await expect(page.locator('#winner-modal')).toBeHidden();

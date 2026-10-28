@@ -46,7 +46,7 @@ test.describe('PWA', () => {
     await expect.poll(() => page.evaluate(async () => (await caches.keys()).filter((k) => k.startsWith('st-')))).toEqual(
       [expect.stringMatching(APP.cacheRe)]);
     await expect.poll(() => page.evaluate(async () => {
-      const k = (await caches.keys()).find((n) => n.startsWith('st-light-'));
+      const k = (await caches.keys()).find((n) => n.startsWith('st-main-'));
       return (await (await caches.open(k)).keys()).length;
     })).toBeGreaterThanOrEqual(20);
   });
@@ -56,14 +56,14 @@ test.describe('PWA', () => {
     await swReady(page);
     // On repart d'une nouvelle installation avec un vieux cache de l'app et un cache d'une app sœur
     await page.evaluate(async () => {
-      await caches.open('st-light-v0');
+      await caches.open('st-main-v0');
       await caches.open('st-autre-v9');
       await caches.open('cache-tiers');
       for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
     });
     await page.reload();
     // Attente de l'activation du nouveau SW : le vieux cache de l'app disparaît
-    await expect.poll(() => page.evaluate(async () => (await caches.keys()).includes('st-light-v0')), { timeout: 15_000 }).toBe(false);
+    await expect.poll(() => page.evaluate(async () => (await caches.keys()).includes('st-main-v0')), { timeout: 15_000 }).toBe(false);
     const keys = await page.evaluate(() => caches.keys());
     expect(keys).toEqual(expect.arrayContaining(['cache-tiers', 'st-autre-v9']));
     expect(keys.some((k) => APP.cacheRe.test(k))).toBe(true);
@@ -73,7 +73,7 @@ test.describe('PWA', () => {
     await page.goto('/');
     await swReady(page);
     await expect.poll(() => page.evaluate(async () => {
-      const k = (await caches.keys()).find((n) => n.startsWith('st-light-'));
+      const k = (await caches.keys()).find((n) => n.startsWith('st-main-'));
       return k ? (await (await caches.open(k)).keys()).length : 0;
     })).toBeGreaterThanOrEqual(20);
     if (browserName === 'webkit') {
@@ -81,7 +81,7 @@ test.describe('PWA', () => {
       // même avec un service worker (« WebKit encountered an internal error ») : limite de l'outil,
       // pas de l'app. On vérifie à la place que la page et les polices sont bien dans le cache hors ligne.
       const cached = await page.evaluate(async () => {
-        const k = (await caches.keys()).find((n) => n.startsWith('st-light-'));
+        const k = (await caches.keys()).find((n) => n.startsWith('st-main-'));
         const c = await caches.open(k);
         const html = (await c.match('./index.html')) || (await c.match('./'));
         return { html: !!html && (await html.text()).includes('<title>'), css: !!(await c.match('./fonts/fonts-core.css')) };
