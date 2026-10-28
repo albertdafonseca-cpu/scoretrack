@@ -7,6 +7,10 @@ const KEY = 'st:main:licence';
 const isPro = (page) => page.evaluate(() => IS_PRO);
 
 test.describe('Licence Pro', () => {
+  // Sans service worker : une fois la page contrôlée, WebKit ne fait plus passer ses requêtes
+  // par page.route (les /api/* simulés partiraient vers le serveur de test)
+  test.use({ serviceWorkers: 'block' });
+
   test('sans licence : version gratuite', async ({ page }) => {
     await page.goto('/');
     expect(await isPro(page)).toBe(false);
