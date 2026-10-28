@@ -35,7 +35,11 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <!-- Splash iOS 2732×2732 : PNG statique pré-généré (l'ancienne génération canvas + toDataURL bloquait le thread principal ~1 s) -->
 <link rel="apple-touch-startup-image" href="icons/splash.png">
-<link rel="stylesheet" href="fonts/fonts-core.css">
+<!-- Polices non bloquantes : la feuille est préchargée puis appliquée (font-display:swap) ; latin Inter + Orbitron préchargés -->
+<link rel="preload" href="fonts/6ab57b19c69b.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/e8a5b1bf533e.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/fonts-core.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="fonts/fonts-core.css"></noscript>
 <!-- fonts-retro.css (arcade) et fonts-classic.css (ldm, ldm-day) : chargées à la demande par applyTheme() -->
 <title>ScoreTrack Light — compteur de scores pour jeux de société</title>
 <meta name="description" content="Compteur de scores gratuit pour jeux de société, de 2 à 6 joueurs : comptez les points, annulez une erreur, consultez le récap. Fonctionne hors ligne.">

@@ -55,6 +55,10 @@ caractères du sha-256 du contenu publié. Elle change d'elle-même dès qu'un f
 incrémenter à la main. La liste des fichiers mis en cache est elle aussi produite au build (tout le site
 sauf `robots.txt`, `sitemap.xml` et l'image de partage).
 
+Cache HTTP (`headers` de `vercel.json`) : polices `.woff2` 1 an (`immutable`, leur nom est l'empreinte du
+contenu) ; feuilles de polices, icônes et `vendor/` 1 jour (nom fixe : un fichier mis à jour doit être
+repris vite, y compris par le service worker) ; page, `sw.js` et manifest toujours revalidés.
+
 ## Décisions prises (ne pas revenir dessus)
 
 - **scoretrack.newgames.app = site principal, version complète (Pro)**, gratuite pour l'instant ; un paiement
