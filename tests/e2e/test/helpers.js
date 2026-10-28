@@ -14,6 +14,11 @@ const APP = {
 };
 const XSS_NAME = '<img src=x onerror=alert(1)>';
 
+// Licence Pro valide, signée avec la clé de test de playwright.config.js (le site de test est
+// construit avec la clé publique correspondante) ; injectée avant chaque page sauf si une licence existe
+const { signLicence } = require('../../../api/_licence.js');
+const LICENCE = signLicence({ v: 1, id: 'gift-e2e', iat: 1 }, process.env.TEST_LICENCE_PRIVKEY);
+
 // Fixture `page` enrichie : collecte erreurs console, réponses HTTP >= 400,
 // requêtes tierces et boîtes de dialogue (confirm accepté, le reste refusé).
 const test = base.test.extend({
@@ -38,6 +43,7 @@ const test = base.test.extend({
     page.problems = problems;
     page.external = external;
     page.dialogs = dialogs;
+    await page.addInitScript(([k, v]) => { if (localStorage.getItem(k) === null) localStorage.setItem(k, v); }, [`st:${APP.id}:licence`, LICENCE]);
     await use(page);
   },
 });
@@ -165,4 +171,4 @@ async function focusCard(page, i) {
   }).toPass({ timeout: 7000 });
 }
 
-module.exports = { focusCard, test, expect, APP, XSS_NAME, seedStorage, storage, json, swReady, startGame, score, applyDelta, tapCard, openBar, setName, acceptPrivacyIfAsked, contrastByTheme };
+module.exports = { LICENCE, focusCard, test, expect, APP, XSS_NAME, seedStorage, storage, json, swReady, startGame, score, applyDelta, tapCard, openBar, setName, acceptPrivacyIfAsked, contrastByTheme };

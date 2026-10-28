@@ -1,12 +1,14 @@
 {
   "static": "apps/test",
   "flags": {
-    "pro": true
+    "pro": false
   },
   "tokens": {
     "APP_ID": "test",
     "APP_NAME": "ScoreTrack Test",
-    "IS_PRO": "true",
-    "HEAD": "head-test"
+    "IS_PRO": "licenceActive()",
+    "HEAD": "head-test",
+    "LICENCE_PUBKEY": "bKAg_cRbpVqgEfkHanthqHQAnWDB_V-vWIMl8PoOntE.wFm28HRoFFr8cMwlfWK_zfJYPNTO40eOmR03myEnEYg",
+    "LICENCE_PRICE": "4,99 €"
   }
 }

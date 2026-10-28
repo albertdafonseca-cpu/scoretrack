@@ -85,7 +85,8 @@ test.describe('Stockage isolé', () => {
     await page.evaluate(() => clearAllData());
     expect(page.dialogs.some((d) => d.startsWith('confirm:'))).toBe(true);
     const st = await storage(page);
-    expect(Object.keys(st).filter((k) => k.startsWith('st:main:'))).toEqual(['st:main:migrated']);
+    // La licence est conservée : effacer ses données ne fait pas perdre son achat
+    expect(Object.keys(st).filter((k) => k.startsWith('st:main:')).sort()).toEqual(['st:main:licence', 'st:main:migrated']);
     expect(st['st:autre:save']).toBe('X');
     expect(st['st:light:profiles']).toBe('["L"]');
     expect(st['st:sib:settings']).toBe('{}');

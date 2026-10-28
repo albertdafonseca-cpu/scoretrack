@@ -76,5 +76,18 @@
         }
       ]
     }
+  ],
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "scoretrack-light.newgames.app"
+        }
+      ],
+      "destination": "https://scoretrack.newgames.app/",
+      "permanent": true
+    }
   ]
 }

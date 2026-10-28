@@ -2,12 +2,13 @@
   "name": "scoretrack-e2e",
   "private": true,
   "version": "1.0.0",
-  "description": "Tests de bout en bout (Playwright) de ScoreTrack Pro, Light et Test",
+  "description": "Tests de bout en bout (Playwright) de ScoreTrack : version gratuite, Pro (licence) et Test",
   "scripts": {
-    "test": "VARIANT=pro playwright test && VARIANT=light playwright test && VARIANT=test playwright test",
+    "test": "VARIANT=gratuit playwright test && VARIANT=pro playwright test && VARIANT=test playwright test",
+    "test:gratuit": "VARIANT=gratuit playwright test",
     "test:pro": "VARIANT=pro playwright test",
-    "test:light": "VARIANT=light playwright test",
-    "test:test": "VARIANT=test playwright test"
+    "test:test": "VARIANT=test playwright test",
+    "test:api": "node --test ../tests/api/*.test.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.56.1"

@@ -39,6 +39,8 @@ self.addEventListener('fetch',e=>{
   if(req.method!=='GET')return;
   const url=new URL(req.url);
   if(url.origin!==self.location.origin)return;
+  // API de paiement et de licence : toujours le réseau, jamais le cache
+  if(url.pathname.startsWith('/api/'))return;
 
   // Navigations : network-first, repli sur le cache (index.html)
   if(req.mode==='navigate'){

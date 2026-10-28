@@ -4,51 +4,58 @@ Dépôt GitHub : `albertdafonseca-cpu/scoretrack` (anciennement `scoretrack-ligh
 nom redirige). Les anciens dépôts `scoretrack-legacy` (ex-site principal) et `scoretrack-test` sont
 archivés, en lecture seule.
 
-Ce dépôt produit trois sites à partir d'une même base :
+Ce dépôt produit deux sites à partir d'une même base :
 
 | Variante | Domaine | Projet Vercel | Rôle | APP_ID (clé de stockage) |
 |---|---|---|---|---|
-| `pro`   | https://scoretrack.newgames.app | scoretrack-pro | **site principal** : version complète, gratuite pour l'instant (payante plus tard) | `main` |
-| `light` | https://scoretrack-light.newgames.app | scoretrack-light | version limitée (2 à 6 joueurs, fonctions Pro verrouillées) | `light` |
-| `test`  | https://scoretrack-test.newgames.app | scoretrack-test | pré-production des évolutions, invisible des moteurs (`noindex`) | `test` |
+| `pro`  | https://scoretrack.newgames.app | scoretrack-pro | **site unique** : gratuit (2 à 6 joueurs) sans licence, complet avec la licence Pro à 4,99 € | `main` |
+| `test` | https://scoretrack-test.newgames.app | scoretrack-test | pré-production, invisible des moteurs (`noindex`), licence exigée aussi | `test` |
+
+L'ancienne adresse https://scoretrack-light.newgames.app redirige (301) vers le site principal
+(règle `redirects` de `vercel.json`, limitée à cet hôte). Paiement et licences : voir `docs/PAIEMENT.md`.
 
 ## Organisation
 
 ```
 src/index.html      gabarit de la page : balises, « @include chemin », blocs « @if [!]drapeau » … « @endif »
-src/html/           en-têtes SEO par site (head-pro, head-light, head-test), corps, superpositions,
-                    fenêtre « Passer à Pro » (Light seul, lien {{PRO_URL}})
+src/html/           en-têtes SEO par site (head-pro, head-test), corps, superpositions,
+                    fenêtre « Passer à Pro » (achat, activation d'une clé)
 src/css/            base, thèmes, mise en page, cartes, interface, animations, accessibilité
 src/i18n/strings.js dictionnaire des 18 langues
-src/js/             stockage, verrous Light, configuration, rendu, saisie, récap/PDF, animations, partie, accessibilité
+src/js/             stockage, licence (licence.js), verrous de la version gratuite (light-lock.js), configuration,
+                    rendu, saisie, récap/PDF, animations, partie, accessibilité
 src/sw.js           service worker commun ({{VERSION}} et {{PRECACHE}} remplis au build)
 variants/<nom>.json dossier statique, drapeaux (pro) et jetons {{APP_ID}}, {{APP_NAME}}, {{IS_PRO}}, {{HEAD}}…
 apps/<variante>/    fichiers statiques publiés tels quels (manifest, robots, sitemap, icônes, polices, vendor…)
+api/                fonctions Vercel : checkout.js (ouvre Stripe Checkout), licence.js (délivre la licence payée)
 tools/build.mjs     assemble et publie dans dist/<variante>/
+tools/licence.mjs   paire de clés, licences offertes, vérification
 ```
 
-Pour modifier l'app : éditer `src/`, jamais `dist/`. Light : IS_PRO=false, verrous et fenêtre « Passer à Pro »
-qui renvoie vers https://scoretrack.newgames.app. Pro et Test : IS_PRO=true, sans verrous.
-Chaque suite de `tests/e2e/<variante>` tourne sur son site construit.
+Pour modifier l'app : éditer `src/`, jamais `dist/`. `IS_PRO` vaut `licenceActive()` : sans licence valide,
+verrous de la version gratuite et fenêtre « Passer à Pro » ; avec, version complète.
+Tests : `tests/e2e/gratuit` (site principal sans licence), `tests/e2e/pro` (même site, licence de test),
+`tests/e2e/test` (pré-production, licence de test), `tests/api` (fonctions de paiement, faux Stripe).
 
 ## Construction
 
 ```
-node tools/build.mjs          # dist/pro, dist/light et dist/test
+node tools/build.mjs          # dist/pro et dist/test
 node tools/build.mjs pro      # une seule variante
-cd tests && npm run test:pro     # ou test:light, test:test ; VARIANT=… npx playwright test --project=chromium
+cd tests && npm run test:gratuit # ou test:pro, test:test, test:api ; VARIANT=… npx playwright test --project=chromium
 ```
 
 Sur Vercel, `vercel.json` lance `node tools/build.mjs --vercel`, qui publie dans `site/` la variante
-indiquée par la variable d'environnement du projet `SCORETRACK_VARIANT` (`light` par défaut). Garde-fou :
-le domaine de production impose sa variante (`scoretrack.newgames.app` → pro, `scoretrack-light.` → light,
-`scoretrack-test.` → test) ; en cas d'écart le build échoue et la version en ligne reste inchangée.
+indiquée par la variable d'environnement du projet `SCORETRACK_VARIANT` (`pro` par défaut ; `light`, ancien
+nom, construit `pro`). Garde-fou : le domaine de production impose sa variante (`scoretrack.newgames.app` et
+`scoretrack-light.` → pro, `scoretrack-test.` → test) ; en cas d'écart le build échoue et la version en ligne
+reste inchangée.
 
 | Projet Vercel | Dépôt | SCORETRACK_VARIANT |
 |---|---|---|
-| scoretrack-pro (ex-score-track) | ce dépôt | `pro` |
-| scoretrack-light | ce dépôt | `light` (valeur par défaut, à indiquer quand même pour la lisibilité) |
-| scoretrack-test | ce dépôt | `test` |
+| scoretrack-pro (ex-score-track) | ce dépôt | `pro` + variables Stripe et licence (`docs/PAIEMENT.md`) |
+| scoretrack-light | ce dépôt | `light` ou rien (le domaine redirige vers le principal) |
+| scoretrack-test | ce dépôt | `test` + variables Stripe (mode test) et licence |
 
 Le service worker et la meta `app-version` reçoivent au build la même version : les 10 premiers
 caractères du sha-256 du contenu publié. Elle change d'elle-même dès qu'un fichier change ; ne rien
@@ -61,14 +68,14 @@ repris vite, y compris par le service worker) ; page, `sw.js` et manifest toujou
 
 ## Décisions prises (ne pas revenir dessus)
 
-- **scoretrack.newgames.app = site principal, version complète (Pro)**, gratuite pour l'instant ; un paiement
-  (store ou clé de licence) viendra plus tard sans changer les sources. Il garde l'APP_ID `main` pour que ses
-  utilisateurs actuels conservent leurs données. Remplace la décision antérieure « principal figé ».
-- **Light = version limitée**, reste en ligne sur son domaine ; sa fenêtre « Passer à Pro » renvoie vers le principal.
-- **SEO : les deux sites sont indexés, chacun pour lui-même** (canonical vers sa propre adresse, titres et
-  descriptions distincts : « jusqu'à 12 joueurs, 14 thèmes, export PDF » contre « 2 à 6 joueurs »). Remplace
-  la décision antérieure « Light référence SEO, canonical du principal vers Light ».
-- **Test = pré-production des évolutions**, invisible des moteurs.
+- **Modèle payant (remplace « gratuit pour l'instant »)** : un seul site, scoretrack.newgames.app, gratuit et
+  limité (2 à 6 joueurs) sans licence, complet avec la **licence Pro, achat unique 4,99 €** (clé signée,
+  Stripe Checkout). Tout le monde passe à ce modèle. L'accès peut être offert (lien d'activation ou code
+  promo Stripe à 100 %). Détails : `docs/PAIEMENT.md`. APP_ID `main` conservé.
+- **scoretrack-light.newgames.app redirige** (301) vers le principal : un acheteur garde ses parties et
+  réglages en se débloquant sur place. Les données de l'ancienne adresse Light ne suivent pas : accepté.
+- **SEO** : le principal est indexé (titre et description présentent le gratuit et la version Pro).
+- **Test = pré-production des évolutions**, invisible des moteurs, **licence exigée** (sinon ce serait une porte gratuite).
 - Stockage isolé par app : clés `st:<APP_ID>:…`, cache du service worker `st-<APP_ID>-…`. Ne jamais changer
   un APP_ID (les parties enregistrées seraient perdues).
 - Accessibilité daltonisme : palette bleu/orange (Okabe-Ito), toujours doublée d'un repère (▲/▼, forme, texte).
@@ -89,3 +96,4 @@ repris vite, y compris par le service worker) ; page, `sw.js` et manifest toujou
 6. ✅ Bugs relevés par l'analyse de duplication corrigés une fois ; comportements unifiés.
 7. ✅ Version du service worker calculée à partir du contenu.
 8. ✅ Le site principal (scoretrack.newgames.app) passe sur la base commune en version complète.
+9. ✅ Licence Pro payante (Stripe), site unique, Light redirigé vers le principal.

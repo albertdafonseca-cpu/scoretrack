@@ -1,12 +1,14 @@
 {
   "static": "apps/pro",
   "flags": {
-    "pro": true
+    "pro": false
   },
   "tokens": {
     "APP_ID": "main",
-    "APP_NAME": "ScoreTrack Pro",
-    "IS_PRO": "true",
-    "HEAD": "head-pro"
+    "APP_NAME": "ScoreTrack",
+    "IS_PRO": "licenceActive()",
+    "HEAD": "head-pro",
+    "LICENCE_PUBKEY": "bKAg_cRbpVqgEfkHanthqHQAnWDB_V-vWIMl8PoOntE.wFm28HRoFFr8cMwlfWK_zfJYPNTO40eOmR03myEnEYg",
+    "LICENCE_PRICE": "4,99 €"
   }
 }

@@ -23,14 +23,18 @@ jobs:
           mv dist dist-1
           node tools/build.mjs
           diff -r dist-1 dist
-      # Garde-fous Vercel : le domaine de production impose sa variante
+      # Garde-fous Vercel : le domaine de production impose sa variante (light = ancien nom de pro)
       - name: Vérifier les garde-fous de domaine
         run: |
           SCORETRACK_VARIANT=pro VERCEL_PROJECT_PRODUCTION_URL=scoretrack.newgames.app node tools/build.mjs --vercel
-          VERCEL_PROJECT_PRODUCTION_URL=scoretrack-light.newgames.app node tools/build.mjs --vercel
+          VERCEL_PROJECT_PRODUCTION_URL=scoretrack.newgames.app node tools/build.mjs --vercel
+          SCORETRACK_VARIANT=light VERCEL_PROJECT_PRODUCTION_URL=scoretrack-light.newgames.app node tools/build.mjs --vercel
           SCORETRACK_VARIANT=test VERCEL_PROJECT_PRODUCTION_URL=scoretrack-test.newgames.app node tools/build.mjs --vercel
-          if VERCEL_PROJECT_PRODUCTION_URL=scoretrack.newgames.app node tools/build.mjs --vercel; then echo "Le principal sans SCORETRACK_VARIANT=pro aurait dû échouer"; exit 1; fi
-          if SCORETRACK_VARIANT=pro VERCEL_PROJECT_PRODUCTION_URL=scoretrack-light.newgames.app node tools/build.mjs --vercel; then echo "Light publié en pro aurait dû échouer"; exit 1; fi
+          if SCORETRACK_VARIANT=test VERCEL_PROJECT_PRODUCTION_URL=scoretrack.newgames.app node tools/build.mjs --vercel; then echo "Le principal publié en test aurait dû échouer"; exit 1; fi
+          if VERCEL_PROJECT_PRODUCTION_URL=scoretrack-test.newgames.app node tools/build.mjs --vercel; then echo "Test sans SCORETRACK_VARIANT aurait dû échouer"; exit 1; fi
+      # Fonctions de paiement (api/) avec un faux Stripe
+      - name: Tests des fonctions api/
+        run: node --test tests/api/*.test.mjs
 
   e2e:
     name: ${{ matrix.variant }} · ${{ matrix.project }}
@@ -38,7 +42,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        variant: [light, pro, test]
+        variant: [gratuit, pro, test]
         project: [chromium, webkit, firefox]
     timeout-minutes: 15
     env:
