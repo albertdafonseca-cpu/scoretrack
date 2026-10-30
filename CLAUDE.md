@@ -27,6 +27,11 @@ n'en recopie que les règles qui se paient cher quand on les oublie.
   changer sans sa demande.
 - **Daltonisme** : palette bleu/orange (Okabe-Ito), toujours doublée d'un repère
   (▲/▼, forme, texte). Le score critique = contour **et** symbole ⚠.
+  Après tout changement d'interface (CSS, couleurs, états, graphiques), lancer
+  le sous-agent **`relecteur-daltonisme`**
+  (`.claude/agents/relecteur-daltonisme.md`) avant de pousser :
+  il signale, en lecture seule, ce qu'un daltonien ne peut pas lire ;
+  la session corrige.
 - Une demande imprécise : poser 3 questions avant d'agir. Tout en français ;
   l'interface est traduite en 18 langues (`src/i18n/strings.js`) : un texte
   ajouté s'y ajoute dans toutes.
