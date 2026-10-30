@@ -77,3 +77,9 @@ Stripe) sur un site unique »).
 - `.claude/hooks/fichiers-sensibles.mjs` (PreToolUse) refuse la lecture et
   l'écriture des secrets (`.env*`, `*.pem`, clés…). Essai :
   `node .claude/hooks/fichiers-sensibles.essai.mjs`.
+- GateGuard (plugin ECC) est réglé par le bloc `env` de
+  `.claude/settings.json` (30/10/2026, décision de l'utilisateur) : plus de
+  question avant la première commande shell, pas de question avant d'écrire un
+  test ou un essai (`**/tests/**`, `**/*.test.*`, `**/*.essai.*`), messages de
+  refus courts ; la question avant d'écrire du code ou de la documentation et
+  le contrôle des commandes destructrices restent.
