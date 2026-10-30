@@ -20,7 +20,9 @@ test.describe('Licence Pro', () => {
   test('lien offert (#licence=…) : activée, mémorisée, adresse nettoyée', async ({ page }) => {
     const lic = valid();
     await page.goto('/#licence=' + lic);
-    await expect.poll(() => page.evaluate(() => location.href)).not.toContain('licence=');
+    // Activation = rechargement sur l'adresse nettoyée : on l'attend au lieu d'évaluer dans la
+    // page pendant qu'elle se recharge (WebKit : « Execution context was destroyed »)
+    await page.waitForURL((u) => !u.hash);
     await expect.poll(() => isPro(page)).toBe(true);
     expect((await storage(page))[KEY]).toBe(lic);
   });
