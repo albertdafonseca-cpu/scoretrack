@@ -83,3 +83,7 @@ Stripe) sur un site unique »).
   test ou un essai (`**/tests/**`, `**/*.test.*`, `**/*.essai.*`), messages de
   refus courts ; la question avant d'écrire du code ou de la documentation et
   le contrôle des commandes destructrices restent.
+- **Connecteurs (01/11/2026, décision de l'utilisateur)** : « Context7 » sert
+  à la documentation à jour des bibliothèques et outils (Playwright, Stripe,
+  Vercel…). Le site est sur Vercel : le connecteur « Cloudflare API » ne le
+  concerne pas.
