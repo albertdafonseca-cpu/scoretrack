@@ -50,7 +50,7 @@ divulguer permet d'en fabriquer.** Seule la clé PUBLIQUE est versionnée
 ```sh
 node tools/build.mjs                  # dist/pro et dist/test
 node --test tests/api/*.test.mjs      # fonctions de paiement, faux Stripe
-cd tests && npm ci && npm run test:gratuit   # ou test:pro, test:test (Playwright 1.56.1)
+cd tests && npm ci && npm run test:gratuit   # ou test:pro, test:test (Playwright 1.64.1)
 ```
 
 La CI (`.github/workflows/tests.yml`, sur PR et poussée vers `main`) vérifie :

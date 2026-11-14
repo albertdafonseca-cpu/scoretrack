@@ -9,7 +9,7 @@ on:
 jobs:
   build:
     name: build reproductible
-    runs-on: ubuntu-24.04  # Playwright 1.56.1 ne prend pas en charge ubuntu-latest (26.04)
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
@@ -38,7 +38,7 @@ jobs:
 
   e2e:
     name: ${{ matrix.variant }} · ${{ matrix.project }}
-    runs-on: ubuntu-24.04  # Playwright 1.56.1 ne prend pas en charge ubuntu-latest (26.04)
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:

@@ -55,8 +55,8 @@
 <meta name="twitter:description" content="Version de test de ScoreTrack : compteur de scores gratuit pour jeux de société et de cartes, jusqu'à 12 joueurs, hors ligne, avec récapitulatif et export PDF.">
 <meta name="twitter:image" content="https://scoretrack-test.newgames.app/icons/og-image.png">
 <meta name="twitter:image:alt" content="Icône ScoreTrack (plus et moins) et texte « ScoreTrack Test » sur fond sombre">
-<!-- Polices non bloquantes : la feuille est préchargée puis appliquée (font-display:swap) ; latin Inter + Orbitron préchargés -->
+<!-- Polices non bloquantes : la feuille se charge en media=print puis passe en all (pas de rel=preload : Chrome 153+ ne le réutilise pas sous service worker et la télécharge deux fois) ; latin Inter + Orbitron préchargés -->
 <link rel="preload" href="fonts/6ab57b19c69b.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/e8a5b1bf533e.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="fonts/fonts-core.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<link rel="stylesheet" href="fonts/fonts-core.css" media="print" onload="this.onload=null;this.media='all'">
 <noscript><link rel="stylesheet" href="fonts/fonts-core.css"></noscript>
