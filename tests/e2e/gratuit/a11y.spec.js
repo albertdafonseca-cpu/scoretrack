@@ -100,7 +100,8 @@ test.describe('Accessibilité', () => {
     await acceptPrivacyIfAsked(page);
     const field = page.locator('#points-custom');
     await expect(field).toHaveAttribute('readonly', '');
-    await expect(field).toHaveClass(/lk-disabled/);
+    // Le cadenas est porté par le conteneur du champ (un <input> n'affiche pas de ::after)
+    await expect(page.locator('.lk-field.lk-disabled').filter({ has: field })).toHaveCount(1);
     await field.click();
     await expect(page.locator('#pro-popup')).toHaveClass(/show/);
     await page.keyboard.press('Escape');

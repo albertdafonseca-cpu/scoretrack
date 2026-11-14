@@ -160,13 +160,13 @@ function initLight(){
   });
   // Points de départ : boutons libres, saisie manuelle Pro (champ en lecture seule, fenêtre Pro au clic)
   const pc=document.getElementById('points-custom');
-  if(pc){pc.readOnly=true;pc.value='';_lk(pc);}
+  if(pc){pc.readOnly=true;pc.value='';_lkField(pc);}
   // Fin de jeu : « No limit » libre ; Victoire et Défaite Pro (la Défaite reste possible par le modèle
   // Loi du Milieu), avec leurs objectifs
   _lkAll(['obj-win','obj-elim']);
   document.querySelectorAll('#objectif-presets .points-chip').forEach(c=>_lk(c));
   const oc=document.getElementById('objectif-custom');
-  if(oc){oc.readOnly=true;_lk(oc);}
+  if(oc){oc.readOnly=true;_lkField(oc);}
   // First Win : verrouiller la row entière (pas juste le toggle)
   const _swT=document.getElementById('toggle-single-winner');
   const swRow=_swT&&_swT.closest?_swT.closest('.win-option-row'):null;

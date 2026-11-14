@@ -21,5 +21,12 @@ function _lk(el){
     if(dx<10&&dy<10){e.preventDefault();e.stopPropagation();_spop();}
   };
 }
+// Champ de saisie : enveloppé une fois dans un conteneur qui porte le cadenas (un <input> n'a pas de ::after)
+function _lkField(inp){
+  if(!inp)return;
+  let w=inp.parentElement;
+  if(!w||!w.classList.contains('lk-field')){w=document.createElement('div');w.className='lk-field';inp.before(w);w.append(inp);}
+  _lk(w);
+}
 function _lkId(id){_lk(document.getElementById(id));}
 function _lkAll(ids){ids.forEach(_lkId);}
