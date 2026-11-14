@@ -12,7 +12,9 @@ Ce dépôt produit deux sites à partir d'une même base :
 | `test` | https://scoretrack-test.newgames.app | scoretrack-test | pré-production, invisible des moteurs (`noindex`), licence exigée aussi | `test` |
 
 L'ancienne adresse https://scoretrack-light.newgames.app redirige (301) vers le site principal
-(règle `redirects` de `vercel.json`, limitée à cet hôte). Paiement et licences : voir `docs/PAIEMENT.md`.
+(règle `redirects` de `vercel.json`, limitée à cet hôte). Le projet Vercel `scoretrack-light` n'a plus
+d'utilité : son domaine est à rattacher au projet `scoretrack-pro`, puis le projet à supprimer (étapes :
+`docs/PAIEMENT.md`). Paiement et licences : voir `docs/PAIEMENT.md`.
 
 ## Organisation
 
@@ -54,7 +56,7 @@ reste inchangée.
 | Projet Vercel | Dépôt | SCORETRACK_VARIANT |
 |---|---|---|
 | scoretrack-pro (ex-score-track) | ce dépôt | `pro` + variables Stripe et licence (`docs/PAIEMENT.md`) |
-| scoretrack-light | ce dépôt | `light` ou rien (le domaine redirige vers le principal) |
+| scoretrack-light | ce dépôt | `light` ou rien — **à supprimer** une fois son domaine rattaché à scoretrack-pro (il ne fait que rediriger) |
 | scoretrack-test | ce dépôt | `test` + variables Stripe (mode test) et licence |
 
 Le service worker et la meta `app-version` reçoivent au build la même version : les 10 premiers
@@ -74,6 +76,9 @@ repris vite, y compris par le service worker) ; page, `sw.js` et manifest toujou
   promo Stripe à 100 %). Détails : `docs/PAIEMENT.md`. APP_ID `main` conservé.
 - **scoretrack-light.newgames.app redirige** (301) vers le principal : un acheteur garde ses parties et
   réglages en se débloquant sur place. Les données de l'ancienne adresse Light ne suivent pas : accepté.
+- **Offrir l'accès à usage unique = code promo Stripe à 100 % limité à 1 utilisation.** Le lien
+  `tools/licence.mjs offrir` n'est pas à usage unique (pas d'état serveur) ; pas de stockage serveur ajouté
+  pour cela (disproportionné pour 4,99 €).
 - **SEO** : le principal est indexé (titre et description présentent le gratuit et la version Pro).
 - **Test = pré-production des évolutions**, invisible des moteurs, **licence exigée** (sinon ce serait une porte gratuite).
 - Stockage isolé par app : clés `st:<APP_ID>:…`, cache du service worker `st-<APP_ID>-…`. Ne jamais changer
