@@ -3,6 +3,7 @@
 //   node tools/licence.mjs init               crée la paire de clés (une seule fois) ; la clé privée
 //                                             va dans ~/.scoretrack/licence-privee.pem, jamais dans le dépôt
 //   node tools/licence.mjs offrir [note]      crée une licence offerte + son lien d'activation
+//                                             (pas à usage unique : voir « Offrir l'accès » de docs/PAIEMENT.md)
 //   node tools/licence.mjs verifier <clé>     vérifie une licence avec la clé publique du site
 // Clé privée lue dans LICENCE_PRIVATE_KEY, sinon dans ~/.scoretrack/licence-privee.pem.
 import { generateKeyPairSync, randomBytes } from 'node:crypto';
@@ -41,6 +42,8 @@ if (cmd === 'init') {
   console.log(`Licence offerte ${id}${rest.length ? ' — ' + rest.join(' ') : ''}`);
   console.log(`Clé : ${licence}`);
   console.log(`Lien d'activation : ${SITE}#licence=${licence}`);
+  console.log('Attention : ce lien n\'est pas à usage unique, quiconque l\'obtient peut l\'activer.');
+  console.log('Pour un accès à usage unique : code promo Stripe à 100 % limité à 1 utilisation (docs/PAIEMENT.md).');
 } else if (cmd === 'verifier') {
   const p = verifyLicence(rest[0], sitePublicKey());
   console.log(p ? `Valide : ${JSON.stringify(p)}` : 'Invalide pour la clé publique du site.');

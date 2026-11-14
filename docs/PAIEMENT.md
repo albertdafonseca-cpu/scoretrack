@@ -21,12 +21,22 @@ fonctions Pro verrouillées) ; avec une licence, tout est débloqué, sur le mê
 
 ## Offrir l'accès
 
-1. **Lien direct** (sans passer par Stripe) :
+1. **Code promo Stripe à usage unique** (recommandé) : Stripe → Catalogue de produits → Coupons → nouveau
+   coupon de **100 %**, durée « Une fois » ; puis, dans ce coupon, « Ajouter un code promotionnel »
+   (ex. `MARIE-7K2F`) avec **« Limiter le nombre d'utilisations » = 1** (facultatif : date d'expiration,
+   limité au produit « ScoreTrack Pro »). Un code par personne, sur le même coupon. La personne clique sur
+   « Débloquer », saisit le code dans Checkout, paie 0 € (`payment_status = no_payment_required`, accepté par
+   `/api/licence`) et reçoit sa licence comme un acheteur ; Stripe refuse ensuite le code. Le tableau de bord
+   Stripe montre qui a utilisé quel code. À essayer d'abord sur le site Test (mode test Stripe).
+2. **Lien direct** (sans passer par Stripe) :
    `node tools/licence.mjs offrir "Pour Marie"` → affiche la clé et un lien
-   `https://scoretrack.newgames.app/#licence=…` qui active la licence en un clic.
-2. **Code promo Stripe** : Stripe → Produits → Coupons → créer un coupon de 100 %, puis un code promo
-   (ex. `AMI2026`). La personne clique sur « Débloquer », saisit le code dans Checkout, paie 0 € et
-   reçoit sa licence comme un acheteur.
+   `https://scoretrack.newgames.app/#licence=…` qui active la licence en un clic. **Ce lien n'est pas à
+   usage unique** : il n'y a pas de serveur qui retient qu'il a servi, donc quiconque l'obtient peut
+   l'activer. À réserver aux personnes de confiance et aux essais.
+
+Dans les deux cas, une licence activée reste copiable (limite assumée ci-dessus) : l'usage unique porte sur
+la *création* de la licence, pas sur son partage. Un lien d'activation vraiment à usage unique hors Stripe
+demanderait un stockage côté serveur (ex. Vercel KV) : écarté, disproportionné pour 4,99 €.
 
 ## Mise en service (à faire une fois)
 
@@ -43,7 +53,10 @@ fonctions Pro verrouillées) ; avec une licence, tout est débloqué, sur le mê
    - `LICENCE_PRIVATE_KEY` = contenu du fichier `licence-privee.pem` (fourni hors du dépôt ; à garder
      aussi dans un gestionnaire de mots de passe : **le perdre empêche d'émettre des licences, le
      divulguer permet d'en fabriquer**).
-3. Projet `scoretrack-light` : rien à changer, son domaine redirige vers le principal.
+3. Ancien projet `scoretrack-light` : inutile. Rattacher son domaine `scoretrack-light.newgames.app` au
+   projet `scoretrack-pro` (Settings → Domains), vérifier la redirection, puis supprimer le projet. Rien à
+   changer dans le code : la règle `redirects` de `vercel.json` ne vise que cet hôte, et le garde-fou du
+   build associe déjà `scoretrack-light.` à `pro`.
 
 ## Test : accès réservé
 
