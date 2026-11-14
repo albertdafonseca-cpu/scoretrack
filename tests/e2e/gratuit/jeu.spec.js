@@ -1,4 +1,4 @@
-const { test, expect, storage, json, startGame, score, applyDelta, tapCard, openBar, acceptPrivacyIfAsked, focusCard } = require('./helpers');
+const { eliminate, selectStart, test, expect, storage, json, startGame, score, applyDelta, tapCard, openBar, acceptPrivacyIfAsked, focusCard } = require('./helpers');
 
 const saved = async (page) => json((await storage(page))['st:main:save']);
 
@@ -97,7 +97,7 @@ test.describe('Parcours de jeu', () => {
     await page.goto('/');
     await acceptPrivacyIfAsked(page);
     await page.locator('#players-grid .player-chip', { hasText: /^2$/ }).click();
-    await page.fill('#points-custom', '10');
+    await selectStart(page, 10);
     await page.click('#go-btn');
     await page.locator('.name-input').nth(0).fill('Zed');
     await page.locator('.name-input').nth(1).fill('Yan');
@@ -133,46 +133,60 @@ test.describe('Parcours de jeu', () => {
       await expect(page.locator('#licence-input')).toBeVisible();
     });
 
-    test('victoire à 0 : le joueur est marqué vainqueur, la partie continue pour les autres', async ({ page }) => {
+    test('No limit : un score à 0 ne termine rien, la partie continue', async ({ page }) => {
       await startGame(page, { players: 3, names: ['A', 'B', 'C'] });
+      expect(await page.evaluate(() => objectifMode)).toBe('none');
       await applyDelta(page, 0, -20);
-      await expect.poll(() => page.evaluate(() => players[0].winner)).toBe(true);
+      expect(await score(page, 0)).toBe(0);
+      expect(await page.evaluate(() => [!!players[0].winner, !!players[0].eliminated])).toEqual([false, false]);
       await expect(page.locator('#winner-modal')).toBeHidden();
+    });
+
+    test('1 joueur : possible en version gratuite', async ({ page }) => {
+      await startGame(page, { players: 1, names: ['Solo'] });
+      await expect(page.locator('#card-0')).toHaveAttribute('aria-label', /^Solo, 20/);
     });
 
     test('fin de partie (mouvement réduit) : modale de fin, sauvegarde effacée, annulation possible', async ({ page }) => {
       await page.emulateMedia({ reducedMotion: 'reduce' });
-      await startGame(page, { players: 2, names: ['A', 'B'] });
-      await applyDelta(page, 0, -20);
-      await applyDelta(page, 1, -20);
+      // Loi du Milieu à 2 joueurs : A éliminé à 0, B gagne
+      await startGame(page, { players: 2, names: ['A', 'B'], mode: 'ldm' });
+      await eliminate(page, 0, -20);
       await expect(page.locator('#winner-modal')).toBeVisible();
       await expect(page.locator('#fin-anim-overlay')).toBeHidden();
       await expect.poll(async () => (await storage(page))['st:main:save']).toBeUndefined();
       // Annuler depuis la fin : modale masquée, dernier score restauré
       await page.evaluate(() => undoLast());
       await expect(page.locator('#winner-modal')).toBeHidden();
-      expect(await score(page, 1)).toBe(20);
-      expect(await page.evaluate(() => players[1].winner)).toBeFalsy();
+      expect(await score(page, 0)).toBe(20);
+      expect(await page.evaluate(() => [!!players[0].eliminated, !!players[1].winner])).toEqual([false, false]);
     });
 
     test('fin de partie avec animation : l\'overlay s\'affiche et Échap le passe', async ({ page }) => {
-      await startGame(page, { players: 2, names: ['A', 'B'] });
-      await applyDelta(page, 0, -20);
-      await applyDelta(page, 1, -20);
-      const overlay = page.locator('#fin-anim-overlay, #win-anim-overlay');
+      await startGame(page, { players: 2, names: ['A', 'B'], mode: 'ldm' });
+      await eliminate(page, 0, -20);
+      // Élimination puis victoire : chaque animation s'affiche et Échap la passe, jusqu'à la modale de fin
+      const overlay = page.locator('#elim-anim-overlay:visible, #fin-anim-overlay:visible, #win-anim-overlay:visible');
       await expect(overlay.first()).toBeVisible();
-      await page.keyboard.press('Escape');
+      await expect(async () => {
+        if (await overlay.count()) await page.keyboard.press('Escape');
+        await expect(page.locator('#winner-modal')).toBeVisible({ timeout: 500 });
+      }).toPass({ timeout: 10_000 });
+      await expect(page.locator('#elim-anim-overlay')).toBeHidden();
       await expect(page.locator('#fin-anim-overlay')).toBeHidden();
       await expect(page.locator('#win-anim-overlay')).toBeHidden();
       await expect(page.locator('#winner-modal')).toBeVisible();
     });
 
-    test('récap : montre les vainqueurs avec glyphes ▲/▼ et ferme avec Échap', async ({ page }) => {
+    test('récap : montre tous les joueurs (même sans vainqueur) avec glyphes ▲/▼ et ferme avec Échap', async ({ page }) => {
       await page.emulateMedia({ reducedMotion: 'reduce' });
-      await startGame(page, { players: 3, names: ['A', 'B', 'C'] });
-      await applyDelta(page, 0, 5);
-      await applyDelta(page, 0, -25);
+      // Partie « No limit » (aucun vainqueur) : le récap gratuit montre tous les joueurs
+      await startGame(page, { players: 3, names: ['Ana', 'Bob', 'Cléo'] });
+      await applyDelta(page, 1, 5);
+      await applyDelta(page, 1, -3);
+      await applyDelta(page, 2, -4);
       await page.evaluate(() => showRecap());
+      for (const n of ['Bob', 'Cléo']) await expect(page.locator('#recap-body')).toContainText(n);
       await expect(page.locator('#recap')).toBeVisible();
       const txt = await page.locator('#recap-body').textContent();
       expect(txt).toContain('▲');
@@ -186,9 +200,11 @@ test.describe('Parcours de jeu', () => {
       await page.goto('/');
       await acceptPrivacyIfAsked(page);
       await page.locator('.preset-card').first().click();
+      // Version gratuite : le modèle est ramené à 4 joueurs, et sa description le dit
+      await expect(page.locator('.preset-card').first().locator('.preset-card-detail')).toContainText('4 joueurs');
       await page.click('#go-btn');
       await page.click('#names-go-btn');
-      await expect(page.locator('.pcard')).toHaveCount(6);
+      await expect(page.locator('.pcard')).toHaveCount(4);
       expect(await page.evaluate(() => objectifMode)).toBe('elim');
       await applyDelta(page, 0, -(await score(page, 0)));
       await expect.poll(() => page.evaluate(() => !!players[0].eliminated)).toBe(true);
@@ -199,8 +215,8 @@ test.describe('Parcours de jeu', () => {
 
     test('export PDF verrouillé : fenêtre Pro, jsPDF jamais chargé', async ({ page }) => {
       await page.emulateMedia({ reducedMotion: 'reduce' });
-      await startGame(page, { players: 2 });
-      await applyDelta(page, 0, -20);
+      await startGame(page, { players: 2, mode: 'ldm' });
+      await eliminate(page, 0, -20);
       await page.evaluate(() => showRecap());
       await expect(page.locator('#recap')).toBeVisible();
       await page.evaluate(() => exportRecapPDF());
@@ -211,12 +227,36 @@ test.describe('Parcours de jeu', () => {
       await expect(page.locator('#pro-popup')).not.toHaveClass(/show/);
     });
 
-    test('les options de victoire Pro sont verrouillées', async ({ page }) => {
+    test('Victoire, Défaite et options de victoire sont Pro ; No limit et les points de départ sont libres', async ({ page }) => {
       await page.goto('/');
       await acceptPrivacyIfAsked(page);
-      await page.locator('#row-last-loser').click();
-      await expect(page.locator('#pro-popup')).toHaveClass(/show/);
-      expect(await page.evaluate(() => lastLoser)).toBeFalsy();
+      await page.click('#obj-none');
+      expect(await page.evaluate(() => objectifMode)).toBe('none');
+      for (const id of ['#obj-win', '#obj-elim']) {
+        await page.click(id);
+        await expect(page.locator('#pro-popup')).toHaveClass(/show/);
+        expect(await page.evaluate(() => objectifMode)).toBe('none');
+        await page.keyboard.press('Escape');
+      }
+      for (const id of ['#row-single-winner', '#row-last-loser']) await expect(page.locator(id)).toHaveClass(/lk-disabled/);
+      expect(await page.evaluate(() => [singleWinner, lastLoser])).toEqual([false, false]);
+      for (const v of [0, 10, 20, 40, 50, 100]) {
+        await page.click(`#start-presets .points-chip[data-val="${v}"]`);
+        expect(await page.evaluate(() => startPoints)).toBe(v);
+      }
+      await expect(page.locator('#pro-popup')).not.toHaveClass(/show/);
+    });
+
+    test('la dernière partie mémorisée hors limites gratuites est ramenée dans les limites', async ({ page }) => {
+      await page.addInitScript(() => {
+        if (sessionStorage.getItem('__seeded')) return;
+        sessionStorage.setItem('__seeded', '1');
+        localStorage.setItem('st:main:privacy', '1');
+        localStorage.setItem('st:main:migrated', '1');
+        localStorage.setItem('st:main:settings', JSON.stringify({ theme: 'cyber', lastGameConfig: { numPlayers: 6, startPoints: 35, objectifMode: 'win', objectifVal: 0, allowNeg: false, singleWinner: true, lastLoser: false } }));
+      });
+      await page.goto('/');
+      expect(await page.evaluate(() => [numPlayers, startPoints, objectifMode, singleWinner])).toEqual([4, 20, 'none', false]);
     });
   });
 

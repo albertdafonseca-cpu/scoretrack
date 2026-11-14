@@ -2561,7 +2561,7 @@ Object.assign(T.fr,{
   licenceBuyError:'Le paiement n\'est pas disponible pour le moment. Vérifiez votre connexion et réessayez.',
   licencePaymentError:'Paiement non confirmé. Si vous avez été débité, contactez le support indiqué sur votre reçu Stripe.',
   licenceOn:'✓ ScoreTrack Pro est activé sur cet appareil.',
-  licenceOff:'Version gratuite (2 à 6 joueurs).',
+  licenceOff:'Version gratuite (1 à 4 joueurs).',
   licenceCopy:'Copier ma clé de licence',
   licenceCopied:'✓ Clé copiée',
 });
@@ -2578,7 +2578,7 @@ Object.assign(T.en,{
   licenceBuyError:'Checkout is not available right now. Check your connection and try again.',
   licencePaymentError:'Payment not confirmed. If you were charged, contact the support address on your Stripe receipt.',
   licenceOn:'✓ ScoreTrack Pro is active on this device.',
-  licenceOff:'Free version (2 to 6 players).',
+  licenceOff:'Free version (1 to 4 players).',
   licenceCopy:'Copy my licence key',
   licenceCopied:'✓ Key copied',
 });
@@ -2595,7 +2595,7 @@ Object.assign(T.pt,{
   licenceBuyError:'O pagamento não está disponível no momento. Verifique sua conexão e tente novamente.',
   licencePaymentError:'Pagamento não confirmado. Se você foi cobrado, contate o suporte indicado no seu recibo Stripe.',
   licenceOn:'✓ O ScoreTrack Pro está ativado neste dispositivo.',
-  licenceOff:'Versão gratuita (2 a 6 jogadores).',
+  licenceOff:'Versão gratuita (1 a 4 jogadores).',
   licenceCopy:'Copiar minha chave de licença',
   licenceCopied:'✓ Chave copiada',
 });

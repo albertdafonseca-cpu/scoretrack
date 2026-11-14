@@ -57,7 +57,7 @@ function confirmReset(){
   document.getElementById('go-btn').disabled=true;document.getElementById('go-btn').textContent=t('btnNext');
   // Restaurer les réglages de la dernière partie, ou LDM par défaut
   if(settings.lastGameConfig){
-    const c=settings.lastGameConfig;
+    const c=lightConfig(settings.lastGameConfig);
     selectPlayer(c.numPlayers);
     selectStartPreset(c.startPoints);
     allowNeg=c.allowNeg||false;

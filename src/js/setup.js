@@ -66,9 +66,12 @@ function saveGame(){
     }));
   }catch(e){}
 }
-// Limites Light : 2 à 6 joueurs (chips 2-4 + preset Loi du Milieu), pas de mode
-// « sans limite » ni d'options de victoire Pro
-const MAX_PLAYERS=12, LIGHT_MIN_PLAYERS=2, LIGHT_MAX_PLAYERS=6;
+// Limites de la version gratuite (décision de l'utilisateur, 14/11/2026) : 1 à 4 joueurs ; fin de jeu
+// « No limit » seulement (Victoire et Défaite sont Pro, sauf le modèle Loi du Milieu, ramené à 4 joueurs) ;
+// points de départ par les boutons, sans saisie manuelle ; pas d'options de victoire Pro.
+// Une partie déjà en cours sous l'ancienne limite (jusqu'à 6 joueurs, Victoire à 0) est encore reprise.
+const MAX_PLAYERS=12, LIGHT_MIN_PLAYERS=1, LIGHT_MAX_PLAYERS=4, LIGHT_RESTORE_MAX_PLAYERS=6;
+const LIGHT_START_VALUES=[0,10,20,40,50,100], LIGHT_DEFAULT_START=20;
 const _isNum=v=>typeof v==='number'&&isFinite(v);
 function isValidSave(s){
   if(!s||typeof s!=='object'||Array.isArray(s))return false;
@@ -85,12 +88,24 @@ function isValidSave(s){
     &&h.playerIdx>=0&&h.playerIdx<P.length&&Array.isArray(h.entries)&&h.entries.every(e=>e&&_isNum(e.delta))))return false;
   if(!_isNum(s.startPoints))return false;
   if(!IS_PRO){
-    if(P.length<LIGHT_MIN_PLAYERS||P.length>LIGHT_MAX_PLAYERS)return false;
-    if(!['win','elim'].includes(s.objectifMode))return false;
+    if(P.length<LIGHT_MIN_PLAYERS||P.length>LIGHT_RESTORE_MAX_PLAYERS)return false;
+    if(!['win','elim','none'].includes(s.objectifMode))return false;
     if(s.singleWinner||s.lastLoser)return false;
   }
   return true;
 }
+// Version gratuite : ramène une configuration (dernière partie mémorisée) dans les limites gratuites
+function lightConfig(c){
+  if(IS_PRO||!c)return c;
+  const r={...c,singleWinner:false,lastLoser:false};
+  r.numPlayers=Math.min(Math.max(r.numPlayers||LIGHT_MAX_PLAYERS,LIGHT_MIN_PLAYERS),LIGHT_MAX_PLAYERS);
+  if(!LIGHT_START_VALUES.includes(r.startPoints))r.startPoints=LIGHT_DEFAULT_START;
+  // Seule la Défaite à 0 du modèle Loi du Milieu est gratuite ; tout le reste repasse en « No limit »
+  if(!(r.objectifMode==='elim'&&r.objectifVal===0)){r.objectifMode='none';r.objectifVal=null;}
+  return r;
+}
+// Nombre de joueurs d'un modèle, plafonné dans la version gratuite
+const presetPlayers=p=>IS_PRO?p.players:Math.min(p.players,LIGHT_MAX_PLAYERS);
 // Renvoie true si la partie a été reprise, false sinon (l'init normale continue)
 function restoreGame(){
   const s=readJSON('save',null);
@@ -173,7 +188,9 @@ function renderPresets(){
   GAME_PRESETS.forEach((p,idx)=>{
     const c=document.createElement('div');
     c.className='preset-card'+(idx===selectedPresetIdx?' on':'');_a11yBtn(c);
-    c.innerHTML=`<div class="preset-card-name">${t(p.nameKey)}</div><div class="preset-card-detail">${t(p.detailKey)}</div>`;
+    // Version gratuite : le détail annonce le nombre de joueurs réellement appliqué (Loi du Milieu à 4)
+    const detail=presetPlayers(p)===p.players?t(p.detailKey):t(p.detailKey).replace(String(p.players),String(presetPlayers(p)));
+    c.innerHTML=`<div class="preset-card-name">${t(p.nameKey)}</div><div class="preset-card-detail">${detail}</div>`;
     if(!IS_PRO && p.nameKey!=='presetLdm'){
       c.classList.add('lk-disabled');
       c.classList.add('lk-locked');

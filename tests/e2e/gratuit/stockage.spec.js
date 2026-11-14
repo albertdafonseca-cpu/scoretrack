@@ -116,12 +116,11 @@ test.describe('Stockage isolé', () => {
     'players pas un tableau': { players: 'x' },
     'liste de joueurs vide': { players: [], seatOrder: [] },
     'trop de joueurs (13)': { players: Array.from({ length: 13 }, () => ({ score: 0 })), seatOrder: [...Array(13).keys()] },
+    // 7 : au-delà même de l'ancienne limite gratuite (6), encore acceptée pour finir une partie en cours
     'plus de joueurs que la version gratuite (7)': { players: Array.from({ length: 7 }, () => ({ score: 0 })), seatOrder: [...Array(7).keys()] },
-    'un seul joueur': { players: [{ score: 0 }], seatOrder: [0] },
     'score non numérique': { players: [{ score: 'abc' }, { score: 1 }] },
     'seatOrder absent': { seatOrder: undefined },
     'history absent': { history: undefined },
-    'mode Pro verrouillé (objectif aucun)': { objectifMode: 'none' },
     'option Pro verrouillée (vainqueur unique)': { singleWinner: true },
     'version de sauvegarde trop ancienne': { saveVersion: 1 },
     'sauvegarde d\'une autre app': { app: 'light' },
@@ -145,6 +144,23 @@ test.describe('Stockage isolé', () => {
     await expect(page.locator('#restore-banner')).toBeHidden();
     expect(page.problems).toEqual([]);
   });
+
+  // Partie en cours sous l'ancienne limite (6 joueurs), à 1 joueur ou en « No limit » : reprise
+  const kept = {
+    '6 joueurs (ancienne limite gratuite)': { players: Array.from({ length: 6 }, (_, i) => ({ playerName: 'P' + i, score: 5 })), seatOrder: [...Array(6).keys()], numPlayers: 6 },
+    'un seul joueur': { players: [{ playerName: 'Solo', score: 4 }], seatOrder: [0], numPlayers: 1 },
+    'fin « No limit »': { objectifMode: 'none', winPoints: null },
+  };
+  for (const [name, over] of Object.entries(kept)) {
+    test(`sauvegarde reprise : ${name}`, async ({ page }) => {
+      const save = validSave(over);
+      await seedStorage(page, { 'st:main:save': save, 'st:main:migrated': '1', 'st:main:privacy': '1' });
+      await page.goto('/');
+      await expect(page.locator('#game-screen')).toHaveCSS('display', 'flex');
+      await expect(page.locator('.pcard')).toHaveCount(save.players.length);
+      expect(page.problems).toEqual([]);
+    });
+  }
 
   test('une sauvegarde valide est reprise automatiquement', async ({ page }) => {
     await seedStorage(page, { 'st:main:save': validSave(), 'st:main:migrated': '1', 'st:main:privacy': '1' });

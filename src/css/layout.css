@@ -19,9 +19,22 @@ body::after{content:'';position:fixed;bottom:0;left:0;right:0;height:env(safe-ar
 .logo-sub{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--muted2);margin-top:4px;letter-spacing:0.15em;text-transform:uppercase;}
 .setup-section{width:100%;max-width:420px;margin-bottom:22px;}
 .setup-label{font-family:var(--btn-font);font-size:11px;font-weight:700;letter-spacing:0.25em;color:var(--accent2);text-transform:uppercase;margin-bottom:10px;display:block;text-shadow:0 0 8px var(--accent2);}
-.lk-disabled{opacity:0.35 !important;position:relative;cursor:pointer !important;}
+.lk-disabled{position:relative;cursor:pointer !important;}
 .lk-locked{pointer-events:auto !important;cursor:pointer !important;}
-.lk-disabled::after{content:'🔒';position:absolute;top:2px;right:4px;font-size:11px;pointer-events:none;z-index:1;}
+/* Verrouillé : un voile (::before) assombrit l'élément, le cadenas (::after) reste par-dessus en pleine couleur.
+   Une opacité sur l'élément atténuerait aussi le cadenas (contraste < 3:1). */
+.lk-disabled::before{content:'';position:absolute;inset:0;background:var(--bg);opacity:0.65;border-radius:inherit;pointer-events:none;z-index:1;}
+.lk-disabled::after{content:'🔒';position:absolute;top:2px;right:4px;font-size:11px;line-height:1.2;pointer-events:none;z-index:2;}
+/* Sélectionné ET verrouillé (Défaite du modèle Loi du Milieu) : voile plus léger pour garder texte et soulignement
+   lisibles, et pastille sombre pour que le cadenas ressorte sur le fond bleu de la puce sélectionnée */
+.lk-disabled.on::before{opacity:0.35;}
+.lk-disabled.on::after{background:var(--bg);border-radius:3px;padding:0 2px;}
+/* Champ de saisie verrouillé : un <input> n'affiche ni ::before ni ::after, le voile et le cadenas sont portés
+   par ce conteneur ; voile léger pour que le texte d'attente reste lisible (>= 4,5:1) */
+/* Puces de fin de jeu (peu de marge intérieure) : le cadenas passe sur le coin pour ne pas couvrir le texte en 320 px */
+.objectif-chip.lk-disabled::after{top:-7px;right:-3px;}
+.lk-field{display:block;}
+.lk-field.lk-disabled::before{opacity:0.15;}
 #pro-popup{display:none;position:fixed;inset:0;z-index:9999;
   background:rgba(0,0,0,0.82);align-items:center;justify-content:center;padding:24px;}
 #pro-popup.show{display:flex;}

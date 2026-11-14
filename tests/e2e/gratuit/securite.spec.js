@@ -1,11 +1,14 @@
-const { test, expect, XSS_NAME, seedStorage, startGame, setName, openBar, applyDelta, focusCard } = require('./helpers');
+const { eliminate, selectStart, test, expect, XSS_NAME, seedStorage, startGame, setName, openBar, applyDelta, focusCard } = require('./helpers');
 
 test.describe('Sécurité', () => {
   test('un prénom <img onerror> n\'est jamais exécuté (profils, cartes, récap)', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await seedStorage(page, { 'st:main:profiles': [XSS_NAME, 'O\'Brien"><b>x'], 'st:main:privacy': '1', 'st:main:migrated': '1' });
     await page.goto('/');
-    await page.locator('#players-grid .player-chip', { hasText: /^3$/ }).click();
-    await page.fill('#points-custom', '20');
+    // Modèle Loi du Milieu (Défaite à 0, seule fin de partie gratuite), 2 joueurs à 20 points
+    await page.locator('.preset-card').first().click();
+    await page.locator('#players-grid .player-chip', { hasText: /^2$/ }).click();
+    await selectStart(page, 20);
     await page.click('#go-btn');
 
     const chips = page.locator('#profiles-list .profile-chip-name');
@@ -16,14 +19,15 @@ test.describe('Sécurité', () => {
     await setName(page, 0, XSS_NAME);
     await page.locator('.name-input').nth(1).fill('Bob');
     await page.click('#names-go-btn');
-    await expect(page.locator('.pcard')).toHaveCount(3);
+    await expect(page.locator('.pcard')).toHaveCount(2);
     await expect(page.locator('#players-wrap img')).toHaveCount(0);
     expect(await page.evaluate(() => players.some((p) => p.playerName === '<img src=x onerror=alert(1)>'))).toBe(true);
     await expect(page.locator('.pplayer', { hasText: '<img src=x' })).toHaveCount(1);
 
-    // La version gratuite n'affiche au récap que les joueurs arrivés au bout : le joueur 1 (nom hostile) atteint 0
-    const idx = await page.evaluate(() => players.findIndex((p) => p.playerName.startsWith('<img')));
-    await applyDelta(page, idx, -20);
+    // Bob est éliminé à 0, le joueur au nom hostile reste seul et gagne : il figure au récap
+    const others = await page.evaluate(() => players.map((p, i) => i).filter((i) => !players[i].playerName.startsWith('<img')));
+    for (const i of others) await eliminate(page, i, -20);
+    await expect.poll(() => page.evaluate(() => players.find((p) => p.playerName.startsWith('<img')).winner)).toBe(true);
     await page.evaluate(() => showRecap());
     await expect(page.locator('#recap')).toBeVisible();
     await expect(page.locator('#recap img')).toHaveCount(0);

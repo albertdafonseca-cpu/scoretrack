@@ -1,6 +1,6 @@
 # Licence ScoreTrack Pro (paiement Stripe)
 
-Achat unique à **4,99 €**. Sans licence, scoretrack.newgames.app est la version gratuite (2 à 6 joueurs,
+Achat unique à **4,99 €**. Sans licence, scoretrack.newgames.app est la version gratuite (1 à 4 joueurs,
 fonctions Pro verrouillées) ; avec une licence, tout est débloqué, sur le même site, sans perdre ses parties.
 
 ## Fonctionnement

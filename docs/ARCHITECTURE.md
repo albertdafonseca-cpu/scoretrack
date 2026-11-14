@@ -8,7 +8,7 @@ Ce dépôt produit deux sites à partir d'une même base :
 
 | Variante | Domaine | Projet Vercel | Rôle | APP_ID (clé de stockage) |
 |---|---|---|---|---|
-| `pro`  | https://scoretrack.newgames.app | scoretrack-pro | **site unique** : gratuit (2 à 6 joueurs) sans licence, complet avec la licence Pro à 4,99 € | `main` |
+| `pro`  | https://scoretrack.newgames.app | scoretrack-pro | **site unique** : gratuit (1 à 4 joueurs) sans licence, complet avec la licence Pro à 4,99 € | `main` |
 | `test` | https://scoretrack-test.newgames.app | scoretrack-test | pré-production, invisible des moteurs (`noindex`), licence exigée aussi | `test` |
 
 L'ancienne adresse https://scoretrack-light.newgames.app redirige (301) vers le site principal
@@ -71,9 +71,16 @@ repris vite, y compris par le service worker) ; page, `sw.js` et manifest toujou
 ## Décisions prises (ne pas revenir dessus)
 
 - **Modèle payant (remplace « gratuit pour l'instant »)** : un seul site, scoretrack.newgames.app, gratuit et
-  limité (2 à 6 joueurs) sans licence, complet avec la **licence Pro, achat unique 4,99 €** (clé signée,
+  limité (1 à 4 joueurs) sans licence, complet avec la **licence Pro, achat unique 4,99 €** (clé signée,
   Stripe Checkout). Tout le monde passe à ce modèle. L'accès peut être offert (lien d'activation ou code
   promo Stripe à 100 %). Détails : `docs/PAIEMENT.md`. APP_ID `main` conservé.
+- **Ce que permet la version gratuite (14/11/2026, décision de l'utilisateur ; `initLight()` et `lightConfig()`)** :
+  1 à 4 joueurs ; fin de jeu « No limit » ; modèle Loi du Milieu (Défaite à 0, ramené à 4 joueurs) ; points de
+  départ par les boutons 0, 10, 20, 40, 50, 100. Restent Pro : 5 à 12 joueurs, Victoire et Défaite (hors Loi du
+  Milieu) et leurs objectifs, saisie manuelle des points, autres modèles, First Win / Last Loser, thèmes (Cyber
+  imposé), langues autres que FR/EN/PT, boutons de noms, export PDF. Le récap montre tous les joueurs,
+  en gratuit comme en Pro (sans quoi une partie « No limit », sans vainqueur, aurait un récap vide). Une partie en
+  cours sous l'ancienne limite (jusqu'à 6 joueurs, Victoire à 0) est encore reprise.
 - **scoretrack-light.newgames.app redirige** (301) vers le principal : un acheteur garde ses parties et
   réglages en se débloquant sur place. Les données de l'ancienne adresse Light ne suivent pas : accepté.
 - **Offrir l'accès à usage unique = code promo Stripe à 100 % limité à 1 utilisation.** Le lien

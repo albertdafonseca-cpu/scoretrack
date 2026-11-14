@@ -21,7 +21,7 @@ n'en recopie que les règles qui se paient cher quand on les oublie.
 - **Ne jamais changer un `APP_ID`** (`main`, `test`) : les clés de stockage
   `st:<APP_ID>:…` changeraient, et toutes les parties enregistrées seraient
   perdues.
-- Le **modèle payant** (gratuit de 2 à 6 joueurs, licence Pro à 4,99 € en
+- Le **modèle payant** (gratuit de 1 à 4 joueurs, licence Pro à 4,99 € en
   achat unique), le prix et ce que verrouille la version gratuite
   (`src/js/light-lock.js`) sont des **décisions de l'utilisateur** : n'en rien
   changer sans sa demande.
