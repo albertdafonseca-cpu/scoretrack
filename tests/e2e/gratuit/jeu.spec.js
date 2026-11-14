@@ -178,15 +178,15 @@ test.describe('Parcours de jeu', () => {
       await expect(page.locator('#winner-modal')).toBeVisible();
     });
 
-    test('récap : montre les vainqueurs avec glyphes ▲/▼ et ferme avec Échap', async ({ page }) => {
+    test('récap : montre tous les joueurs (même sans vainqueur) avec glyphes ▲/▼ et ferme avec Échap', async ({ page }) => {
       await page.emulateMedia({ reducedMotion: 'reduce' });
-      // Le récap gratuit ne montre que le vainqueur : B marque +5 puis −3, A est éliminé, B gagne
-      await startGame(page, { players: 2, names: ['A', 'B'], mode: 'ldm' });
+      // Partie « No limit » (aucun vainqueur) : le récap gratuit montre tous les joueurs
+      await startGame(page, { players: 3, names: ['Ana', 'Bob', 'Cléo'] });
       await applyDelta(page, 1, 5);
       await applyDelta(page, 1, -3);
-      await eliminate(page, 0, -20);
-      await expect.poll(() => page.evaluate(() => players[1].winner)).toBe(true);
+      await applyDelta(page, 2, -4);
       await page.evaluate(() => showRecap());
+      for (const n of ['Bob', 'Cléo']) await expect(page.locator('#recap-body')).toContainText(n);
       await expect(page.locator('#recap')).toBeVisible();
       const txt = await page.locator('#recap-body').textContent();
       expect(txt).toContain('▲');

@@ -75,7 +75,6 @@ function showRecap(){
 
   let html='';
   players.forEach((p,pi)=>{
-    if(!IS_PRO&&!p.winner)return;
     const groups=history.filter(h=>h.playerIdx===pi).sort((a,b)=>a.rank-b.rank);
     if(!groups.length&&!p.eliminated&&!p.winner)return;
     const total=groups.reduce((s,g)=>s+g.entries.reduce((ss,e)=>ss+e.delta,0),0);

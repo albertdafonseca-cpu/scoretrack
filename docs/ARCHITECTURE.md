@@ -78,7 +78,8 @@ repris vite, y compris par le service worker) ; page, `sw.js` et manifest toujou
   1 à 4 joueurs ; fin de jeu « No limit » ; modèle Loi du Milieu (Défaite à 0, ramené à 4 joueurs) ; points de
   départ par les boutons 0, 10, 20, 40, 50, 100. Restent Pro : 5 à 12 joueurs, Victoire et Défaite (hors Loi du
   Milieu) et leurs objectifs, saisie manuelle des points, autres modèles, First Win / Last Loser, thèmes (Cyber
-  imposé), langues autres que FR/EN/PT, boutons de noms, export PDF, récap des non-vainqueurs. Une partie en
+  imposé), langues autres que FR/EN/PT, boutons de noms, export PDF. Le récap montre tous les joueurs,
+  en gratuit comme en Pro (sans quoi une partie « No limit », sans vainqueur, aurait un récap vide). Une partie en
   cours sous l'ancienne limite (jusqu'à 6 joueurs, Victoire à 0) est encore reprise.
 - **scoretrack-light.newgames.app redirige** (301) vers le principal : un acheteur garde ses parties et
   réglages en se débloquant sur place. Les données de l'ancienne adresse Light ne suivent pas : accepté.

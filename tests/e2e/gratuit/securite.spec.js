@@ -24,8 +24,7 @@ test.describe('Sécurité', () => {
     expect(await page.evaluate(() => players.some((p) => p.playerName === '<img src=x onerror=alert(1)>'))).toBe(true);
     await expect(page.locator('.pplayer', { hasText: '<img src=x' })).toHaveCount(1);
 
-    // La version gratuite n'affiche au récap que le vainqueur : Bob est éliminé à 0, le joueur au nom
-    // hostile reste seul et gagne
+    // Bob est éliminé à 0, le joueur au nom hostile reste seul et gagne : il figure au récap
     const others = await page.evaluate(() => players.map((p, i) => i).filter((i) => !players[i].playerName.startsWith('<img')));
     for (const i of others) await eliminate(page, i, -20);
     await expect.poll(() => page.evaluate(() => players.find((p) => p.playerName.startsWith('<img')).winner)).toBe(true);
