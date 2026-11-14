@@ -1,4 +1,4 @@
-const { test, expect, startGame, score, focusCard, acceptPrivacyIfAsked } = require('./helpers');
+const { selectStart, test, expect, startGame, score, focusCard, acceptPrivacyIfAsked } = require('./helpers');
 
 // Comportements unifiés entre les sites (étape 6, voir docs/ARCHITECTURE.md) — même fichier dans chaque suite
 async function openScoreModal(page, i) {
@@ -93,7 +93,7 @@ test.describe('Comportements communs', () => {
     await page.goto('/');
     await acceptPrivacyIfAsked(page);
     await page.locator('#players-grid .player-chip', { hasText: /^2$/ }).click();
-    await page.fill('#points-custom', '20');
+    await selectStart(page, 20);
     await page.click('#go-btn');
     await expect(page.locator('#names-page')).toHaveClass(/active/);
     await expect(page.locator('.name-input').first()).toHaveAttribute('maxlength', '12');

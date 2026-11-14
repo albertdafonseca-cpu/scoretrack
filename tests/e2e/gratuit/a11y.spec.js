@@ -1,4 +1,4 @@
-const { test, expect, startGame, openBar, applyDelta, acceptPrivacyIfAsked, contrastByTheme, focusCard } = require('./helpers');
+const { eliminate, selectStart, test, expect, startGame, openBar, applyDelta, acceptPrivacyIfAsked, contrastByTheme, focusCard } = require('./helpers');
 
 test.describe('Accessibilité', () => {
   test('carte joueur : focusable, role=group, aria-label mis à jour au clavier', async ({ page }) => {
@@ -94,21 +94,25 @@ test.describe('Accessibilité', () => {
     expect(await page.evaluate(() => numPlayers)).toBe(4);
   });
 
-  test('erreur de saisie : message texte + aria-invalid', async ({ page }) => {
+  test('saisie manuelle des points de départ : réservée au Pro (lecture seule, fenêtre Pro au clavier)', async ({ page }) => {
+    // Le message d'erreur et aria-invalid de ce champ sont testés dans la suite Pro, où il est utilisable
     await page.goto('/');
     await acceptPrivacyIfAsked(page);
-    await page.fill('#points-custom', '-5');
-    await expect(page.locator('#points-custom')).toHaveAttribute('aria-invalid', 'true');
-    await expect(page.locator('#points-custom-err')).not.toBeEmpty();
-    await page.fill('#points-custom', '20');
-    await expect(page.locator('#points-custom')).not.toHaveAttribute('aria-invalid', 'true');
+    const field = page.locator('#points-custom');
+    await expect(field).toHaveAttribute('readonly', '');
+    await expect(field).toHaveClass(/lk-disabled/);
+    await field.click();
+    await expect(page.locator('#pro-popup')).toHaveClass(/show/);
+    await page.keyboard.press('Escape');
+    await selectStart(page, 50);
+    expect(await page.evaluate(() => startPoints)).toBe(50);
   });
 
   test('champs de nom étiquetés « Nom du joueur N »', async ({ page }) => {
     await page.goto('/');
     await acceptPrivacyIfAsked(page);
     await page.locator('#players-grid .player-chip', { hasText: /^3$/ }).click();
-    await page.fill('#points-custom', '20');
+    await selectStart(page, 20);
     await page.click('#go-btn');
     await expect(page.locator('.name-input')).toHaveCount(3);
     await expect(page.locator('.name-input').nth(2)).toHaveAttribute('aria-label', /3/);
@@ -117,11 +121,11 @@ test.describe('Accessibilité', () => {
   test('indicateurs non chromatiques : forme par joueur et glyphes ▲/▼', async ({ page }) => {
     await page.goto('/');
     await acceptPrivacyIfAsked(page);
-    await page.click('#go-btn'); // 6 joueurs par défaut
+    await page.click('#go-btn'); // modèle Loi du Milieu par défaut, ramené à 4 joueurs en version gratuite
     await page.click('#names-go-btn');
-    await expect(page.locator('.pcard')).toHaveCount(6);
+    await expect(page.locator('.pcard')).toHaveCount(4);
     const shapes = await page.locator('.pcard .pshape').allTextContents();
-    expect(new Set(shapes).size).toBe(6);
+    expect(new Set(shapes).size).toBe(4);
     await expect(page.locator('.pcard .pshape').first()).toHaveAttribute('aria-hidden', 'true');
     await focusCard(page, 1);
     await page.keyboard.press('+');
@@ -131,12 +135,12 @@ test.describe('Accessibilité', () => {
     await expect(page.locator('#df-1')).toContainText('▼');
   });
 
-  test('contraste du texte des cartes >= 4.5:1 dans les 14 thèmes (6 joueurs)', async ({ page }) => {
+  test('contraste du texte des cartes >= 4.5:1 dans les 14 thèmes (4 joueurs, maximum gratuit)', async ({ page }) => {
     await page.goto('/');
     await acceptPrivacyIfAsked(page);
     await page.click('#go-btn');
     await page.click('#names-go-btn');
-    await expect(page.locator('.pcard')).toHaveCount(6);
+    await expect(page.locator('.pcard')).toHaveCount(4);
     const res = await contrastByTheme(page);
     expect(Object.keys(res)).toHaveLength(14);
     const bad = Object.entries(res).filter(([, v]) => v.min < 4.5);
@@ -182,9 +186,9 @@ test.describe('Accessibilité', () => {
 
   test('fin de partie : le focus passe dans la modale de fin et l\'annonce est faite', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await startGame(page, { players: 2, names: ['A', 'B'] });
-    await applyDelta(page, 0, -20);
-    await applyDelta(page, 1, -20);
+    // Loi du Milieu à 2 joueurs : A éliminé à 0, B gagne, la partie se termine
+    await startGame(page, { players: 2, names: ['A', 'B'], mode: 'ldm' });
+    await eliminate(page, 0, -20);
     await expect(page.locator('#winner-modal')).toBeVisible();
     await expect(page.locator('#winner-modal')).toHaveAttribute('role', 'dialog');
     await expect.poll(() => page.evaluate(() => document.getElementById('winner-modal').contains(document.activeElement))).toBe(true);

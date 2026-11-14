@@ -97,7 +97,7 @@ test.describe('Licence Pro', () => {
 
   test('réglages : état de la licence et bouton d\'achat', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('#licence-status')).toHaveText('Version gratuite (2 à 6 joueurs).');
+    await expect(page.locator('#licence-status')).toHaveText('Version gratuite (1 à 4 joueurs).');
     await expect(page.locator('#licence-action')).toHaveText('Débloquer pour 4,99 €');
   });
 });

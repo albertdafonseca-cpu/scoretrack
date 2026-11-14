@@ -8,7 +8,7 @@ const APP = {
   manifestName: 'ScoreTrack',
   cachePrefix: 'st-main-',
   cacheRe: /^st-main-v[0-9a-f]{10}$/, // version = empreinte du contenu (tools/build.mjs)
-  maxPlayers: 6, // version gratuite : 2 à 6 joueurs
+  maxPlayers: 4, // version gratuite : 1 à 4 joueurs (une partie en cours jusqu'à 6 reste reprise)
 };
 const XSS_NAME = '<img src=x onerror=alert(1)>';
 
@@ -79,12 +79,15 @@ async function setName(page, i, value) {
   await page.locator('.name-input').nth(i).evaluate((el, v) => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); }, value);
 }
 
-/** Setup → noms → partie, via l'interface (objectif par défaut de l'app). */
-async function startGame(page, { players = 3, points = 20, names = [] } = {}) {
+/** Setup → noms → partie, via l'interface. Version gratuite : fin « No limit » (par défaut) ou
+ *  `mode: 'ldm'`, la Défaite à 0 du modèle Loi du Milieu (seule fin de partie gratuite). */
+async function startGame(page, { players = 3, points = 20, names = [], mode = 'none' } = {}) {
   await page.goto('/');
   await acceptPrivacyIfAsked(page);
+  if (mode === 'ldm') await page.locator('.preset-card').first().click();
+  else await page.click('#obj-none');
   await page.locator('#players-grid .player-chip', { hasText: new RegExp(`^${players}$`) }).click();
-  await page.fill('#points-custom', String(points));
+  await selectStart(page, points);
   await page.click('#go-btn');
   await expect(page.locator('#names-page')).toHaveClass(/active/);
   for (let i = 0; i < names.length; i++) await page.locator('.name-input').nth(i).fill(names[i]);
@@ -93,6 +96,9 @@ async function startGame(page, { players = 3, points = 20, names = [] } = {}) {
   // Les cartes restent masquées (visibility:hidden) le temps d'ajuster les textes : on attend qu'elles soient visibles
   await expect(page.locator('.pcard').first()).toBeVisible();
 }
+
+/** Points de départ : bouton (la saisie manuelle est Pro). */
+const selectStart = (page, points) => page.click(`#start-presets .points-chip[data-val="${points}"]`);
 
 const score = async (page, i) => +(await page.locator('#sc-' + i).textContent()).replace(/\s/g, '');
 
@@ -119,6 +125,14 @@ async function applyDelta(page, i, delta) {
   for (const d of String(Math.abs(delta))) await page.keyboard.press(d);
   await page.click(delta < 0 ? '#sign-minus' : '#sign-plus');
   await expect(page.locator('#score-modal')).toBeHidden();
+}
+
+/** Défaite (Loi du Milieu) : amène le joueur à 0 par la modale, puis confirme l'élimination. */
+async function eliminate(page, i, delta) {
+  await applyDelta(page, i, delta);
+  await expect(page.locator('#elim-modal')).toBeVisible();
+  await page.click('#btn-elim-confirm-txt');
+  await expect(page.locator('#elim-modal')).toBeHidden();
 }
 
 /** Contraste WCAG du texte des cartes pour chaque thème (exécuté dans la page). */
@@ -163,4 +177,4 @@ async function focusCard(page, i) {
   }).toPass({ timeout: 7000 });
 }
 
-module.exports = { focusCard, test, expect, APP, XSS_NAME, seedStorage, storage, json, swReady, startGame, score, applyDelta, tapCard, openBar, setName, acceptPrivacyIfAsked, contrastByTheme };
+module.exports = { eliminate, selectStart, focusCard, test, expect, APP, XSS_NAME, seedStorage, storage, json, swReady, startGame, score, applyDelta, tapCard, openBar, setName, acceptPrivacyIfAsked, contrastByTheme };

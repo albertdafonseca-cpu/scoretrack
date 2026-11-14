@@ -154,19 +154,19 @@ function _setText(id, val, isHtml=false){
 function _setBtnLabel(id,v){const el=document.getElementById(id);if(!el)return;const lbl=el.querySelector('.btn-label');if(lbl)lbl.innerHTML=v;else el.textContent=v;}
 function _getFooterBtn(e){const t=e?.currentTarget||e?.target;if(!t)return null;return(typeof t.closest==='function'?t.closest('button'):null)||t;}
 function initLight(){
-  // Joueurs : 1 et 5-12
+  // Joueurs : 1 à 4 libres, 5 à 12 Pro
   document.querySelectorAll('#players-grid .player-chip').forEach(c=>{
-    const n=parseInt(c.textContent);
-    if(n<2||n>4) _lk(c);
+    if(parseInt(c.textContent)>LIGHT_MAX_PLAYERS) _lk(c);
   });
-  // Starting points chips : toutes (saisie manuelle uniquement)
-  document.querySelectorAll('#start-presets .points-chip').forEach(c=>_lk(c));
-  // Victory chips : toutes sauf 0
-  document.querySelectorAll('#objectif-presets .points-chip').forEach(c=>{
-    if(parseInt(c.dataset.oval??c.textContent)!==0) _lk(c);
-  });
-  // Fin de jeu : Défaite + No Limit
-  _lkAll(['obj-elim','obj-none']);
+  // Points de départ : boutons libres, saisie manuelle Pro (champ en lecture seule, fenêtre Pro au clic)
+  const pc=document.getElementById('points-custom');
+  if(pc){pc.readOnly=true;pc.value='';_lk(pc);}
+  // Fin de jeu : « No limit » libre ; Victoire et Défaite Pro (la Défaite reste possible par le modèle
+  // Loi du Milieu), avec leurs objectifs
+  _lkAll(['obj-win','obj-elim']);
+  document.querySelectorAll('#objectif-presets .points-chip').forEach(c=>_lk(c));
+  const oc=document.getElementById('objectif-custom');
+  if(oc){oc.readOnly=true;_lk(oc);}
   // First Win : verrouiller la row entière (pas juste le toggle)
   const _swT=document.getElementById('toggle-single-winner');
   const swRow=_swT&&_swT.closest?_swT.closest('.win-option-row'):null;
@@ -178,16 +178,6 @@ function initLight(){
   // Thème Cyber forcé
   applyTheme('cyber'); selectedTheme='cyber'; settings.theme='cyber';
   saveSettings();
-  // Starting points : chips visibles et verrouillées (lk-disabled), saisie manuelle à 20
-  const pc=document.getElementById('points-custom');
-  if(pc&&!pc.value){pc.value='20'; startPoints=20;}
-  // Fin de jeu : forcer Victoire à 0
-  if(objectifMode!=='win'){
-    selectObjectif('win');
-    const c0=document.querySelector('#objectif-presets .points-chip[data-oval="0"]');
-    if(c0) c0.click();
-    if(c0) _lk(c0);  // chip 0 verrouillée aussi (popup Pro au clic)
-  }
 }
 function updateRestoreBtn(){
   const btnR=document.getElementById('btn-restoredefault');
@@ -442,7 +432,7 @@ function applyDefaults(firstRun){
     const ldmIdx=GAME_PRESETS.findIndex(p=>p.nameKey==='presetLdm');
     applyPreset(ldmIdx>=0?ldmIdx:0);
   } else {
-    const c=settings.lastGameConfig;
+    const c=lightConfig(settings.lastGameConfig);
     selectPlayer(c.numPlayers);
     selectStartPreset(c.startPoints);
       allowNeg=c.allowNeg||false;
@@ -462,7 +452,7 @@ function applyPreset(idx){
   document.querySelectorAll('.preset-card').forEach(c=>c.classList.remove('on'));
   const cards=document.querySelectorAll('.preset-card');
   if(cards[idx])cards[idx].classList.add('on');
-  selectPlayer(p.players);
+  selectPlayer(presetPlayers(p));
   selectStartPreset(p.start);
   allowNeg=p.allowNeg||false;
   singleWinner=p.singleWinner||false;
@@ -477,7 +467,7 @@ function highlightMatchingPreset(){
   const currentVal=getObjectifVal();
   document.querySelectorAll('.preset-card').forEach((card,idx)=>{
     const p=GAME_PRESETS[idx];if(!p)return;
-    const match=p.players===numPlayers&&p.start===startPoints&&
+    const match=presetPlayers(p)===numPlayers&&p.start===startPoints&&
       (p.objectifMode||'none')===objectifMode&&
       (p.objectifVal??null)===currentVal&&
       (p.singleWinner||false)===singleWinner&&
