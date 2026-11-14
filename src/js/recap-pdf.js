@@ -96,7 +96,7 @@ function showRecap(){
     html+=`<div class="recap-player"><div class="recap-player-header"><span class="recap-shape" aria-hidden="true" style="color:${pColor(pi)};text-shadow:0 0 6px ${pColor(pi)}">${pShape(pi)}</span><div class="recap-player-name">${esc(p.playerName||(t('player')+' '+(pi+1)))}</div>${statusBadge}</div>`;
     groups.forEach(g=>{
       const sum=g.entries.reduce((s,e)=>s+e.delta,0);
-      const cls=sum>0?'pos':'neg';const sign=sum>0?'▲ +':sum<0?'▼ ':'';
+      const cls=sum>0?'pos':sum<0?'neg':'zero';const sign=sum>0?'▲ +':sum<0?'▼ ':'';
       html+=`<div class="recap-entry"><div class="recap-entry-rank">${t('recapRound')} ${esc(g.rank)}</div><div class="recap-delta ${cls}">${sign}${fmtNum(sum)}</div></div>`;
     });
     const displayScore=p.finalScore!==undefined?p.finalScore:p.score;

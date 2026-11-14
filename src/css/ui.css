@@ -80,6 +80,8 @@
 .recap-delta{font-family:'Share Tech Mono',monospace;font-size:22px;}
 .recap-delta.pos{color:var(--green);text-shadow:0 0 8px var(--green);}
 .recap-delta.neg{color:var(--red);text-shadow:0 0 8px var(--red);}
+/* Tour à somme nulle : couleur neutre, ni gain ni perte (ni ▲ ni ▼) */
+.recap-delta.zero{color:var(--muted2);}
 .recap-total{display:flex;align-items:center;justify-content:flex-end;padding:10px 14px;background:rgba(0,255,200,0.03);}
 .recap-total-val{font-family:'Share Tech Mono',monospace;font-size:26px;color:var(--accent2);text-shadow:0 0 8px var(--accent2);}
 .hidden{display:none!important;}
